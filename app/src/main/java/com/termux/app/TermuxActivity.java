@@ -20,6 +20,7 @@ import android.provider.Settings;
 import android.view.ContextMenu;
 import android.view.ContextMenu.ContextMenuInfo;
 import android.view.Gravity;
+import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.SubMenu;
@@ -28,7 +29,9 @@ import android.view.ViewGroup;
 import android.view.WindowInsets;
 import android.view.WindowInsetsController;
 import android.view.WindowManager;
+import android.util.DisplayMetrics;
 import android.widget.EditText;
+import android.widget.FrameLayout;
 import android.widget.ImageButton;
 import android.widget.ListView;
 import android.widget.RelativeLayout;
@@ -36,6 +39,7 @@ import android.widget.Toast;
 import com.termux.R;
 import com.termux.app.api.file.FileReceiverActivity;
 import com.termux.app.style.TermuxBackgroundManager;
+import com.termux.app.style.TermuxSystemWallpaperManager;
 import com.termux.app.terminal.TermuxActivityRootView;
 import com.termux.app.terminal.TermuxTerminalSessionActivityClient;
 import com.termux.app.terminal.io.TermuxTerminalExtraKeys;
@@ -88,7 +92,7 @@ import java.util.Arrays;
  * </ul>
  * about memory leaks.
  */
-public final class TermuxActivity extends AppCompatActivity implements ServiceConnection {
+public final class TermuxActivity extends AppCompatActivity implements ServiceConnection, SuggestionBarCallback {
 
     /**
      * The connection to the {@link TermuxService}. Requested in {@link #onCreate(Bundle)} with a call to
@@ -140,6 +144,8 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
     ExtraKeysView mExtraKeysView;
     ExtraKeysView mExtraKeysView2;
 
+    SuggestionBarView mSuggestionBarView;
+
     /**
      * The client for the {@link #mExtraKeysView}.
      */
@@ -155,6 +161,11 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
      * The termux background manager for updating background.
      */
     TermuxBackgroundManager mTermuxBackgroundManager;
+
+    /**
+     * The termux system wallpaper manager for setting system wallpaper.
+     */
+    TermuxSystemWallpaperManager mTermuxSystemWallpaperManager;
 
     /**
      * The {@link TermuxActivity} broadcast receiver for various things like terminal style configuration changes.
@@ -214,6 +225,8 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
 
     private static final int CONTEXT_SUBMENU_REMOVE_BACKGROUND_IMAGE_ID = 13;
 
+    private static final int CONTEXT_SUBMENU_SET_SYSTEM_WALLPAPER_ID = 15;
+
     private static final int CONTEXT_MENU_TOGGLE_KEEP_SCREEN_ON = 6;
 
     private static final int CONTEXT_MENU_HELP_ID = 7;
@@ -227,6 +240,8 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
     private static final String ARG_ACTIVITY_RECREATED = "activity_recreated";
 
     private static final String LOG_TAG = "TermuxActivity";
+
+    private static final int SUGGESTION_BAR_MIN_BUTTON_DP = 56;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -251,6 +266,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
             return;
         }
         setMargins();
+        setSuggestionBarView();
         mTermuxActivityRootView = findViewById(R.id.activity_termux_root_view);
         mTermuxActivityRootView.setActivity(this);
         mTermuxActivityBottomSpaceView = findViewById(R.id.activity_termux_bottom_space_view);
@@ -271,6 +287,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         // Must be done every time activity is created in order to registerForActivityResult,
         // Even if the logic of launching is based on user input.
         setBackgroundManager();
+        setSystemWallpaperManager();
         setTermuxTerminalViewAndClients();
         setTerminalToolbarView(savedInstanceState);
         setSettingsButtonView();
@@ -337,6 +354,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
             addTermuxActivityRootViewGlobalLayoutListener();
     
         configureViewVisibility(R.id.terminal_monetbackground, mPreferences.isMonetBackgroundEnabled());
+        applyTerminalMonetBackgroundOpacity();
         configureBackgroundBlur(R.id.sessions_backgroundblur, R.id.sessions_background, mPreferences.isSessionsBlurEnabled(), 0.5f);
         configureExtraKeysBackground();
     
@@ -355,6 +373,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
             mTermuxTerminalViewClient.onResume();
 
         configureViewVisibility(R.id.terminal_monetbackground, mPreferences.isMonetBackgroundEnabled());
+        applyTerminalMonetBackgroundOpacity();
         configureBackgroundBlur(R.id.sessions_backgroundblur, R.id.sessions_background, mPreferences.isSessionsBlurEnabled(), 0.5f);
         configureExtraKeysBackground();
         
@@ -368,6 +387,20 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         View view = findViewById(viewId);
         view.setVisibility(isVisible ? View.VISIBLE : View.GONE);
     }
+
+    private void applyTerminalMonetBackgroundOpacity() {
+        int opacity = mPreferences.getTerminalBackgroundOpacity();
+        float alpha = opacity / 100f;
+        if (alpha < 0f) {
+            alpha = 0f;
+        } else if (alpha > 1f) {
+            alpha = 1f;
+        }
+        View terminalMonetBackground = findViewById(R.id.terminal_monetbackground);
+        if (terminalMonetBackground != null) {
+            terminalMonetBackground.setAlpha(alpha);
+        }
+    }
     
     private void configureBackgroundBlur(int blurViewId, int backgroundViewId, boolean isBlurEnabled, float alphaIfBlurred) {
         View blurView = findViewById(blurViewId);
@@ -377,22 +410,36 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
     }
     
     private void configureExtraKeysBackground() {
+        View appsBarBackground = findViewById(R.id.apps_bar_background);
+        View appsBarBackgroundBlur = findViewById(R.id.apps_bar_backgroundblur);
+        View appsBarContainer = findViewById(R.id.apps_bar_container);
         View extraKeysBackground = findViewById(R.id.extrakeys_background);
         View extraKeysBackgroundBlur = findViewById(R.id.extrakeys_backgroundblur);
-        boolean isToolbarToggled = mPreferences.toogleShowTerminalToolbar();
+        boolean isToolbarShown = mPreferences.shouldShowTerminalToolbar();
+        boolean isBlurEnabled = mPreferences.isExtraKeysBlurEnabled();
 
-        if (!isToolbarToggled) {
+        if (appsBarBackground != null) {
+            appsBarBackground.setVisibility(View.GONE);
+        }
+        if (appsBarBackgroundBlur != null) {
+            appsBarBackgroundBlur.setVisibility(View.GONE);
+        }
+
+        if (!isToolbarShown) {
             extraKeysBackgroundBlur.setVisibility(View.GONE);
             extraKeysBackground.setVisibility(View.GONE);
+
+            appsBarContainer.setVisibility(View.GONE);
         } else {
-            if (mPreferences.isExtraKeysBlurEnabled()) {
+            if (isBlurEnabled) {
                 extraKeysBackgroundBlur.setVisibility(View.VISIBLE);
-                extraKeysBackground.setAlpha(0.80f);
+                extraKeysBackground.setAlpha(0.50f);
             } else {
                 extraKeysBackgroundBlur.setVisibility(View.GONE);
                 extraKeysBackground.setAlpha(1.0f);
             }
             extraKeysBackground.setVisibility(View.VISIBLE);
+            appsBarContainer.setVisibility(View.VISIBLE);
         }
     }
 
@@ -522,6 +569,30 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         ViewUtils.setLayoutMarginsInDp(relativeLayout, marginHorizontal, marginVertical, marginHorizontal, marginVertical);
     }
 
+    private void setSuggestionBarView() {
+        FrameLayout appsBarContainer = findViewById(R.id.apps_bar_container);
+        if (appsBarContainer == null) {
+            return;
+        }
+        LayoutInflater.from(this).inflate(R.layout.suggestion_bar, appsBarContainer, true);
+        mSuggestionBarView = appsBarContainer.findViewById(R.id.suggestion_bar);
+        if (mSuggestionBarView != null) {
+            DisplayMetrics displayMetrics = getResources().getDisplayMetrics();
+            int maxButtons = calculateSuggestionBarMaxButtons(displayMetrics);
+            mSuggestionBarView.setMaxButtonCount(maxButtons);
+            mSuggestionBarView.reloadAllApps();
+        }
+    }
+
+    static int calculateSuggestionBarMaxButtons(DisplayMetrics displayMetrics) {
+        if (displayMetrics == null) {
+            return 1;
+        }
+        float density = Math.max(displayMetrics.density, 0.1f);
+        int screenWidthDp = (int) (displayMetrics.widthPixels / density);
+        return Math.max(1, screenWidthDp / SUGGESTION_BAR_MIN_BUTTON_DP);
+    }
+
     public void addTermuxActivityRootViewGlobalLayoutListener() {
         getTermuxActivityRootView().getViewTreeObserver().addOnGlobalLayoutListener(getTermuxActivityRootView());
     }
@@ -535,6 +606,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         // Set termux terminal view and session clients
         mTermuxTerminalSessionActivityClient = new TermuxTerminalSessionActivityClient(this);
         mTermuxTerminalViewClient = new TermuxTerminalViewClient(this, mTermuxTerminalSessionActivityClient);
+        mTermuxTerminalViewClient.setSuggestionBarCallback(this);
         // Set termux terminal view
         mTerminalView = findViewById(R.id.terminal_view);
         mTerminalView.setTerminalViewClient(mTermuxTerminalViewClient);
@@ -570,11 +642,12 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
 
     public void setTerminalToolbarHeight() {
         final ViewPager terminalToolbarViewPager = getTerminalToolbarViewPager();
+        View appsBarContainer = findViewById(R.id.apps_bar_container);
         View extraKeysBackgroundBlur = findViewById(R.id.extrakeys_backgroundblur);
         View extraKeysBackground = findViewById(R.id.extrakeys_background);
         if (terminalToolbarViewPager == null)
             return;
-        ViewGroup.LayoutParams layoutParams = terminalToolbarViewPager.getLayoutParams();
+        ViewGroup.LayoutParams toolbarLayoutParams = terminalToolbarViewPager.getLayoutParams();
 
         int i = terminalToolbarViewPager.getCurrentItem();
         int matrix = 0;
@@ -586,10 +659,35 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
                 matrix = mTermuxTerminalExtraKeys2.getExtraKeysInfo().getMatrix().length;
         }
 
-        layoutParams.height = Math.round(mTerminalToolbarDefaultHeight * matrix * mProperties.getTerminalToolbarHeightScaleFactor());
-        terminalToolbarViewPager.setLayoutParams(layoutParams);
-        extraKeysBackground.setLayoutParams(layoutParams);
-        extraKeysBackgroundBlur.setLayoutParams(layoutParams);
+        int toolbarHeightPx = Math.round(mTerminalToolbarDefaultHeight * matrix * mProperties.getTerminalToolbarHeightScaleFactor());
+        toolbarLayoutParams.height = toolbarHeightPx;
+        terminalToolbarViewPager.setLayoutParams(toolbarLayoutParams);
+
+        int appsBarHeightPx = 0;
+        if (appsBarContainer != null) {
+            ViewGroup.LayoutParams appsBarLayoutParams = appsBarContainer.getLayoutParams();
+            if (appsBarLayoutParams != null) {
+                appsBarHeightPx = appsBarLayoutParams.height;
+                if (appsBarHeightPx < 0) {
+                    appsBarHeightPx = 0;
+                }
+            }
+        }
+
+        if (extraKeysBackground == null || extraKeysBackgroundBlur == null)
+            return;
+
+        int combinedHeight = toolbarHeightPx + appsBarHeightPx;
+        updateExtraKeysBackgroundHeight(extraKeysBackground, combinedHeight);
+        updateExtraKeysBackgroundHeight(extraKeysBackgroundBlur, combinedHeight);
+    }
+
+    private void updateExtraKeysBackgroundHeight(View view, int height) {
+        ViewGroup.LayoutParams layoutParams = view.getLayoutParams();
+        if (layoutParams == null)
+            return;
+        layoutParams.height = height;
+        view.setLayoutParams(layoutParams);
     }
 
     public void toggleTerminalToolbar() {
@@ -600,9 +698,9 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         Logger.showToast(this, showNow ? getString(R.string.msg_enabling_terminal_toolbar) : getString(R.string.msg_disabling_terminal_toolbar), true);
     
         updateViewVisibility(terminalToolbarViewPager, showNow);
-        updateViewVisibility(R.id.extrakeys_backgroundblur, showNow);
-        updateViewVisibility(R.id.extrakeys_background, showNow);
-    
+
+        configureExtraKeysBackground();
+
         isToolbarHidden = !showNow;
     
         if (showNow && isTerminalToolbarTextInputViewSelected()) {
@@ -666,6 +764,10 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         this.mTermuxBackgroundManager = new TermuxBackgroundManager(TermuxActivity.this);
     }
 
+    private void setSystemWallpaperManager() {
+        this.mTermuxSystemWallpaperManager = new TermuxSystemWallpaperManager(TermuxActivity.this);
+    }
+
     @SuppressLint("RtlHardcoded")
     @Override
     public void onBackPressed() {
@@ -720,6 +822,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         subMenu.clearHeader();
         subMenu.add(SubMenu.NONE, CONTEXT_SUBMENU_FONT_AND_COLOR_ID, SubMenu.NONE, R.string.action_font_and_color);
         subMenu.add(SubMenu.NONE, CONTEXT_SUBMENU_SET_BACKROUND_IMAGE_ID, SubMenu.NONE, R.string.action_set_background_image);
+        subMenu.add(SubMenu.NONE, CONTEXT_SUBMENU_SET_SYSTEM_WALLPAPER_ID, SubMenu.NONE, R.string.action_set_system_wallpaper);
         subMenu.add(SubMenu.NONE, CONTEXT_SUBMENU_REMOVE_BACKGROUND_IMAGE_ID, SubMenu.NONE, R.string.action_remove_background_image);
         menu.add(Menu.NONE, CONTEXT_MENU_TOGGLE_KEEP_SCREEN_ON, Menu.NONE, R.string.action_toggle_keep_screen_on).setCheckable(true).setChecked(mPreferences.shouldKeepScreenOn());
         menu.add(Menu.NONE, CONTEXT_MENU_HELP_ID, Menu.NONE, R.string.action_open_help);
@@ -766,6 +869,9 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
                 return true;
             case CONTEXT_SUBMENU_SET_BACKROUND_IMAGE_ID:
                 mTermuxBackgroundManager.setBackgroundImage();
+                return true;
+            case CONTEXT_SUBMENU_SET_SYSTEM_WALLPAPER_ID:
+                mTermuxSystemWallpaperManager.setSystemWallpaper();
                 return true;
             case CONTEXT_SUBMENU_REMOVE_BACKGROUND_IMAGE_ID:
                 mTermuxBackgroundManager.removeBackgroundImage(true);
@@ -991,6 +1097,33 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
 
     public TermuxBackgroundManager getmTermuxBackgroundManager() {
         return mTermuxBackgroundManager;
+    }
+
+    @Override
+    public void reloadSuggestionBar(char inputChar) {
+        if (mSuggestionBarView == null || mTerminalView == null) {
+            return;
+        }
+        String input = mTerminalView.getCurrentInput(inputChar);
+        mSuggestionBarView.reloadWithInput(input, mTerminalView);
+    }
+
+    @Override
+    public void reloadSuggestionBar(boolean delete, boolean enter) {
+        if (mSuggestionBarView == null || mTerminalView == null) {
+            return;
+        }
+        String input = "";
+        if (!enter) {
+            input = mTerminalView.getCurrentInput();
+            if (input == null) {
+                input = "";
+            }
+            if (delete && input.length() > 0) {
+                input = input.substring(0, input.length() - 1);
+            }
+        }
+        mSuggestionBarView.reloadWithInput(input, mTerminalView);
     }
 
     public static void updateTermuxActivityStyling(Context context, boolean recreateActivity) {

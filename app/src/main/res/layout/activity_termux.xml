@@ -22,7 +22,7 @@
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:layout_alignParentTop="true"
-            android:layout_above="@+id/terminal_toolbar_view_pager">
+            android:layout_above="@+id/apps_bar_container">
 
             <View
                 android:id="@+id/terminal_monetbackground"
@@ -138,6 +138,7 @@
             android:layout_width="match_parent"
             android:layout_height="37.5dp"
             android:layout_alignParentBottom="true"
+            android:visibility="gone"
             app:realtimeBlurRadius="10dp"
             app:realtimeOverlayColor="@android:color/transparent" />
 
@@ -146,7 +147,33 @@
             android:layout_width="match_parent"
             android:layout_height="37.5dp"
             android:layout_alignParentBottom="true"
+            android:visibility="gone"
             android:background="@color/background_accent"/>
+
+        <com.github.mmin18.widget.RealtimeBlurView
+            android:id="@+id/apps_bar_backgroundblur"
+            android:layout_width="match_parent"
+            android:layout_height="37.5dp"
+            android:layout_above="@+id/terminal_toolbar_view_pager"
+            android:visibility="gone"
+            app:realtimeBlurRadius="10dp"
+            app:realtimeOverlayColor="@android:color/transparent" />
+
+        <View
+            android:id="@+id/apps_bar_background"
+            android:layout_width="match_parent"
+            android:layout_height="37.5dp"
+            android:layout_above="@+id/terminal_toolbar_view_pager"
+            android:visibility="gone"
+            android:background="@color/background_accent"/>
+
+        <FrameLayout
+            android:id="@+id/apps_bar_container"
+            android:layout_width="match_parent"
+            android:layout_height="37.5dp"
+            android:layout_above="@+id/terminal_toolbar_view_pager"
+            android:visibility="gone">
+        </FrameLayout>
 
         <androidx.viewpager.widget.ViewPager
             android:id="@+id/terminal_toolbar_view_pager"
@@ -160,7 +187,7 @@
     <View
         android:id="@+id/activity_termux_bottom_space_view"
         android:layout_width="match_parent"
-        android:layout_height="0dp"
+        android:layout_height="1sp"
         android:background="@android:color/transparent" />
 
 </com.termux.app.terminal.TermuxActivityRootView>
