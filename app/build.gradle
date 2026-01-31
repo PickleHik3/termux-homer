@@ -23,6 +23,7 @@ android {
     defaultConfig {
         minSdkVersion project.properties.minSdkVersion.toInteger()
         targetSdkVersion project.properties.targetSdkVersion.toInteger()
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         versionCode 1020 // Always keep the same versionCode as Termux Upstream to allow users to swap between termux installations.
         versionName "0.119.0-b1+monet36"
 
@@ -121,11 +122,15 @@ dependencies {
     implementation "io.noties.markwon:recycler:$markwonVersion"
     implementation 'com.google.guava:listenablefuture:9999.0-empty-to-avoid-conflict-with-guava'
     implementation "com.github.misakmanukyan:RealtimeBlurView_v2:80d9939272"
+    implementation "me.xdrop:fuzzywuzzy:1.4.0"
     implementation project(":terminal-view")
     implementation project(":termux-shared")
     implementation project(":native-entrypoint")
     testImplementation "junit:junit:4.13.2"
     testImplementation "org.robolectric:robolectric:4.13"
+    androidTestImplementation "androidx.test:runner:1.6.2"
+    androidTestImplementation "androidx.test.ext:junit:1.2.1"
+    androidTestImplementation "androidx.test:rules:1.6.1"
     coreLibraryDesugaring "com.android.tools:desugar_jdk_libs:2.1.2"
 }
 
