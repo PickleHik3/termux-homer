@@ -76,6 +76,9 @@ class TermuxStylePreferencesDataStore extends PreferenceDataStore {
             case "background_image_enabled":
                 mPreferences.setBackgroundImageEnabled(value);
                 break;
+            case "use_system_wallpaper":
+                mPreferences.setUseSystemWallpaperEnabled(value);
+                break;
             case "extrakeys_blur_enabled":
                 mPreferences.setExtraKeysBlurEnabled(value);
                 break;
@@ -97,6 +100,8 @@ class TermuxStylePreferencesDataStore extends PreferenceDataStore {
         switch(key) {
             case "background_image_enabled":
                 return mPreferences.isBackgroundImageEnabled();
+            case "use_system_wallpaper":
+                return mPreferences.isUseSystemWallpaperEnabled();
             case "extrakeys_blur_enabled":
                 return mPreferences.isExtraKeysBlurEnabled();
             case "sessions_blur_enabled":
@@ -105,6 +110,35 @@ class TermuxStylePreferencesDataStore extends PreferenceDataStore {
                 return mPreferences.isMonetBackgroundEnabled();
             default:
                 return false;
+        }
+    }
+
+    @Override
+    public void putInt(String key, int value) {
+        if (mPreferences == null)
+            return;
+        if (key == null)
+            return;
+        switch (key) {
+            case "terminal_background_opacity":
+                mPreferences.setTerminalBackgroundOpacity(value);
+                break;
+            default:
+                break;
+        }
+    }
+
+    @Override
+    public int getInt(String key, int defValue) {
+        if (mPreferences == null)
+            return defValue;
+        if (key == null)
+            return defValue;
+        switch (key) {
+            case "terminal_background_opacity":
+                return mPreferences.getTerminalBackgroundOpacity();
+            default:
+                return defValue;
         }
     }
 }

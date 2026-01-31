@@ -202,6 +202,13 @@ public final class TermuxPreferenceConstants {
         public static final String KEY_BACKGROUND_IMAGE_ENABLED = "background_image_enabled";
 
         public static final boolean DEFAULT_VALUE_BACKGROUND_IMAGE_ENABLED = false;
+
+        /**
+         * Defines the key for terminal background opacity (percentage), where 100 is fully opaque.
+         */
+        public static final String KEY_TERMINAL_BACKGROUND_OPACITY = "terminal_background_opacity";
+
+        public static final int DEFAULT_VALUE_TERMINAL_BACKGROUND_OPACITY = 100;
         
         /**
          * Defines the key for whether extrakeys blur is enabled or not.
@@ -223,6 +230,13 @@ public final class TermuxPreferenceConstants {
         public static final String KEY_MONET_BACKGROUND_ENABLED = "monet_background_enabled";
 
         public static final boolean DEFAULT_VALUE_MONET_BACKGROUND_ENABLED = false;
+
+        /**
+         * Defines the key for whether the system wallpaper should be used.
+         */
+        public static final String KEY_USE_SYSTEM_WALLPAPER = "use_system_wallpaper";
+
+        public static final boolean DEFAULT_VALUE_USE_SYSTEM_WALLPAPER = false;
     }
 
     /**

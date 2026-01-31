@@ -1,11 +1,14 @@
 package com.termux.app.style;
 
 import android.app.Activity;
+import android.app.WallpaperManager;
 import android.content.Context;
+import android.content.Intent;
 import android.content.res.Configuration;
 import android.graphics.Bitmap;
 import android.graphics.Point;
 import android.graphics.drawable.Drawable;
+import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
 import androidx.activity.result.ActivityResultLauncher;
@@ -13,7 +16,9 @@ import androidx.activity.result.contract.ActivityResultContract;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
+import androidx.core.content.ContextCompat;
 import com.termux.R;
+import com.termux.app.RunCommandService;
 import com.termux.app.TermuxActivity;
 import com.termux.shared.activity.ActivityUtils;
 import com.termux.shared.data.DataUtils;
@@ -22,10 +27,13 @@ import com.termux.shared.file.FileUtils;
 import com.termux.shared.image.ImageUtils;
 import com.termux.shared.logger.Logger;
 import com.termux.shared.termux.TermuxConstants;
+import com.termux.shared.termux.TermuxConstants.TERMUX_APP.RUN_COMMAND_SERVICE;
 import com.termux.shared.termux.settings.preferences.TermuxAppSharedPreferences;
+import com.termux.shared.termux.TermuxUtils;
 import com.termux.shared.view.ViewUtils;
 import com.termux.terminal.TerminalSession;
 import com.termux.terminal.TextStyle;
+import java.io.File;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -90,6 +98,7 @@ public class TermuxBackgroundManager {
                             Logger.logDebug(LOG_TAG, "Storing background original image to " + TermuxConstants.TERMUX_BACKGROUND_IMAGE_PATH);
                             Logger.logDebug(LOG_TAG, "Storing background portrait image to " + TermuxConstants.TERMUX_BACKGROUND_IMAGE_PORTRAIT_PATH);
                             Logger.logDebug(LOG_TAG, "Storing background landscape image to " + TermuxConstants.TERMUX_BACKGROUND_IMAGE_LANDSCAPE_PATH);
+                            maybeSetSystemWallpaper(bitmap);
                         } else {
                             Logger.logErrorAndShowToast(mActivity, LOG_TAG, mActivity.getString(R.string.error_background_image_loading_from_gallery_failed));
                         }
@@ -266,5 +275,64 @@ public class TermuxBackgroundManager {
     public void notifyBackgroundUpdated(boolean isImage) {
         mPreferences.setBackgroundImageEnabled(isImage);
         TermuxActivity.updateTermuxActivityStyling(mActivity, true);
+    }
+
+    private void maybeSetSystemWallpaper(@NonNull Bitmap bitmap) {
+        if (!mPreferences.isUseSystemWallpaperEnabled()) {
+            return;
+        }
+
+        boolean setWithTermuxApi = trySetSystemWallpaperWithTermuxApi();
+        if (!setWithTermuxApi) {
+            setWallpaperWithManager(bitmap);
+        }
+    }
+
+    private boolean trySetSystemWallpaperWithTermuxApi() {
+        String apiError = TermuxUtils.isTermuxAPIAppInstalled(mActivity);
+        if (apiError != null) {
+            showToast(mActivity.getString(R.string.error_termux_api_not_installed), true);
+            return false;
+        }
+
+        File commandFile = new File(TermuxConstants.TERMUX_BIN_PREFIX_DIR_PATH, "termux-wallpaper");
+        if (!commandFile.isFile()) {
+            showToast(mActivity.getString(R.string.error_termux_wallpaper_not_found), true);
+            return false;
+        }
+
+        Intent intent = new Intent(mActivity, RunCommandService.class);
+        intent.setAction(RUN_COMMAND_SERVICE.ACTION_RUN_COMMAND);
+        intent.putExtra(RUN_COMMAND_SERVICE.EXTRA_COMMAND_PATH, commandFile.getAbsolutePath());
+        intent.putExtra(RUN_COMMAND_SERVICE.EXTRA_ARGUMENTS, new String[] { "-f", TermuxConstants.TERMUX_BACKGROUND_IMAGE_PATH });
+        intent.putExtra(RUN_COMMAND_SERVICE.EXTRA_BACKGROUND, true);
+        intent.putExtra(RUN_COMMAND_SERVICE.EXTRA_COMMAND_LABEL, mActivity.getString(R.string.action_set_system_wallpaper));
+
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                ContextCompat.startForegroundService(mActivity, intent);
+            } else {
+                mActivity.startService(intent);
+            }
+        } catch (Exception e) {
+            Logger.logStackTraceWithMessage(LOG_TAG, "Failed to start termux-wallpaper", e);
+            showToast(mActivity.getString(R.string.error_termux_wallpaper_start_failed), true);
+            return false;
+        }
+
+        return true;
+    }
+
+    private void setWallpaperWithManager(@NonNull Bitmap bitmap) {
+        try {
+            WallpaperManager.getInstance(mActivity).setBitmap(bitmap);
+        } catch (Exception e) {
+            Logger.logStackTraceWithMessage(LOG_TAG, "Failed to set wallpaper", e);
+            showToast(mActivity.getString(R.string.error_wallpaper_set_failed), true);
+        }
+    }
+
+    private void showToast(@NonNull String message, boolean longDuration) {
+        handler.post(() -> mActivity.showToast(message, longDuration));
     }
 }

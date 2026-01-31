@@ -233,6 +233,23 @@ public class TermuxAppSharedPreferences extends AppSharedPreferences {
     public void setBackgroundImageEnabled(boolean value) {
         SharedPreferenceUtils.setBoolean(mSharedPreferences, TERMUX_APP.KEY_BACKGROUND_IMAGE_ENABLED, value, false);
     }
+
+    public boolean isUseSystemWallpaperEnabled() {
+        return SharedPreferenceUtils.getBoolean(mSharedPreferences, TERMUX_APP.KEY_USE_SYSTEM_WALLPAPER, TERMUX_APP.DEFAULT_VALUE_USE_SYSTEM_WALLPAPER);
+    }
+
+    public void setUseSystemWallpaperEnabled(boolean value) {
+        SharedPreferenceUtils.setBoolean(mSharedPreferences, TERMUX_APP.KEY_USE_SYSTEM_WALLPAPER, value, false);
+    }
+
+    public int getTerminalBackgroundOpacity() {
+        int opacity = SharedPreferenceUtils.getInt(mSharedPreferences, TERMUX_APP.KEY_TERMINAL_BACKGROUND_OPACITY, TERMUX_APP.DEFAULT_VALUE_TERMINAL_BACKGROUND_OPACITY);
+        return DataUtils.clamp(opacity, 0, 100);
+    }
+
+    public void setTerminalBackgroundOpacity(int value) {
+        SharedPreferenceUtils.setInt(mSharedPreferences, TERMUX_APP.KEY_TERMINAL_BACKGROUND_OPACITY, DataUtils.clamp(value, 0, 100), false);
+    }
     
     public boolean isExtraKeysBlurEnabled() {
         return SharedPreferenceUtils.getBoolean(mSharedPreferences, TERMUX_APP.KEY_EXTRAKEYS_BLUR_ENABLED, TERMUX_APP.DEFAULT_VALUE_EXTRAKEYS_BLUR_ENABLED);
