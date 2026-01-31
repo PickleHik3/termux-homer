@@ -17,6 +17,7 @@ import android.widget.EditText;
 import android.widget.ListView;
 import android.widget.Toast;
 import com.termux.R;
+import com.termux.app.SuggestionBarCallback;
 import com.termux.app.TermuxActivity;
 import com.termux.shared.file.FileUtils;
 import com.termux.shared.interact.MessageDialogUtils;
@@ -73,6 +74,8 @@ public class TermuxTerminalViewClient extends TermuxTerminalViewClientBase {
 
     private static final String LOG_TAG = "TermuxTerminalViewClient";
 
+    private SuggestionBarCallback mSuggestionBarCallback;
+
     public TermuxTerminalViewClient(TermuxActivity activity, TermuxTerminalSessionActivityClient termuxTerminalSessionActivityClient) {
         this.mActivity = activity;
         this.mTermuxTerminalSessionActivityClient = termuxTerminalSessionActivityClient;
@@ -80,6 +83,10 @@ public class TermuxTerminalViewClient extends TermuxTerminalViewClientBase {
 
     public TermuxActivity getActivity() {
         return mActivity;
+    }
+
+    public void setSuggestionBarCallback(SuggestionBarCallback callback) {
+        mSuggestionBarCallback = callback;
     }
 
     /**
@@ -269,6 +276,9 @@ public class TermuxTerminalViewClient extends TermuxTerminalViewClientBase {
                 mTermuxTerminalSessionActivityClient.switchToSession(index);
             }
             return true;
+        }
+        if (keyCode == KeyEvent.KEYCODE_DEL || keyCode == KeyEvent.KEYCODE_ENTER) {
+            SuggestionBarInputHook.onKeyDown(mSuggestionBarCallback, keyCode);
         }
         return false;
     }
@@ -469,6 +479,7 @@ public class TermuxTerminalViewClient extends TermuxTerminalViewClientBase {
                 }
             }
         }
+        SuggestionBarInputHook.onCodePoint(mSuggestionBarCallback, codePoint, ctrlDown);
         return false;
     }
 

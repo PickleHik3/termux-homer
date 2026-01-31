@@ -116,6 +116,8 @@ public final class TerminalView extends View {
      */
     int mCombiningAccent;
 
+    private char mSplitChar = ' ';
+
     /**
      * The current AutoFill type returned for {@link View#getAutofillType()} by {@link #getAutofillType()}.
      *
@@ -702,6 +704,54 @@ public final class TerminalView extends View {
     @Override
     public boolean isOpaque() {
         return true;
+    }
+
+    public void setSplitChar(char splitChar) {
+        mSplitChar = splitChar;
+    }
+
+    public String getCurrentInput() {
+        if (mEmulator == null) {
+            return null;
+        }
+        int rowAbs = mTopRow + mEmulator.getCursorRow();
+        String originalText = mEmulator.getScreen().getSelectedText(0, rowAbs, mEmulator.mColumns, rowAbs);
+        return extractCurrentInputFromLine(originalText, mEmulator.getCursorCol(), mSplitChar, null);
+    }
+
+    public String getCurrentInput(char currentChar) {
+        if (mEmulator == null) {
+            return null;
+        }
+        int rowAbs = mTopRow + mEmulator.getCursorRow();
+        String originalText = mEmulator.getScreen().getSelectedText(0, rowAbs, mEmulator.mColumns, rowAbs);
+        return extractCurrentInputFromLine(originalText, mEmulator.getCursorCol(), mSplitChar, currentChar);
+    }
+
+    static String extractCurrentInputFromLine(String originalText, int cut, char splitChar, Character insertCharOrNull) {
+        if (originalText == null) {
+            return null;
+        }
+        String workingText = originalText;
+        if (insertCharOrNull != null) {
+            if (cut == 0 || cut >= workingText.length()) {
+                workingText = workingText + insertCharOrNull.charValue();
+            } else if (cut > 0) {
+                StringBuilder builder = new StringBuilder(workingText.length() + 1);
+                builder.append(workingText, 0, cut);
+                builder.append(insertCharOrNull.charValue());
+                builder.append(workingText.substring(cut));
+                workingText = builder.toString();
+            }
+        }
+        int splitIndex = workingText.indexOf(splitChar);
+        if (splitIndex < 0) {
+            return null;
+        }
+        String text = workingText.substring(splitIndex + 1);
+        text = text.replaceAll("[^a-zA-Z ]", "");
+        text = text.replaceAll(" {2,}", " ");
+        return text.trim();
     }
 
     /**
