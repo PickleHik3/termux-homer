@@ -278,10 +278,8 @@ public class TermuxBackgroundManager {
     }
 
     private void maybeSetSystemWallpaper(@NonNull Bitmap bitmap) {
-        if (!mPreferences.isUseSystemWallpaperEnabled()) {
-            return;
-        }
-
+        // Always set system wallpaper when in-app wallpaper is set
+        // This ensures monet colors update automatically
         boolean setWithTermuxApi = trySetSystemWallpaperWithTermuxApi();
         if (!setWithTermuxApi) {
             setWallpaperWithManager(bitmap);
@@ -291,13 +289,13 @@ public class TermuxBackgroundManager {
     private boolean trySetSystemWallpaperWithTermuxApi() {
         String apiError = TermuxUtils.isTermuxAPIAppInstalled(mActivity);
         if (apiError != null) {
-            showToast(mActivity.getString(R.string.error_termux_api_not_installed), true);
+            Logger.logDebug(LOG_TAG, "Termux:API not installed, will use WallpaperManager instead");
             return false;
         }
 
         File commandFile = new File(TermuxConstants.TERMUX_BIN_PREFIX_DIR_PATH, "termux-wallpaper");
         if (!commandFile.isFile()) {
-            showToast(mActivity.getString(R.string.error_termux_wallpaper_not_found), true);
+            Logger.logDebug(LOG_TAG, "termux-wallpaper command not found, will use WallpaperManager instead");
             return false;
         }
 
@@ -314,9 +312,9 @@ public class TermuxBackgroundManager {
             } else {
                 mActivity.startService(intent);
             }
+            Logger.logInfo(LOG_TAG, "Setting system wallpaper via termux-api");
         } catch (Exception e) {
-            Logger.logStackTraceWithMessage(LOG_TAG, "Failed to start termux-wallpaper", e);
-            showToast(mActivity.getString(R.string.error_termux_wallpaper_start_failed), true);
+            Logger.logStackTraceWithMessage(LOG_TAG, "Failed to start termux-wallpaper, will use WallpaperManager instead", e);
             return false;
         }
 
@@ -326,8 +324,9 @@ public class TermuxBackgroundManager {
     private void setWallpaperWithManager(@NonNull Bitmap bitmap) {
         try {
             WallpaperManager.getInstance(mActivity).setBitmap(bitmap);
+            Logger.logInfo(LOG_TAG, "System wallpaper set successfully via WallpaperManager");
         } catch (Exception e) {
-            Logger.logStackTraceWithMessage(LOG_TAG, "Failed to set wallpaper", e);
+            Logger.logStackTraceWithMessage(LOG_TAG, "Failed to set system wallpaper", e);
             showToast(mActivity.getString(R.string.error_wallpaper_set_failed), true);
         }
     }

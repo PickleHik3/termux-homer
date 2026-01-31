@@ -13,6 +13,7 @@ import android.content.ServiceConnection;
 import android.content.pm.PackageManager;
 import android.content.res.Configuration;
 import android.graphics.Color;
+import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -173,8 +174,6 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
      */
     TermuxSystemWallpaperManager mTermuxSystemWallpaperManager;
 
-    private WallpaperManager.OnColorsChangedListener mWallpaperListener;
-
     /**
      * The {@link TermuxActivity} broadcast receiver for various things like terminal style configuration changes.
      */
@@ -268,9 +267,6 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
 
         // Apply wallpaper or normal theme based on preference
         setActivityThemeAndWindow();
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
-            setupWallpaperListener();
-        }
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_termux);
         // Load termux shared preferences
@@ -370,11 +366,9 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
     
         if (mPreferences.isTerminalMarginAdjustmentEnabled())
             addTermuxActivityRootViewGlobalLayoutListener();
-    
+
         if (mPreferences.isUseSystemWallpaperEnabled()) {
             configureViewVisibility(R.id.terminal_monetbackground, false);
-            applyDecorViewBackgroundOpacity();
-            refreshBlurViews();
         } else if (mPreferences.isMonetBackgroundEnabled()) {
             configureViewVisibility(R.id.terminal_monetbackground, true);
             applyTerminalMonetBackgroundOpacity();
@@ -400,7 +394,6 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
 
         if (mPreferences.isUseSystemWallpaperEnabled()) {
             configureViewVisibility(R.id.terminal_monetbackground, false);
-            applyDecorViewBackgroundOpacity();
         } else if (mPreferences.isMonetBackgroundEnabled()) {
             configureViewVisibility(R.id.terminal_monetbackground, true);
             applyTerminalMonetBackgroundOpacity();
@@ -409,7 +402,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         }
         configureBackgroundBlur(R.id.sessions_backgroundblur, R.id.sessions_background, mPreferences.isSessionsBlurEnabled(), 0.5f);
         configureExtraKeysBackground();
-        
+
         // Check if a crash happened on last run of the app or if a plugin crashed and show a
         // notification with the crash details if it did
         TermuxCrashUtils.notifyAppCrashFromCrashLogFile(this, LOG_TAG);
@@ -453,49 +446,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         }
     }
 
-    @androidx.annotation.RequiresApi(api = Build.VERSION_CODES.O_MR1)
-    private void setupWallpaperListener() {
-        if (mPreferences == null || !mPreferences.isUseSystemWallpaperEnabled()) {
-            return;
-        }
 
-        WallpaperManager wallpaperManager = WallpaperManager.getInstance(this);
-        if (wallpaperManager == null) {
-            return;
-        }
-
-        mWallpaperListener = (colors, which) -> {
-            Logger.logDebug(LOG_TAG, "Wallpaper changed, refreshing background and blur");
-            applyDecorViewBackgroundOpacity();
-            refreshBlurViews();
-        };
-
-        wallpaperManager.addOnColorsChangedListener(mWallpaperListener, new Handler(Looper.getMainLooper()));
-    }
-
-    private void refreshBlurViews() {
-        View sessionsBlur = findViewById(R.id.sessions_backgroundblur);
-        View extraKeysBlur = findViewById(R.id.extrakeys_backgroundblur);
-
-        if (sessionsBlur != null && sessionsBlur.getVisibility() == View.VISIBLE) {
-            sessionsBlur.setVisibility(View.INVISIBLE);
-            sessionsBlur.post(() -> {
-                if (sessionsBlur != null) {
-                    sessionsBlur.setVisibility(View.VISIBLE);
-                }
-            });
-        }
-
-        if (extraKeysBlur != null && extraKeysBlur.getVisibility() == View.VISIBLE) {
-            extraKeysBlur.setVisibility(View.INVISIBLE);
-            extraKeysBlur.post(() -> {
-                if (extraKeysBlur != null) {
-                    extraKeysBlur.setVisibility(View.VISIBLE);
-                }
-            });
-        }
-    }
-    
     private void configureBackgroundBlur(int blurViewId, int backgroundViewId, boolean isBlurEnabled, float alphaIfBlurred) {
         View blurView = findViewById(blurViewId);
         View backgroundView = findViewById(backgroundViewId);
@@ -575,13 +526,6 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         Logger.logDebug(LOG_TAG, "onDestroy");
         if (mIsInvalidState)
             return;
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1 && mWallpaperListener != null) {
-            WallpaperManager wallpaperManager = WallpaperManager.getInstance(this);
-            if (wallpaperManager != null) {
-                wallpaperManager.removeOnColorsChangedListener(mWallpaperListener);
-            }
-            mWallpaperListener = null;
-        }
         if (mTermuxService != null) {
             // Do not leave service and session clients with references to activity.
             mTermuxService.unsetTermuxTerminalSessionClient();
@@ -1323,9 +1267,6 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         intentFilter.addAction(TERMUX_ACTIVITY.ACTION_NOTIFY_APP_CRASH);
         intentFilter.addAction(TERMUX_ACTIVITY.ACTION_RELOAD_STYLE);
         intentFilter.addAction(TERMUX_ACTIVITY.ACTION_REQUEST_PERMISSIONS);
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O_MR1 && mPreferences != null && mPreferences.isUseSystemWallpaperEnabled()) {
-            intentFilter.addAction(Intent.ACTION_WALLPAPER_CHANGED);
-        }
 
         if (Build.VERSION.SDK_INT >= 28 ) {
             registerReceiver(mTermuxActivityBroadcastReceiver, intentFilter, Context.RECEIVER_NOT_EXPORTED);
@@ -1357,11 +1298,6 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
             if (mIsVisible) {
                 fixTermuxActivityBroadcastReceiverIntent(intent);
                 switch(intent.getAction()) {
-                    case Intent.ACTION_WALLPAPER_CHANGED:
-                        Logger.logDebug(LOG_TAG, "Received wallpaper changed broadcast");
-                        applyDecorViewBackgroundOpacity();
-                        refreshBlurViews();
-                        return;
                     case TERMUX_ACTIVITY.ACTION_NOTIFY_APP_CRASH:
                         Logger.logDebug(LOG_TAG, "Received intent to notify app crash");
                         TermuxCrashUtils.notifyAppCrashFromCrashLogFile(context, LOG_TAG);
@@ -1400,9 +1336,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         setTerminalToolbarHeight();
         configureExtraKeysBackground();
         if (mPreferences != null) {
-            if (mPreferences.isUseSystemWallpaperEnabled()) {
-                applyDecorViewBackgroundOpacity();
-            } else if (mPreferences.isMonetBackgroundEnabled()) {
+            if (mPreferences.isMonetBackgroundEnabled()) {
                 applyTerminalMonetBackgroundOpacity();
             }
         }
