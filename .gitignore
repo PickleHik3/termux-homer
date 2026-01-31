@@ -42,3 +42,6 @@ local.properties
 .swp
 ehthumbs.db
 Thumbs.db
+
+# Local QA snapshots
+.qa/
