@@ -24,6 +24,11 @@ local.properties
 .idea/
 *.iml
 
+# Eclipse / Buildship
+.classpath
+.project
+.settings/
+
 # Vim
 *.swo
 *.swp
