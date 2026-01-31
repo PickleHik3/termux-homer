@@ -23,4 +23,4 @@ jobs:
         java-version: '17'
     - name: Execute tests
       run: |
-        ./gradlew test
+        ./gradlew :app:testDebugUnitTest :terminal-emulator:test
