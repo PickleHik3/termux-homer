@@ -109,6 +109,34 @@ public final class TermuxPreferenceConstants {
         public static final boolean DEFAULT_VALUE_SHOW_TERMINAL_TOOLBAR = true;
 
         /**
+         * Defines the key for app launcher button count.
+         */
+        public static final String KEY_APP_LAUNCHER_BUTTON_COUNT = "app_launcher_button_count";
+
+        public static final int DEFAULT_APP_LAUNCHER_BUTTON_COUNT = 5;
+
+        /**
+         * Defines the key for app launcher default buttons.
+         */
+        public static final String KEY_APP_LAUNCHER_DEFAULT_BUTTONS = "app_launcher_default_buttons";
+
+        public static final String DEFAULT_APP_LAUNCHER_DEFAULT_BUTTONS = "phone,bromite,whatsapp,telegram,spotify";
+
+        /**
+         * Defines the key for app launcher bar height scale.
+         */
+        public static final String KEY_APP_LAUNCHER_BAR_HEIGHT = "app_launcher_bar_height";
+
+        public static final float DEFAULT_APP_LAUNCHER_BAR_HEIGHT = 1.2f;
+
+        /**
+         * Defines the key for app launcher icon scale.
+         */
+        public static final String KEY_APP_LAUNCHER_ICON_SCALE = "app_launcher_icon_scale";
+
+        public static final float DEFAULT_APP_LAUNCHER_ICON_SCALE = 1.0f;
+
+        /**
          * Defines the key for whether the soft keyboard will be enabled, for cases where users want
          * to use a hardware keyboard instead.
          */

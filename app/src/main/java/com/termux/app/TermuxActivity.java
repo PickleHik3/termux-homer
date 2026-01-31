@@ -2,6 +2,7 @@ package com.termux.app;
 
 import android.annotation.SuppressLint;
 import android.app.AlertDialog;
+import android.app.WallpaperManager;
 import android.content.ActivityNotFoundException;
 import android.content.BroadcastReceiver;
 import android.content.ComponentName;
@@ -11,11 +12,14 @@ import android.content.IntentFilter;
 import android.content.ServiceConnection;
 import android.content.pm.PackageManager;
 import android.content.res.Configuration;
+import android.graphics.Color;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
+import android.os.Handler;
 import android.os.IBinder;
+import android.os.Looper;
 import android.provider.Settings;
 import android.view.ContextMenu;
 import android.view.ContextMenu.ContextMenuInfo;
@@ -80,7 +84,9 @@ import androidx.core.view.WindowInsetsCompat;
 import androidx.core.view.WindowInsetsCompat.Type;
 import androidx.drawerlayout.widget.DrawerLayout;
 import androidx.viewpager.widget.ViewPager;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 
 /**
  * A terminal emulator activity.
@@ -166,6 +172,8 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
      * The termux system wallpaper manager for setting system wallpaper.
      */
     TermuxSystemWallpaperManager mTermuxSystemWallpaperManager;
+
+    private WallpaperManager.OnColorsChangedListener mWallpaperListener;
 
     /**
      * The {@link TermuxActivity} broadcast receiver for various things like terminal style configuration changes.
@@ -254,12 +262,22 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         // Load Termux app SharedProperties from disk
         mProperties = TermuxAppSharedProperties.getProperties();
         reloadProperties();
-        setActivityTheme();
+
+        // Load preferences BEFORE setting theme (needed to check wallpaper preference)
+        mPreferences = TermuxAppSharedPreferences.build(this, false);
+
+        // Apply wallpaper or normal theme based on preference
+        setActivityThemeAndWindow();
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+            setupWallpaperListener();
+        }
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_termux);
         // Load termux shared preferences
         // This will also fail if TermuxConstants.TERMUX_PACKAGE_NAME does not equal applicationId
-        mPreferences = TermuxAppSharedPreferences.build(this, true);
+        if (mPreferences == null) {
+            mPreferences = TermuxAppSharedPreferences.build(this, true);
+        }
         if (mPreferences == null) {
             // An AlertDialog should have shown to kill the app, so we don't continue running activity code
             mIsInvalidState = true;
@@ -353,8 +371,16 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         if (mPreferences.isTerminalMarginAdjustmentEnabled())
             addTermuxActivityRootViewGlobalLayoutListener();
     
-        configureViewVisibility(R.id.terminal_monetbackground, mPreferences.isMonetBackgroundEnabled());
-        applyTerminalMonetBackgroundOpacity();
+        if (mPreferences.isUseSystemWallpaperEnabled()) {
+            configureViewVisibility(R.id.terminal_monetbackground, false);
+            applyDecorViewBackgroundOpacity();
+            refreshBlurViews();
+        } else if (mPreferences.isMonetBackgroundEnabled()) {
+            configureViewVisibility(R.id.terminal_monetbackground, true);
+            applyTerminalMonetBackgroundOpacity();
+        } else {
+            configureViewVisibility(R.id.terminal_monetbackground, false);
+        }
         configureBackgroundBlur(R.id.sessions_backgroundblur, R.id.sessions_background, mPreferences.isSessionsBlurEnabled(), 0.5f);
         configureExtraKeysBackground();
     
@@ -372,8 +398,15 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         if (mTermuxTerminalViewClient != null)
             mTermuxTerminalViewClient.onResume();
 
-        configureViewVisibility(R.id.terminal_monetbackground, mPreferences.isMonetBackgroundEnabled());
-        applyTerminalMonetBackgroundOpacity();
+        if (mPreferences.isUseSystemWallpaperEnabled()) {
+            configureViewVisibility(R.id.terminal_monetbackground, false);
+            applyDecorViewBackgroundOpacity();
+        } else if (mPreferences.isMonetBackgroundEnabled()) {
+            configureViewVisibility(R.id.terminal_monetbackground, true);
+            applyTerminalMonetBackgroundOpacity();
+        } else {
+            configureViewVisibility(R.id.terminal_monetbackground, false);
+        }
         configureBackgroundBlur(R.id.sessions_backgroundblur, R.id.sessions_background, mPreferences.isSessionsBlurEnabled(), 0.5f);
         configureExtraKeysBackground();
         
@@ -401,6 +434,67 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
             terminalMonetBackground.setAlpha(alpha);
         }
     }
+
+    private void applyDecorViewBackgroundOpacity() {
+        int opacity = mPreferences != null ? mPreferences.getTerminalBackgroundOpacity() : 50;
+        if (opacity < 0) {
+            opacity = 0;
+        } else if (opacity > 100) {
+            opacity = 100;
+        }
+
+        int alpha = (int) ((opacity / 100f) * 255);
+        int backgroundColor = (alpha << 24) | 0x000000;
+
+        View decorView = getWindow().getDecorView();
+        if (decorView != null) {
+            decorView.setBackgroundColor(backgroundColor);
+            Logger.logVerbose(LOG_TAG, "Applied DecorView opacity: " + opacity + "% (alpha: 0x" + Integer.toHexString(alpha) + ")");
+        }
+    }
+
+    @androidx.annotation.RequiresApi(api = Build.VERSION_CODES.O_MR1)
+    private void setupWallpaperListener() {
+        if (mPreferences == null || !mPreferences.isUseSystemWallpaperEnabled()) {
+            return;
+        }
+
+        WallpaperManager wallpaperManager = WallpaperManager.getInstance(this);
+        if (wallpaperManager == null) {
+            return;
+        }
+
+        mWallpaperListener = (colors, which) -> {
+            Logger.logDebug(LOG_TAG, "Wallpaper changed, refreshing background and blur");
+            applyDecorViewBackgroundOpacity();
+            refreshBlurViews();
+        };
+
+        wallpaperManager.addOnColorsChangedListener(mWallpaperListener, new Handler(Looper.getMainLooper()));
+    }
+
+    private void refreshBlurViews() {
+        View sessionsBlur = findViewById(R.id.sessions_backgroundblur);
+        View extraKeysBlur = findViewById(R.id.extrakeys_backgroundblur);
+
+        if (sessionsBlur != null && sessionsBlur.getVisibility() == View.VISIBLE) {
+            sessionsBlur.setVisibility(View.INVISIBLE);
+            sessionsBlur.post(() -> {
+                if (sessionsBlur != null) {
+                    sessionsBlur.setVisibility(View.VISIBLE);
+                }
+            });
+        }
+
+        if (extraKeysBlur != null && extraKeysBlur.getVisibility() == View.VISIBLE) {
+            extraKeysBlur.setVisibility(View.INVISIBLE);
+            extraKeysBlur.post(() -> {
+                if (extraKeysBlur != null) {
+                    extraKeysBlur.setVisibility(View.VISIBLE);
+                }
+            });
+        }
+    }
     
     private void configureBackgroundBlur(int blurViewId, int backgroundViewId, boolean isBlurEnabled, float alphaIfBlurred) {
         View blurView = findViewById(blurViewId);
@@ -410,36 +504,52 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
     }
     
     private void configureExtraKeysBackground() {
-        View appsBarBackground = findViewById(R.id.apps_bar_background);
-        View appsBarBackgroundBlur = findViewById(R.id.apps_bar_backgroundblur);
         View appsBarContainer = findViewById(R.id.apps_bar_container);
         View extraKeysBackground = findViewById(R.id.extrakeys_background);
         View extraKeysBackgroundBlur = findViewById(R.id.extrakeys_backgroundblur);
+        View appsBarBackground = findViewById(R.id.apps_bar_background);
+        View appsBarBackgroundBlur = findViewById(R.id.apps_bar_backgroundblur);
+
         boolean isToolbarShown = mPreferences.shouldShowTerminalToolbar();
         boolean isBlurEnabled = mPreferences.isExtraKeysBlurEnabled();
 
-        if (appsBarBackground != null) {
-            appsBarBackground.setVisibility(View.GONE);
+        if (!isToolbarShown) {
+            if (extraKeysBackgroundBlur != null) {
+                extraKeysBackgroundBlur.setVisibility(View.GONE);
+            }
+            if (extraKeysBackground != null) {
+                extraKeysBackground.setVisibility(View.GONE);
+            }
+            if (appsBarBackgroundBlur != null) {
+                appsBarBackgroundBlur.setVisibility(View.GONE);
+            }
+            if (appsBarBackground != null) {
+                appsBarBackground.setVisibility(View.GONE);
+            }
+            if (appsBarContainer != null) {
+                appsBarContainer.setVisibility(View.GONE);
+            }
+            return;
         }
+
+        if (appsBarContainer != null) {
+            appsBarContainer.setVisibility(View.VISIBLE);
+        }
+
         if (appsBarBackgroundBlur != null) {
             appsBarBackgroundBlur.setVisibility(View.GONE);
         }
+        if (appsBarBackground != null) {
+            appsBarBackground.setVisibility(View.GONE);
+        }
 
-        if (!isToolbarShown) {
-            extraKeysBackgroundBlur.setVisibility(View.GONE);
-            extraKeysBackground.setVisibility(View.GONE);
-
-            appsBarContainer.setVisibility(View.GONE);
-        } else {
-            if (isBlurEnabled) {
-                extraKeysBackgroundBlur.setVisibility(View.VISIBLE);
-                extraKeysBackground.setAlpha(0.50f);
-            } else {
-                extraKeysBackgroundBlur.setVisibility(View.GONE);
-                extraKeysBackground.setAlpha(1.0f);
-            }
+        if (extraKeysBackground != null) {
             extraKeysBackground.setVisibility(View.VISIBLE);
-            appsBarContainer.setVisibility(View.VISIBLE);
+            extraKeysBackground.setAlpha(isBlurEnabled ? 0.50f : 1.0f);
+        }
+
+        if (extraKeysBackgroundBlur != null) {
+            extraKeysBackgroundBlur.setVisibility(isBlurEnabled ? View.VISIBLE : View.GONE);
         }
     }
 
@@ -465,6 +575,13 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         Logger.logDebug(LOG_TAG, "onDestroy");
         if (mIsInvalidState)
             return;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1 && mWallpaperListener != null) {
+            WallpaperManager wallpaperManager = WallpaperManager.getInstance(this);
+            if (wallpaperManager != null) {
+                wallpaperManager.removeOnColorsChangedListener(mWallpaperListener);
+            }
+            mWallpaperListener = null;
+        }
         if (mTermuxService != null) {
             // Do not leave service and session clients with references to activity.
             mTermuxService.unsetTermuxTerminalSessionClient();
@@ -553,13 +670,25 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
             mTermuxTerminalViewClient.onReloadProperties();
     }
 
-    private void setActivityTheme() {
+    private void setActivityThemeAndWindow() {
         // Update NightMode.APP_NIGHT_MODE
         TermuxThemeUtils.setAppNightMode(mProperties.getNightMode());
         // Set activity night mode. If NightMode.SYSTEM is set, then android will automatically
         // trigger recreation of activity when uiMode/dark mode configuration is changed so that
         // day or night theme takes affect.
         AppCompatActivityUtils.setNightMode(this, NightMode.getAppNightMode().getName(), true);
+
+        if (mPreferences != null && mPreferences.isUseSystemWallpaperEnabled()) {
+            setTheme(R.style.Theme_TermuxActivity_Wallpaper);
+            Logger.logDebug(LOG_TAG, "Applied wallpaper theme");
+        } else {
+            setTheme(R.style.Theme_TermuxActivity_DayNight_NoActionBar);
+            Logger.logDebug(LOG_TAG, "Applied normal theme");
+        }
+
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
+        getWindow().clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS);
+        getWindow().setStatusBarColor(Color.TRANSPARENT);
     }
 
     private void setMargins() {
@@ -576,12 +705,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         }
         LayoutInflater.from(this).inflate(R.layout.suggestion_bar, appsBarContainer, true);
         mSuggestionBarView = appsBarContainer.findViewById(R.id.suggestion_bar);
-        if (mSuggestionBarView != null) {
-            DisplayMetrics displayMetrics = getResources().getDisplayMetrics();
-            int maxButtons = calculateSuggestionBarMaxButtons(displayMetrics);
-            mSuggestionBarView.setMaxButtonCount(maxButtons);
-            mSuggestionBarView.reloadAllApps();
-        }
+        applySuggestionBarPreferences();
     }
 
     static int calculateSuggestionBarMaxButtons(DisplayMetrics displayMetrics) {
@@ -591,6 +715,43 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         float density = Math.max(displayMetrics.density, 0.1f);
         int screenWidthDp = (int) (displayMetrics.widthPixels / density);
         return Math.max(1, screenWidthDp / SUGGESTION_BAR_MIN_BUTTON_DP);
+    }
+
+    private void applySuggestionBarPreferences() {
+        if (mSuggestionBarView == null || mPreferences == null) {
+            return;
+        }
+        int maxButtons = mPreferences.getAppLauncherButtonCount();
+        if (maxButtons <= 0) {
+            DisplayMetrics displayMetrics = getResources().getDisplayMetrics();
+            maxButtons = calculateSuggestionBarMaxButtons(displayMetrics);
+        }
+        mSuggestionBarView.setMaxButtonCount(maxButtons);
+        mSuggestionBarView.setDefaultButtons(getDefaultAppLauncherButtons());
+        float barHeightScale = mPreferences.getAppLauncherBarHeightScale();
+        float iconScale = mPreferences.getAppLauncherIconScale();
+        mSuggestionBarView.setBarHeightScale(barHeightScale);
+        mSuggestionBarView.setIconScale(iconScale);
+        mSuggestionBarView.reloadAllApps();
+    }
+
+    private List<String> getDefaultAppLauncherButtons() {
+        if (mPreferences == null) {
+            return new ArrayList<>();
+        }
+        String defaultButtons = mPreferences.getAppLauncherDefaultButtons();
+        if (defaultButtons == null || defaultButtons.trim().isEmpty()) {
+            return new ArrayList<>();
+        }
+        String[] buttons = defaultButtons.split(",");
+        List<String> cleanedButtons = new ArrayList<>();
+        for (String button : buttons) {
+            String trimmed = button.trim();
+            if (!trimmed.isEmpty()) {
+                cleanedButtons.add(trimmed);
+            }
+        }
+        return cleanedButtons;
     }
 
     public void addTermuxActivityRootViewGlobalLayoutListener() {
@@ -632,12 +793,25 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
             terminalToolbarViewPager.setVisibility(View.VISIBLE);
         ViewGroup.LayoutParams layoutParams = terminalToolbarViewPager.getLayoutParams();
         mTerminalToolbarDefaultHeight = layoutParams.height;
+        updateAppLauncherBarHeight();
         setTerminalToolbarHeight();
         String savedTextInput = null;
         if (savedInstanceState != null)
             savedTextInput = savedInstanceState.getString(ARG_TERMINAL_TOOLBAR_TEXT_INPUT);
         terminalToolbarViewPager.setAdapter(new TerminalToolbarViewPager.PageAdapter(this, savedTextInput));
         terminalToolbarViewPager.addOnPageChangeListener(new TerminalToolbarViewPager.OnPageChangeListener(this, terminalToolbarViewPager));
+    }
+
+    private void updateAppLauncherBarHeight() {
+        if (mPreferences == null)
+            return;
+        int barHeightPx = Math.round(mTerminalToolbarDefaultHeight * mPreferences.getAppLauncherBarHeightScale());
+        if (barHeightPx < 0) {
+            barHeightPx = 0;
+        }
+        updateViewHeight(R.id.apps_bar_container, barHeightPx);
+        updateViewHeight(R.id.apps_bar_background, barHeightPx);
+        updateViewHeight(R.id.apps_bar_backgroundblur, barHeightPx);
     }
 
     public void setTerminalToolbarHeight() {
@@ -683,6 +857,17 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
     }
 
     private void updateExtraKeysBackgroundHeight(View view, int height) {
+        ViewGroup.LayoutParams layoutParams = view.getLayoutParams();
+        if (layoutParams == null)
+            return;
+        layoutParams.height = height;
+        view.setLayoutParams(layoutParams);
+    }
+
+    private void updateViewHeight(int viewId, int height) {
+        View view = findViewById(viewId);
+        if (view == null)
+            return;
         ViewGroup.LayoutParams layoutParams = view.getLayoutParams();
         if (layoutParams == null)
             return;
@@ -1138,6 +1323,9 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         intentFilter.addAction(TERMUX_ACTIVITY.ACTION_NOTIFY_APP_CRASH);
         intentFilter.addAction(TERMUX_ACTIVITY.ACTION_RELOAD_STYLE);
         intentFilter.addAction(TERMUX_ACTIVITY.ACTION_REQUEST_PERMISSIONS);
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O_MR1 && mPreferences != null && mPreferences.isUseSystemWallpaperEnabled()) {
+            intentFilter.addAction(Intent.ACTION_WALLPAPER_CHANGED);
+        }
 
         if (Build.VERSION.SDK_INT >= 28 ) {
             registerReceiver(mTermuxActivityBroadcastReceiver, intentFilter, Context.RECEIVER_NOT_EXPORTED);
@@ -1169,6 +1357,11 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
             if (mIsVisible) {
                 fixTermuxActivityBroadcastReceiverIntent(intent);
                 switch(intent.getAction()) {
+                    case Intent.ACTION_WALLPAPER_CHANGED:
+                        Logger.logDebug(LOG_TAG, "Received wallpaper changed broadcast");
+                        applyDecorViewBackgroundOpacity();
+                        refreshBlurViews();
+                        return;
                     case TERMUX_ACTIVITY.ACTION_NOTIFY_APP_CRASH:
                         Logger.logDebug(LOG_TAG, "Received intent to notify app crash");
                         TermuxCrashUtils.notifyAppCrashFromCrashLogFile(context, LOG_TAG);
@@ -1202,7 +1395,17 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
             TermuxThemeUtils.setAppNightMode(mProperties.getNightMode());
         }
         setMargins();
+        updateAppLauncherBarHeight();
+        applySuggestionBarPreferences();
         setTerminalToolbarHeight();
+        configureExtraKeysBackground();
+        if (mPreferences != null) {
+            if (mPreferences.isUseSystemWallpaperEnabled()) {
+                applyDecorViewBackgroundOpacity();
+            } else if (mPreferences.isMonetBackgroundEnabled()) {
+                applyTerminalMonetBackgroundOpacity();
+            }
+        }
         FileReceiverActivity.updateFileReceiverActivityComponentsState(this);
         if (mTermuxTerminalSessionActivityClient != null)
             mTermuxTerminalSessionActivityClient.onReloadActivityStyling();

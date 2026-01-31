@@ -78,6 +78,41 @@ public class TermuxAppSharedPreferences extends AppSharedPreferences {
         return !currentValue;
     }
 
+    public int getAppLauncherButtonCount() {
+        int buttonCount = SharedPreferenceUtils.getIntStoredAsString(mSharedPreferences, TERMUX_APP.KEY_APP_LAUNCHER_BUTTON_COUNT, TERMUX_APP.DEFAULT_APP_LAUNCHER_BUTTON_COUNT);
+        return DataUtils.clamp(buttonCount, 1, 20);
+    }
+
+    public void setAppLauncherButtonCount(int value) {
+        SharedPreferenceUtils.setIntStoredAsString(mSharedPreferences, TERMUX_APP.KEY_APP_LAUNCHER_BUTTON_COUNT, value, false);
+    }
+
+    public String getAppLauncherDefaultButtons() {
+        return SharedPreferenceUtils.getString(mSharedPreferences, TERMUX_APP.KEY_APP_LAUNCHER_DEFAULT_BUTTONS, TERMUX_APP.DEFAULT_APP_LAUNCHER_DEFAULT_BUTTONS, true);
+    }
+
+    public void setAppLauncherDefaultButtons(String value) {
+        SharedPreferenceUtils.setString(mSharedPreferences, TERMUX_APP.KEY_APP_LAUNCHER_DEFAULT_BUTTONS, value, false);
+    }
+
+    public float getAppLauncherBarHeightScale() {
+        float heightScale = SharedPreferenceUtils.getFloat(mSharedPreferences, TERMUX_APP.KEY_APP_LAUNCHER_BAR_HEIGHT, TERMUX_APP.DEFAULT_APP_LAUNCHER_BAR_HEIGHT);
+        return DataUtils.rangedOrDefault(heightScale, TERMUX_APP.DEFAULT_APP_LAUNCHER_BAR_HEIGHT, 0.4f, 3.0f);
+    }
+
+    public void setAppLauncherBarHeightScale(float value) {
+        SharedPreferenceUtils.setFloat(mSharedPreferences, TERMUX_APP.KEY_APP_LAUNCHER_BAR_HEIGHT, value, false);
+    }
+
+    public float getAppLauncherIconScale() {
+        float iconScale = SharedPreferenceUtils.getFloat(mSharedPreferences, TERMUX_APP.KEY_APP_LAUNCHER_ICON_SCALE, TERMUX_APP.DEFAULT_APP_LAUNCHER_ICON_SCALE);
+        return DataUtils.rangedOrDefault(iconScale, TERMUX_APP.DEFAULT_APP_LAUNCHER_ICON_SCALE, 0.4f, 3.0f);
+    }
+
+    public void setAppLauncherIconScale(float value) {
+        SharedPreferenceUtils.setFloat(mSharedPreferences, TERMUX_APP.KEY_APP_LAUNCHER_ICON_SCALE, value, false);
+    }
+
     public boolean isTerminalMarginAdjustmentEnabled() {
         return SharedPreferenceUtils.getBoolean(mSharedPreferences, TERMUX_APP.KEY_TERMINAL_MARGIN_ADJUSTMENT, TERMUX_APP.DEFAULT_TERMINAL_MARGIN_ADJUSTMENT);
     }

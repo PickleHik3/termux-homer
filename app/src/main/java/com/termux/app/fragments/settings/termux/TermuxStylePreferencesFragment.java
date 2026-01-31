@@ -10,6 +10,7 @@ import androidx.preference.PreferenceManager;
 import androidx.preference.SwitchPreferenceCompat;
 import com.termux.R;
 import com.termux.app.style.TermuxBackgroundManager;
+import com.termux.shared.data.DataUtils;
 import com.termux.shared.termux.settings.preferences.TermuxAppSharedPreferences;
 
 @Keep
@@ -137,6 +138,50 @@ class TermuxStylePreferencesDataStore extends PreferenceDataStore {
         switch (key) {
             case "terminal_background_opacity":
                 return mPreferences.getTerminalBackgroundOpacity();
+            default:
+                return defValue;
+        }
+    }
+
+    @Override
+    public void putString(String key, String value) {
+        if (mPreferences == null)
+            return;
+        if (key == null)
+            return;
+        switch (key) {
+            case "app_launcher_button_count":
+                mPreferences.setAppLauncherButtonCount(DataUtils.getIntFromString(value, mPreferences.getAppLauncherButtonCount()));
+                break;
+            case "app_launcher_default_buttons":
+                mPreferences.setAppLauncherDefaultButtons(value);
+                break;
+            case "app_launcher_bar_height":
+                mPreferences.setAppLauncherBarHeightScale(DataUtils.getFloatFromString(value, mPreferences.getAppLauncherBarHeightScale()));
+                break;
+            case "app_launcher_icon_scale":
+                mPreferences.setAppLauncherIconScale(DataUtils.getFloatFromString(value, mPreferences.getAppLauncherIconScale()));
+                break;
+            default:
+                break;
+        }
+    }
+
+    @Override
+    public String getString(String key, String defValue) {
+        if (mPreferences == null)
+            return defValue;
+        if (key == null)
+            return defValue;
+        switch (key) {
+            case "app_launcher_button_count":
+                return Integer.toString(mPreferences.getAppLauncherButtonCount());
+            case "app_launcher_default_buttons":
+                return mPreferences.getAppLauncherDefaultButtons();
+            case "app_launcher_bar_height":
+                return Float.toString(mPreferences.getAppLauncherBarHeightScale());
+            case "app_launcher_icon_scale":
+                return Float.toString(mPreferences.getAppLauncherIconScale());
             default:
                 return defValue;
         }

@@ -38,6 +38,8 @@ public final class SuggestionBarView extends GridLayout {
     private boolean showIcons = true;
     private boolean bandW = false;
     private int searchTolerance = 70;
+    private float iconScale = 1.0f;
+    private float barHeightScale = 1.0f;
 
     public SuggestionBarView(Context context, AttributeSet attrs) {
         super(context, attrs);
@@ -80,6 +82,14 @@ public final class SuggestionBarView extends GridLayout {
 
     public void setSearchTolerance(int searchTolerance) {
         this.searchTolerance = searchTolerance;
+    }
+
+    public void setIconScale(float iconScale) {
+        this.iconScale = iconScale;
+    }
+
+    public void setBarHeightScale(float barHeightScale) {
+        this.barHeightScale = barHeightScale;
     }
 
     private List<SuggestionBarButton> searchButtons(List<SuggestionBarButton> list, String input, boolean fuzzy) {
@@ -193,6 +203,8 @@ public final class SuggestionBarView extends GridLayout {
                 imageButton.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
                 imageButton.setAdjustViewBounds(true);
                 imageButton.setBackground(null);
+                imageButton.setScaleX(iconScale);
+                imageButton.setScaleY(iconScale);
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
                     imageButton.setImageTintList(null);
                 }
@@ -245,6 +257,8 @@ public final class SuggestionBarView extends GridLayout {
                 ImageButton imageButton = new ImageButton(getContext(), null, android.R.attr.buttonBarButtonStyle);
                 imageButton.setImageDrawable(filler);
                 imageButton.setLayoutParams(param);
+                imageButton.setScaleX(iconScale);
+                imageButton.setScaleY(iconScale);
                 imageButton.setVisibility(INVISIBLE);
                 addView(imageButton);
             }

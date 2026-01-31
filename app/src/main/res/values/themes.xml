@@ -56,4 +56,14 @@
 
     </style>
 
+    <!-- Wallpaper theme for transparent terminal background -->
+    <style name="Theme.TermuxActivity.Wallpaper" parent="Theme.TermuxActivity.DayNight.NoActionBar">
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:colorBackgroundCacheHint">@null</item>
+        <item name="android:windowShowWallpaper">true</item>
+        <item name="android:windowTranslucentNavigation">true</item>
+        <item name="android:windowTranslucentStatus">true</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+    </style>
+
 </resources>
