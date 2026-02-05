@@ -29,7 +29,8 @@ public class TermuxActivitySuggestionBarTest {
         assertNotNull(activity.mSuggestionBarView);
         int appliedMax = ReflectionHelpers.getField(activity.mSuggestionBarView, "maxButtonCount");
         DisplayMetrics metrics = activity.getResources().getDisplayMetrics();
-        int expectedMax = TermuxActivity.calculateSuggestionBarMaxButtons(metrics);
+        int configuredMax = activity.getPreferences().getAppLauncherButtonCount();
+        int expectedMax = configuredMax > 0 ? configuredMax : TermuxActivity.calculateSuggestionBarMaxButtons(metrics);
 
         assertEquals(expectedMax, appliedMax);
     }
