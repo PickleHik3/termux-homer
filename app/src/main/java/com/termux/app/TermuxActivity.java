@@ -251,6 +251,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
     private static final String LOG_TAG = "TermuxActivity";
 
     private static final int SUGGESTION_BAR_MIN_BUTTON_DP = 56;
+    private static final int SUGGESTION_BAR_MAX_INPUT_CHARS = 32;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -1256,6 +1257,12 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
             return;
         }
         String input = mTerminalView.getCurrentInput(inputChar);
+        if (input == null) {
+            input = "";
+        }
+        if (input.length() > SUGGESTION_BAR_MAX_INPUT_CHARS) {
+            input = "";
+        }
         mSuggestionBarView.reloadWithInput(input, mTerminalView);
     }
 
@@ -1268,6 +1275,9 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         if (!enter) {
             input = mTerminalView.getCurrentInput();
             if (input == null) {
+                input = "";
+            }
+            if (input.length() > SUGGESTION_BAR_MAX_INPUT_CHARS) {
                 input = "";
             }
             if (delete && input.length() > 0) {
