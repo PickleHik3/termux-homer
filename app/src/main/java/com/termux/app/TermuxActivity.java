@@ -1257,9 +1257,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
             return;
         }
         String input = mTerminalView.getCurrentInput(inputChar);
-        if (input == null) {
-            input = "";
-        }
+        input = normalizeSuggestionBarInput(input);
         if (input.length() > SUGGESTION_BAR_MAX_INPUT_CHARS) {
             input = "";
         }
@@ -1274,9 +1272,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         String input = "";
         if (!enter) {
             input = mTerminalView.getCurrentInput();
-            if (input == null) {
-                input = "";
-            }
+            input = normalizeSuggestionBarInput(input);
             if (input.length() > SUGGESTION_BAR_MAX_INPUT_CHARS) {
                 input = "";
             }
@@ -1285,6 +1281,19 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
             }
         }
         mSuggestionBarView.reloadWithInput(input, mTerminalView);
+    }
+
+    private String normalizeSuggestionBarInput(String input) {
+        if (mTerminalView != null && mTerminalView.isAlternateBufferActive()) {
+            return "";
+        }
+        if (input == null) {
+            return "";
+        }
+        if (input.indexOf(' ') >= 0) {
+            return "";
+        }
+        return input;
     }
 
     public static void updateTermuxActivityStyling(Context context, boolean recreateActivity) {

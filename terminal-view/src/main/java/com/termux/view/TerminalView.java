@@ -728,6 +728,10 @@ public final class TerminalView extends View {
         return extractCurrentInputFromLine(originalText, mEmulator.getCursorCol(), mSplitChar, currentChar);
     }
 
+    public boolean isAlternateBufferActive() {
+        return mEmulator != null && mEmulator.isAlternateBufferActive();
+    }
+
     static String extractCurrentInputFromLine(String originalText, int cut, char splitChar, Character insertCharOrNull) {
         if (originalText == null) {
             return null;
