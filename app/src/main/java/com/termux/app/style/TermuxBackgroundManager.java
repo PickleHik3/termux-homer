@@ -278,8 +278,10 @@ public class TermuxBackgroundManager {
     }
 
     private void maybeSetSystemWallpaper(@NonNull Bitmap bitmap) {
-        // Always set system wallpaper when in-app wallpaper is set
-        // This ensures monet colors update automatically
+        if (!mPreferences.isUseSystemWallpaperEnabled()) {
+            return;
+        }
+        // Sync system wallpaper when enabled so monet colors update automatically
         boolean setWithTermuxApi = trySetSystemWallpaperWithTermuxApi();
         if (!setWithTermuxApi) {
             setWallpaperWithManager(bitmap);

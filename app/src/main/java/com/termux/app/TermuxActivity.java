@@ -2,7 +2,6 @@ package com.termux.app;
 
 import android.annotation.SuppressLint;
 import android.app.AlertDialog;
-import android.app.WallpaperManager;
 import android.content.ActivityNotFoundException;
 import android.content.BroadcastReceiver;
 import android.content.ComponentName;
@@ -13,6 +12,8 @@ import android.content.ServiceConnection;
 import android.content.pm.PackageManager;
 import android.content.res.Configuration;
 import android.graphics.Color;
+import android.graphics.RenderEffect;
+import android.graphics.Shader;
 import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.os.Build;
@@ -41,6 +42,7 @@ import android.widget.ImageButton;
 import android.widget.ListView;
 import android.widget.RelativeLayout;
 import android.widget.Toast;
+import com.github.mmin18.widget.RealtimeBlurView;
 import com.termux.R;
 import com.termux.app.api.file.FileReceiverActivity;
 import com.termux.app.style.TermuxBackgroundManager;
@@ -234,7 +236,6 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
 
     private static final int CONTEXT_SUBMENU_REMOVE_BACKGROUND_IMAGE_ID = 13;
 
-    private static final int CONTEXT_SUBMENU_SET_SYSTEM_WALLPAPER_ID = 15;
 
     private static final int CONTEXT_MENU_TOGGLE_KEEP_SCREEN_ON = 6;
 
@@ -370,16 +371,15 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         if (mPreferences.isTerminalMarginAdjustmentEnabled())
             addTermuxActivityRootViewGlobalLayoutListener();
 
-        if (mPreferences.isUseSystemWallpaperEnabled()) {
-            configureViewVisibility(R.id.terminal_monetbackground, false);
-        } else if (mPreferences.isMonetBackgroundEnabled()) {
+        if (mPreferences.isMonetBackgroundEnabled()) {
             configureViewVisibility(R.id.terminal_monetbackground, true);
             applyTerminalMonetBackgroundOpacity();
         } else {
             configureViewVisibility(R.id.terminal_monetbackground, false);
         }
-        configureBackgroundBlur(R.id.sessions_backgroundblur, R.id.sessions_background, mPreferences.isSessionsBlurEnabled(), 0.5f);
+        configureBackgroundBlur(R.id.sessions_backgroundblur, R.id.sessions_background, mPreferences.isSessionsBlurEnabled(), 0.5f, mPreferences.getSessionsBlurRadius());
         configureExtraKeysBackground();
+        applyTerminalBlurEffect();
     
         registerTermuxActivityBroadcastReceiver();
         registerPackageChangeReceiver();
@@ -396,16 +396,15 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         if (mTermuxTerminalViewClient != null)
             mTermuxTerminalViewClient.onResume();
 
-        if (mPreferences.isUseSystemWallpaperEnabled()) {
-            configureViewVisibility(R.id.terminal_monetbackground, false);
-        } else if (mPreferences.isMonetBackgroundEnabled()) {
+        if (mPreferences.isMonetBackgroundEnabled()) {
             configureViewVisibility(R.id.terminal_monetbackground, true);
             applyTerminalMonetBackgroundOpacity();
         } else {
             configureViewVisibility(R.id.terminal_monetbackground, false);
         }
-        configureBackgroundBlur(R.id.sessions_backgroundblur, R.id.sessions_background, mPreferences.isSessionsBlurEnabled(), 0.5f);
+        configureBackgroundBlur(R.id.sessions_backgroundblur, R.id.sessions_background, mPreferences.isSessionsBlurEnabled(), 0.5f, mPreferences.getSessionsBlurRadius());
         configureExtraKeysBackground();
+        applyTerminalBlurEffect();
 
         // Check if a crash happened on last run of the app or if a plugin crashed and show a
         // notification with the crash details if it did
@@ -451,9 +450,10 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
     }
 
 
-    private void configureBackgroundBlur(int blurViewId, int backgroundViewId, boolean isBlurEnabled, float alphaIfBlurred) {
+    private void configureBackgroundBlur(int blurViewId, int backgroundViewId, boolean isBlurEnabled, float alphaIfBlurred, int blurRadiusDp) {
         View blurView = findViewById(blurViewId);
         View backgroundView = findViewById(backgroundViewId);
+        applyRealtimeBlurRadius(blurView, blurRadiusDp);
         blurView.setVisibility(isBlurEnabled ? View.VISIBLE : View.GONE);
         backgroundView.setAlpha(isBlurEnabled ? alphaIfBlurred : 1.0f);
     }
@@ -467,6 +467,10 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
 
         boolean isToolbarShown = mPreferences.shouldShowTerminalToolbar();
         boolean isBlurEnabled = mPreferences.isExtraKeysBlurEnabled();
+        float barAlpha = mPreferences.getAppBarOpacity() / 100f;
+        int blurRadiusDp = mPreferences.getExtraKeysBlurRadius();
+        applyRealtimeBlurRadius(extraKeysBackgroundBlur, blurRadiusDp);
+        applyRealtimeBlurRadius(appsBarBackgroundBlur, blurRadiusDp);
 
         if (!isToolbarShown) {
             if (extraKeysBackgroundBlur != null) {
@@ -491,21 +495,46 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
             appsBarContainer.setVisibility(View.VISIBLE);
         }
 
-        if (appsBarBackgroundBlur != null) {
-            appsBarBackgroundBlur.setVisibility(View.GONE);
-        }
         if (appsBarBackground != null) {
-            appsBarBackground.setVisibility(View.GONE);
+            appsBarBackground.setVisibility(View.VISIBLE);
+            appsBarBackground.setAlpha(isBlurEnabled ? barAlpha : 1.0f);
+        }
+        if (appsBarBackgroundBlur != null) {
+            appsBarBackgroundBlur.setVisibility(isBlurEnabled ? View.VISIBLE : View.GONE);
         }
 
         if (extraKeysBackground != null) {
             extraKeysBackground.setVisibility(View.VISIBLE);
-            extraKeysBackground.setAlpha(isBlurEnabled ? 0.50f : 1.0f);
+            extraKeysBackground.setAlpha(isBlurEnabled ? barAlpha : 1.0f);
         }
 
         if (extraKeysBackgroundBlur != null) {
             extraKeysBackgroundBlur.setVisibility(isBlurEnabled ? View.VISIBLE : View.GONE);
         }
+    }
+
+    private void applyRealtimeBlurRadius(View blurView, int blurRadiusDp) {
+        if (!(blurView instanceof RealtimeBlurView)) {
+            return;
+        }
+        float radiusPx = ViewUtils.dpToPx(this, Math.max(0, blurRadiusDp));
+        ((RealtimeBlurView) blurView).setBlurRadius(radiusPx);
+    }
+
+    private void applyTerminalBlurEffect() {
+        if (mTerminalView == null || mPreferences == null) {
+            return;
+        }
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
+            return;
+        }
+        int blurRadiusDp = mPreferences.getTerminalBlurRadius();
+        if (blurRadiusDp <= 0) {
+            mTerminalView.setRenderEffect(null);
+            return;
+        }
+        float radiusPx = ViewUtils.dpToPx(this, blurRadiusDp);
+        mTerminalView.setRenderEffect(RenderEffect.createBlurEffect(radiusPx, radiusPx, Shader.TileMode.CLAMP));
     }
 
     @Override
@@ -627,13 +656,8 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         // day or night theme takes affect.
         AppCompatActivityUtils.setNightMode(this, NightMode.getAppNightMode().getName(), true);
 
-        if (mPreferences != null && mPreferences.isUseSystemWallpaperEnabled()) {
-            setTheme(R.style.Theme_TermuxActivity_Wallpaper);
-            Logger.logDebug(LOG_TAG, "Applied wallpaper theme");
-        } else {
-            setTheme(R.style.Theme_TermuxActivity_DayNight_NoActionBar);
-            Logger.logDebug(LOG_TAG, "Applied normal theme");
-        }
+        setTheme(R.style.Theme_TermuxActivity_DayNight_NoActionBar);
+        Logger.logDebug(LOG_TAG, "Applied normal theme");
 
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
         getWindow().clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS);
@@ -974,7 +998,6 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         subMenu.clearHeader();
         subMenu.add(SubMenu.NONE, CONTEXT_SUBMENU_FONT_AND_COLOR_ID, SubMenu.NONE, R.string.action_font_and_color);
         subMenu.add(SubMenu.NONE, CONTEXT_SUBMENU_SET_BACKROUND_IMAGE_ID, SubMenu.NONE, R.string.action_set_background_image);
-        subMenu.add(SubMenu.NONE, CONTEXT_SUBMENU_SET_SYSTEM_WALLPAPER_ID, SubMenu.NONE, R.string.action_set_system_wallpaper);
         subMenu.add(SubMenu.NONE, CONTEXT_SUBMENU_REMOVE_BACKGROUND_IMAGE_ID, SubMenu.NONE, R.string.action_remove_background_image);
         menu.add(Menu.NONE, CONTEXT_MENU_TOGGLE_KEEP_SCREEN_ON, Menu.NONE, R.string.action_toggle_keep_screen_on).setCheckable(true).setChecked(mPreferences.shouldKeepScreenOn());
         menu.add(Menu.NONE, CONTEXT_MENU_HELP_ID, Menu.NONE, R.string.action_open_help);
@@ -1021,9 +1044,6 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
                 return true;
             case CONTEXT_SUBMENU_SET_BACKROUND_IMAGE_ID:
                 mTermuxBackgroundManager.setBackgroundImage();
-                return true;
-            case CONTEXT_SUBMENU_SET_SYSTEM_WALLPAPER_ID:
-                mTermuxSystemWallpaperManager.setSystemWallpaper();
                 return true;
             case CONTEXT_SUBMENU_REMOVE_BACKGROUND_IMAGE_ID:
                 mTermuxBackgroundManager.removeBackgroundImage(true);
@@ -1428,6 +1448,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
                 applyTerminalMonetBackgroundOpacity();
             }
         }
+        applyTerminalBlurEffect();
         FileReceiverActivity.updateFileReceiverActivityComponentsState(this);
         if (mTermuxTerminalSessionActivityClient != null)
             mTermuxTerminalSessionActivityClient.onReloadActivityStyling();
