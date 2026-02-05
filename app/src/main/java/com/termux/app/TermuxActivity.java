@@ -12,8 +12,6 @@ import android.content.ServiceConnection;
 import android.content.pm.PackageManager;
 import android.content.res.Configuration;
 import android.graphics.Color;
-import android.graphics.RenderEffect;
-import android.graphics.Shader;
 import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.os.Build;
@@ -379,7 +377,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         }
         configureBackgroundBlur(R.id.sessions_backgroundblur, R.id.sessions_background, mPreferences.isSessionsBlurEnabled(), 0.5f, mPreferences.getSessionsBlurRadius());
         configureExtraKeysBackground();
-        applyTerminalBlurEffect();
+        applyTerminalBlurBackground();
     
         registerTermuxActivityBroadcastReceiver();
         registerPackageChangeReceiver();
@@ -404,7 +402,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         }
         configureBackgroundBlur(R.id.sessions_backgroundblur, R.id.sessions_background, mPreferences.isSessionsBlurEnabled(), 0.5f, mPreferences.getSessionsBlurRadius());
         configureExtraKeysBackground();
-        applyTerminalBlurEffect();
+        applyTerminalBlurBackground();
 
         // Check if a crash happened on last run of the app or if a plugin crashed and show a
         // notification with the crash details if it did
@@ -470,7 +468,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         float barAlpha = mPreferences.getAppBarOpacity() / 100f;
         int blurRadiusDp = mPreferences.getExtraKeysBlurRadius();
         applyRealtimeBlurRadius(extraKeysBackgroundBlur, blurRadiusDp);
-        applyRealtimeBlurRadius(appsBarBackgroundBlur, blurRadiusDp);
+        // App bar uses the combined extra-keys background surface.
 
         if (!isToolbarShown) {
             if (extraKeysBackgroundBlur != null) {
@@ -496,11 +494,10 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         }
 
         if (appsBarBackground != null) {
-            appsBarBackground.setVisibility(View.VISIBLE);
-            appsBarBackground.setAlpha(isBlurEnabled ? barAlpha : 1.0f);
+            appsBarBackground.setVisibility(View.GONE);
         }
         if (appsBarBackgroundBlur != null) {
-            appsBarBackgroundBlur.setVisibility(isBlurEnabled ? View.VISIBLE : View.GONE);
+            appsBarBackgroundBlur.setVisibility(View.GONE);
         }
 
         if (extraKeysBackground != null) {
@@ -521,20 +518,17 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         ((RealtimeBlurView) blurView).setBlurRadius(radiusPx);
     }
 
-    private void applyTerminalBlurEffect() {
-        if (mTerminalView == null || mPreferences == null) {
+    private void applyTerminalBlurBackground() {
+        if (mPreferences == null) {
             return;
         }
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
+        View blurView = findViewById(R.id.terminal_backgroundblur);
+        if (blurView == null) {
             return;
         }
         int blurRadiusDp = mPreferences.getTerminalBlurRadius();
-        if (blurRadiusDp <= 0) {
-            mTerminalView.setRenderEffect(null);
-            return;
-        }
-        float radiusPx = ViewUtils.dpToPx(this, blurRadiusDp);
-        mTerminalView.setRenderEffect(RenderEffect.createBlurEffect(radiusPx, radiusPx, Shader.TileMode.CLAMP));
+        applyRealtimeBlurRadius(blurView, blurRadiusDp);
+        blurView.setVisibility(blurRadiusDp > 0 ? View.VISIBLE : View.GONE);
     }
 
     @Override
@@ -1448,7 +1442,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
                 applyTerminalMonetBackgroundOpacity();
             }
         }
-        applyTerminalBlurEffect();
+        applyTerminalBlurBackground();
         FileReceiverActivity.updateFileReceiverActivityComponentsState(this);
         if (mTermuxTerminalSessionActivityClient != null)
             mTermuxTerminalSessionActivityClient.onReloadActivityStyling();

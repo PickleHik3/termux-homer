@@ -8,3 +8,4 @@
 - Repurposed “Sync system wallpaper” to control system wallpaper syncing when setting in-app background; removed context-menu “Set system wallpaper”.
 - Added blur/opacity controls: per-surface blur sliders (sessions, extra keys/app bar, terminal), app bar opacity slider, and terminal blur (Android 12+).
 - Added Monet overlay toggle and wired terminal opacity slider to update `termux.properties` background overlay color.
+- Fixed app search bar blur/opacity mismatch by using the shared extra-keys background surface, and moved terminal blur behind text with a dedicated blur view.

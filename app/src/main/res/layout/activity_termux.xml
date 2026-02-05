@@ -30,6 +30,14 @@
                 android:layout_height="match_parent"
                 android:background="@color/background_accent"/>
 
+            <com.github.mmin18.widget.RealtimeBlurView
+                android:id="@+id/terminal_backgroundblur"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:visibility="gone"
+                app:realtimeBlurRadius="10dp"
+                app:realtimeOverlayColor="@android:color/transparent" />
+
             <com.termux.view.TerminalView
                 android:id="@+id/terminal_view"
                 android:layout_width="match_parent"
