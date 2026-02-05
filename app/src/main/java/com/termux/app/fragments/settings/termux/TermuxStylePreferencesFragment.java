@@ -2,16 +2,33 @@ package com.termux.app.fragments.settings.termux;
 
 import android.content.Context;
 import android.os.Bundle;
+import androidx.annotation.ColorInt;
 import androidx.annotation.Keep;
 import androidx.annotation.NonNull;
 import androidx.preference.PreferenceDataStore;
 import androidx.preference.PreferenceFragmentCompat;
 import androidx.preference.PreferenceManager;
 import androidx.preference.SwitchPreferenceCompat;
+import com.google.android.material.color.MaterialColors;
 import com.termux.R;
+import com.termux.app.TermuxActivity;
 import com.termux.app.style.TermuxBackgroundManager;
 import com.termux.shared.data.DataUtils;
+import com.termux.shared.file.FileUtils;
+import com.termux.shared.logger.Logger;
+import com.termux.shared.settings.properties.SharedProperties;
+import com.termux.shared.termux.TermuxConstants;
+import com.termux.shared.termux.settings.properties.TermuxPropertyConstants;
+import com.termux.shared.termux.settings.properties.TermuxSharedProperties;
 import com.termux.shared.termux.settings.preferences.TermuxAppSharedPreferences;
+import java.io.File;
+import java.io.BufferedReader;
+import java.io.FileInputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Properties;
 
 @Keep
 public class TermuxStylePreferencesFragment extends PreferenceFragmentCompat {
@@ -54,6 +71,7 @@ class TermuxStylePreferencesDataStore extends PreferenceDataStore {
     private final TermuxAppSharedPreferences mPreferences;
 
     private static TermuxStylePreferencesDataStore mInstance;
+    private static final String LOG_TAG = "TermuxStylePreferences";
 
     private TermuxStylePreferencesDataStore(Context context) {
         mContext = context;
@@ -89,6 +107,24 @@ class TermuxStylePreferencesDataStore extends PreferenceDataStore {
             case "monet_background_enabled":
                 mPreferences.setMonetBackgroundEnabled(value);
                 break;
+            case "monet_overlay_enabled":
+                if (value) {
+                    String current = getCurrentOverlayColorString();
+                    if (current != null && !current.isEmpty()) {
+                        mPreferences.setManualOverlayColor(current);
+                    }
+                }
+                mPreferences.setMonetOverlayEnabled(value);
+                Integer manualOverride = null;
+                if (!value) {
+                    String manualColor = mPreferences.getManualOverlayColor();
+                    if (manualColor != null && !manualColor.isEmpty()) {
+                        manualOverride = TermuxSharedProperties.getBackgroundOverlayInternalPropertyValueFromValue(manualColor);
+                    }
+                }
+                syncBackgroundOverlayColor(mPreferences.getTerminalBackgroundOpacity(), manualOverride);
+                TermuxActivity.updateTermuxActivityStyling(mContext, true);
+                break;
             case "app_launcher_show_icons":
                 mPreferences.setAppLauncherShowIconsEnabled(value);
                 break;
@@ -115,6 +151,8 @@ class TermuxStylePreferencesDataStore extends PreferenceDataStore {
                 return mPreferences.isSessionsBlurEnabled();
             case "monet_background_enabled":
                 return mPreferences.isMonetBackgroundEnabled();
+            case "monet_overlay_enabled":
+                return mPreferences.isMonetOverlayEnabled();
             case "app_launcher_show_icons":
                 return mPreferences.isAppLauncherShowIconsEnabled();
             case "app_launcher_bw_icons":
@@ -133,6 +171,20 @@ class TermuxStylePreferencesDataStore extends PreferenceDataStore {
         switch (key) {
             case "terminal_background_opacity":
                 mPreferences.setTerminalBackgroundOpacity(value);
+                syncBackgroundOverlayColor(value, null);
+                TermuxActivity.updateTermuxActivityStyling(mContext, true);
+                break;
+            case "terminal_blur_radius":
+                mPreferences.setTerminalBlurRadius(value);
+                break;
+            case "sessions_blur_radius":
+                mPreferences.setSessionsBlurRadius(value);
+                break;
+            case "extrakeys_blur_radius":
+                mPreferences.setExtraKeysBlurRadius(value);
+                break;
+            case "app_bar_opacity":
+                mPreferences.setAppBarOpacity(value);
                 break;
             default:
                 break;
@@ -148,6 +200,14 @@ class TermuxStylePreferencesDataStore extends PreferenceDataStore {
         switch (key) {
             case "terminal_background_opacity":
                 return mPreferences.getTerminalBackgroundOpacity();
+            case "terminal_blur_radius":
+                return mPreferences.getTerminalBlurRadius();
+            case "sessions_blur_radius":
+                return mPreferences.getSessionsBlurRadius();
+            case "extrakeys_blur_radius":
+                return mPreferences.getExtraKeysBlurRadius();
+            case "app_bar_opacity":
+                return mPreferences.getAppBarOpacity();
             default:
                 return defValue;
         }
@@ -204,6 +264,80 @@ class TermuxStylePreferencesDataStore extends PreferenceDataStore {
                 return Float.toString(mPreferences.getAppLauncherIconScale());
             default:
                 return defValue;
+        }
+    }
+
+    private void syncBackgroundOverlayColor(int opacityPercent, Integer baseColorOverride) {
+        int alpha = (int) ((DataUtils.clamp(opacityPercent, 0, 100) / 100f) * 255);
+        Properties properties = loadTermuxProperties();
+        String currentValue = properties.getProperty(TermuxPropertyConstants.KEY_BACKGROUND_OVERLAY_COLOR);
+        int baseColor = baseColorOverride != null ? baseColorOverride : TermuxSharedProperties.getBackgroundOverlayInternalPropertyValueFromValue(currentValue);
+        if (mPreferences.isMonetOverlayEnabled()) {
+            baseColor = getMonetSurfaceColor(baseColor);
+        }
+        int newColor = (baseColor & 0x00FFFFFF) | (alpha << 24);
+        writeOverlayColorToProperties(String.format("#%08X", newColor));
+    }
+
+    private String getCurrentOverlayColorString() {
+        Properties properties = loadTermuxProperties();
+        return properties.getProperty(TermuxPropertyConstants.KEY_BACKGROUND_OVERLAY_COLOR);
+    }
+
+    private Properties loadTermuxProperties() {
+        File propertiesFile = SharedProperties.getPropertiesFileFromList(TermuxConstants.TERMUX_PROPERTIES_FILE_PATHS_LIST, LOG_TAG);
+        if (propertiesFile == null) {
+            propertiesFile = TermuxConstants.TERMUX_PROPERTIES_PRIMARY_FILE;
+        }
+        Properties properties = SharedProperties.getPropertiesFromFile(mContext, propertiesFile, null);
+        return properties == null ? new Properties() : properties;
+    }
+
+    private void writeOverlayColorToProperties(@NonNull String overlayColor) {
+        File propertiesFile = SharedProperties.getPropertiesFileFromList(TermuxConstants.TERMUX_PROPERTIES_FILE_PATHS_LIST, LOG_TAG);
+        if (propertiesFile == null) {
+            propertiesFile = TermuxConstants.TERMUX_PROPERTIES_PRIMARY_FILE;
+        }
+        File parentDir = propertiesFile.getParentFile();
+        if (parentDir != null && !parentDir.exists()) {
+            //noinspection ResultOfMethodCallIgnored
+            parentDir.mkdirs();
+        }
+        List<String> lines = new ArrayList<>();
+        boolean updated = false;
+        if (propertiesFile.exists()) {
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(propertiesFile), StandardCharsets.UTF_8))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    String trimmed = line.trim();
+                    if (!trimmed.startsWith("#") && trimmed.matches("^\\s*" + TermuxPropertyConstants.KEY_BACKGROUND_OVERLAY_COLOR + "\\s*=.*$")) {
+                        lines.add(TermuxPropertyConstants.KEY_BACKGROUND_OVERLAY_COLOR + "=" + overlayColor);
+                        updated = true;
+                    } else {
+                        lines.add(line);
+                    }
+                }
+            } catch (Exception e) {
+                Logger.logStackTraceWithMessage(LOG_TAG, "Failed to read termux.properties", e);
+            }
+        }
+        if (!updated) {
+            lines.add(TermuxPropertyConstants.KEY_BACKGROUND_OVERLAY_COLOR + "=" + overlayColor);
+        }
+        StringBuilder output = new StringBuilder();
+        for (String line : lines) {
+            output.append(line).append('\n');
+        }
+        FileUtils.writeTextToFile("termux.properties", propertiesFile.getAbsolutePath(), StandardCharsets.UTF_8, output.toString(), false);
+    }
+
+    @ColorInt
+    private int getMonetSurfaceColor(@ColorInt int fallbackColor) {
+        try {
+            return MaterialColors.getColor(mContext, com.google.android.material.R.attr.colorSurface, fallbackColor);
+        } catch (Exception e) {
+            Logger.logStackTraceWithMessage(LOG_TAG, "Failed to resolve Monet surface color", e);
+            return fallbackColor;
         }
     }
 }

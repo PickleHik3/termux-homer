@@ -338,6 +338,42 @@ public class TermuxAppSharedPreferences extends AppSharedPreferences {
     public void setTerminalBackgroundOpacity(int value) {
         SharedPreferenceUtils.setInt(mSharedPreferences, TERMUX_APP.KEY_TERMINAL_BACKGROUND_OPACITY, DataUtils.clamp(value, 0, 100), false);
     }
+
+    public int getTerminalBlurRadius() {
+        int radius = SharedPreferenceUtils.getInt(mSharedPreferences, TERMUX_APP.KEY_TERMINAL_BLUR_RADIUS, TERMUX_APP.DEFAULT_VALUE_TERMINAL_BLUR_RADIUS);
+        return Math.max(radius, 0);
+    }
+
+    public void setTerminalBlurRadius(int value) {
+        SharedPreferenceUtils.setInt(mSharedPreferences, TERMUX_APP.KEY_TERMINAL_BLUR_RADIUS, Math.max(value, 0), false);
+    }
+
+    public int getSessionsBlurRadius() {
+        int radius = SharedPreferenceUtils.getInt(mSharedPreferences, TERMUX_APP.KEY_SESSIONS_BLUR_RADIUS, TERMUX_APP.DEFAULT_VALUE_SESSIONS_BLUR_RADIUS);
+        return Math.max(radius, 0);
+    }
+
+    public void setSessionsBlurRadius(int value) {
+        SharedPreferenceUtils.setInt(mSharedPreferences, TERMUX_APP.KEY_SESSIONS_BLUR_RADIUS, Math.max(value, 0), false);
+    }
+
+    public int getExtraKeysBlurRadius() {
+        int radius = SharedPreferenceUtils.getInt(mSharedPreferences, TERMUX_APP.KEY_EXTRAKEYS_BLUR_RADIUS, TERMUX_APP.DEFAULT_VALUE_EXTRAKEYS_BLUR_RADIUS);
+        return Math.max(radius, 0);
+    }
+
+    public void setExtraKeysBlurRadius(int value) {
+        SharedPreferenceUtils.setInt(mSharedPreferences, TERMUX_APP.KEY_EXTRAKEYS_BLUR_RADIUS, Math.max(value, 0), false);
+    }
+
+    public int getAppBarOpacity() {
+        int opacity = SharedPreferenceUtils.getInt(mSharedPreferences, TERMUX_APP.KEY_APP_BAR_OPACITY, TERMUX_APP.DEFAULT_VALUE_APP_BAR_OPACITY);
+        return DataUtils.clamp(opacity, 0, 100);
+    }
+
+    public void setAppBarOpacity(int value) {
+        SharedPreferenceUtils.setInt(mSharedPreferences, TERMUX_APP.KEY_APP_BAR_OPACITY, DataUtils.clamp(value, 0, 100), false);
+    }
     
     public boolean isExtraKeysBlurEnabled() {
         return SharedPreferenceUtils.getBoolean(mSharedPreferences, TERMUX_APP.KEY_EXTRAKEYS_BLUR_ENABLED, TERMUX_APP.DEFAULT_VALUE_EXTRAKEYS_BLUR_ENABLED);
@@ -361,6 +397,22 @@ public class TermuxAppSharedPreferences extends AppSharedPreferences {
     
     public void setMonetBackgroundEnabled(boolean value) {
         SharedPreferenceUtils.setBoolean(mSharedPreferences, TERMUX_APP.KEY_MONET_BACKGROUND_ENABLED, value, false);
+    }
+
+    public boolean isMonetOverlayEnabled() {
+        return SharedPreferenceUtils.getBoolean(mSharedPreferences, TERMUX_APP.KEY_MONET_OVERLAY_ENABLED, TERMUX_APP.DEFAULT_VALUE_MONET_OVERLAY_ENABLED);
+    }
+
+    public void setMonetOverlayEnabled(boolean value) {
+        SharedPreferenceUtils.setBoolean(mSharedPreferences, TERMUX_APP.KEY_MONET_OVERLAY_ENABLED, value, false);
+    }
+
+    public String getManualOverlayColor() {
+        return SharedPreferenceUtils.getString(mSharedPreferences, TERMUX_APP.KEY_MANUAL_OVERLAY_COLOR, TERMUX_APP.DEFAULT_VALUE_MANUAL_OVERLAY_COLOR, true);
+    }
+
+    public void setManualOverlayColor(String value) {
+        SharedPreferenceUtils.setString(mSharedPreferences, TERMUX_APP.KEY_MANUAL_OVERLAY_COLOR, value, false);
     }
 
     public boolean arePluginErrorNotificationsEnabled(boolean readFromFile) {

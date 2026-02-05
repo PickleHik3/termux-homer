@@ -273,6 +273,34 @@ public final class TermuxPreferenceConstants {
         public static final String KEY_TERMINAL_BACKGROUND_OPACITY = "terminal_background_opacity";
 
         public static final int DEFAULT_VALUE_TERMINAL_BACKGROUND_OPACITY = 100;
+
+        /**
+         * Defines the key for terminal background blur radius (dp). 0 disables blur.
+         */
+        public static final String KEY_TERMINAL_BLUR_RADIUS = "terminal_blur_radius";
+
+        public static final int DEFAULT_VALUE_TERMINAL_BLUR_RADIUS = 0;
+
+        /**
+         * Defines the key for sessions blur radius (dp). 0 disables blur.
+         */
+        public static final String KEY_SESSIONS_BLUR_RADIUS = "sessions_blur_radius";
+
+        public static final int DEFAULT_VALUE_SESSIONS_BLUR_RADIUS = 10;
+
+        /**
+         * Defines the key for extrakeys/app bar blur radius (dp). 0 disables blur.
+         */
+        public static final String KEY_EXTRAKEYS_BLUR_RADIUS = "extrakeys_blur_radius";
+
+        public static final int DEFAULT_VALUE_EXTRAKEYS_BLUR_RADIUS = 10;
+
+        /**
+         * Defines the key for extrakeys/app bar opacity (percentage), where 100 is fully opaque.
+         */
+        public static final String KEY_APP_BAR_OPACITY = "app_bar_opacity";
+
+        public static final int DEFAULT_VALUE_APP_BAR_OPACITY = 50;
         
         /**
          * Defines the key for whether extrakeys blur is enabled or not.
@@ -294,6 +322,20 @@ public final class TermuxPreferenceConstants {
         public static final String KEY_MONET_BACKGROUND_ENABLED = "monet_background_enabled";
 
         public static final boolean DEFAULT_VALUE_MONET_BACKGROUND_ENABLED = false;
+
+        /**
+         * Defines the key for whether monet color should be used for the terminal background overlay.
+         */
+        public static final String KEY_MONET_OVERLAY_ENABLED = "monet_overlay_enabled";
+
+        public static final boolean DEFAULT_VALUE_MONET_OVERLAY_ENABLED = false;
+
+        /**
+         * Stores the last manual overlay color so it can be restored when monet overlay is disabled.
+         */
+        public static final String KEY_MANUAL_OVERLAY_COLOR = "manual_overlay_color";
+
+        public static final String DEFAULT_VALUE_MANUAL_OVERLAY_COLOR = "";
 
         /**
          * Defines the key for whether the system wallpaper should be used.
