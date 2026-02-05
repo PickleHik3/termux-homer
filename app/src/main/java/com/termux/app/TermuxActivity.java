@@ -251,7 +251,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
     private static final String LOG_TAG = "TermuxActivity";
 
     private static final int SUGGESTION_BAR_MIN_BUTTON_DP = 56;
-    private static final int SUGGESTION_BAR_MAX_INPUT_CHARS = 20;
+    private static final int SUGGESTION_BAR_MAX_INPUT_CHARS = 10;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
