@@ -2,7 +2,7 @@
 
 <!DOCTYPE resources [
     <!ENTITY TERMUX_PACKAGE_NAME "com.termux">
-    <!ENTITY TERMUX_APP_NAME "Termux:Monet">
+    <!ENTITY TERMUX_APP_NAME "Termux:Launcher">
     <!ENTITY TERMUX_API_APP_NAME "Termux:API">
     <!ENTITY TERMUX_GUI_APP_NAME "Termux:GUI">
     <!ENTITY TERMUX_BOOT_APP_NAME "Termux:Boot">
@@ -236,7 +236,7 @@
 
 
         <!-- Termux Style Preferences -->
-        <string name="termux_style_preferences_title">&TERMUX_APP_NAME; Appearance</string>
+        <string name="termux_style_preferences_title">&TERMUX_APP_NAME; Settings</string>
         <string name="termux_style_preferences_summary">Preferences for &TERMUX_APP_NAME; appearance and customisation</string>
 
             <!-- Background Category -->
