@@ -4,48 +4,6 @@
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
     <PreferenceCategory
-        app:key="background"
-        app:title="@string/termux_background_header">
-
-        <SwitchPreferenceCompat
-            app:key="background_image_enabled"
-            app:summaryOff="@string/termux_background_image_enabled_off"
-            app:summaryOn="@string/termux_background_image_enabled_on"
-            app:title="@string/termux_background_image_enabled_title" />
-
-        <SwitchPreferenceCompat
-            app:key="use_system_wallpaper"
-            app:title="@string/termux_use_system_wallpaper_title"
-            app:summaryOn="@string/termux_use_system_wallpaper_on"
-            app:summaryOff="@string/termux_use_system_wallpaper_off" />
-
-        <SwitchPreferenceCompat
-            app:key="monet_background_enabled"
-            app:summaryOff="@string/termux_monet_background_enabled_off"
-            app:summaryOn="@string/termux_monet_background_enabled_on"
-            app:title="@string/termux_monet_background_enabled_title" />
-
-        <androidx.preference.SeekBarPreference
-            app:key="terminal_background_opacity"
-            app:title="@string/termux_terminal_background_opacity_title"
-            app:summary="@string/termux_terminal_background_opacity_summary"
-            android:min="0"
-            android:max="100"
-            app:showSeekBarValue="true" />
-    </PreferenceCategory>
-    
-    <PreferenceCategory
-        app:key="extrakeys"
-        app:title="@string/termux_extrakeys_header">
-        
-        <SwitchPreferenceCompat
-            app:key="extrakeys_blur_enabled"
-            app:summaryOff="@string/termux_extrakeys_blur_enabled_off"
-            app:summaryOn="@string/termux_extrakeys_blur_enabled_on"
-            app:title="@string/termux_extrakeys_blur_enabled_title" />
-    </PreferenceCategory>
-
-    <PreferenceCategory
         app:key="app_launcher"
         app:title="@string/termux_app_launcher_header" />
 
@@ -107,6 +65,44 @@
         app:title="@string/termux_app_launcher_appearance_header">
 
         <SwitchPreferenceCompat
+            app:key="background_image_enabled"
+            app:summaryOff="@string/termux_background_image_enabled_off"
+            app:summaryOn="@string/termux_background_image_enabled_on"
+            app:title="@string/termux_background_image_enabled_title" />
+
+        <SwitchPreferenceCompat
+            app:key="use_system_wallpaper"
+            app:title="@string/termux_use_system_wallpaper_title"
+            app:summaryOn="@string/termux_use_system_wallpaper_on"
+            app:summaryOff="@string/termux_use_system_wallpaper_off" />
+
+        <SwitchPreferenceCompat
+            app:key="monet_background_enabled"
+            app:summaryOff="@string/termux_monet_background_enabled_off"
+            app:summaryOn="@string/termux_monet_background_enabled_on"
+            app:title="@string/termux_monet_background_enabled_title" />
+
+        <androidx.preference.SeekBarPreference
+            app:key="terminal_background_opacity"
+            app:title="@string/termux_terminal_background_opacity_title"
+            app:summary="@string/termux_terminal_background_opacity_summary"
+            android:min="0"
+            android:max="100"
+            app:showSeekBarValue="true" />
+
+        <SwitchPreferenceCompat
+            app:key="extrakeys_blur_enabled"
+            app:summaryOff="@string/termux_extrakeys_blur_enabled_off"
+            app:summaryOn="@string/termux_extrakeys_blur_enabled_on"
+            app:title="@string/termux_extrakeys_blur_enabled_title" />
+
+        <SwitchPreferenceCompat
+            app:key="sessions_blur_enabled"
+            app:summaryOff="@string/termux_sessions_blur_enabled_off"
+            app:summaryOn="@string/termux_sessions_blur_enabled_on"
+            app:title="@string/termux_sessions_blur_enabled_title" />
+
+        <SwitchPreferenceCompat
             app:key="app_launcher_show_icons"
             app:title="@string/termux_app_launcher_show_icons_title"
             app:summary="@string/termux_app_launcher_show_icons_summary"
@@ -117,17 +113,6 @@
             app:title="@string/termux_app_launcher_bw_icons_title"
             app:summary="@string/termux_app_launcher_bw_icons_summary"
             android:defaultValue="false" />
-    </PreferenceCategory>
-    
-    <PreferenceCategory
-        app:key="sessions"
-        app:title="@string/termux_sessions_header">
-        
-        <SwitchPreferenceCompat
-            app:key="sessions_blur_enabled"
-            app:summaryOff="@string/termux_sessions_blur_enabled_off"
-            app:summaryOn="@string/termux_sessions_blur_enabled_on"
-            app:title="@string/termux_sessions_blur_enabled_title" />
     </PreferenceCategory>
 
 </PreferenceScreen>
