@@ -117,10 +117,18 @@ public final class TermuxPreferenceConstants {
 
         /**
          * Defines the key for app launcher search tolerance (0-100).
+         * Kept for legacy settings migration.
          */
         public static final String KEY_APP_LAUNCHER_SEARCH_TOLERANCE = "app_launcher_search_tolerance";
 
         public static final int DEFAULT_APP_LAUNCHER_SEARCH_TOLERANCE = 70;
+
+        /**
+         * Defines the key for app launcher search mode.
+         */
+        public static final String KEY_APP_LAUNCHER_SEARCH_MODE = "app_launcher_search_mode";
+
+        public static final String DEFAULT_APP_LAUNCHER_SEARCH_MODE = "balanced";
 
         /**
          * Defines the key for app launcher input split character.

@@ -47,21 +47,19 @@
 
     <PreferenceCategory
         app:key="app_launcher"
-        app:title="@string/termux_app_launcher_header">
+        app:title="@string/termux_app_launcher_header" />
 
-        <EditTextPreference
-            app:key="app_launcher_button_count"
-            app:title="@string/termux_app_launcher_button_count_title"
-            app:summary="@string/termux_app_launcher_button_count_summary"
-            android:defaultValue="5"
-            android:inputType="number" />
+    <PreferenceCategory
+        app:key="app_launcher_search"
+        app:title="@string/termux_app_launcher_search_header">
 
-        <EditTextPreference
-            app:key="app_launcher_search_tolerance"
-            app:title="@string/termux_app_launcher_search_tolerance_title"
-            app:summary="@string/termux_app_launcher_search_tolerance_summary"
-            android:defaultValue="70"
-            android:inputType="number" />
+        <ListPreference
+            app:key="app_launcher_search_mode"
+            app:title="@string/termux_app_launcher_search_mode_title"
+            app:summary="@string/termux_app_launcher_search_mode_summary"
+            android:defaultValue="balanced"
+            app:entries="@array/app_launcher_search_mode_entries"
+            app:entryValues="@array/app_launcher_search_mode_values" />
 
         <EditTextPreference
             app:key="app_launcher_input_char"
@@ -76,18 +74,18 @@
             app:summary="@string/termux_app_launcher_default_buttons_summary"
             android:defaultValue="phone,bromite,whatsapp,telegram,spotify"
             android:inputType="text" />
+    </PreferenceCategory>
 
-        <SwitchPreferenceCompat
-            app:key="app_launcher_show_icons"
-            app:title="@string/termux_app_launcher_show_icons_title"
-            app:summary="@string/termux_app_launcher_show_icons_summary"
-            android:defaultValue="true" />
+    <PreferenceCategory
+        app:key="app_launcher_layout"
+        app:title="@string/termux_app_launcher_layout_header">
 
-        <SwitchPreferenceCompat
-            app:key="app_launcher_bw_icons"
-            app:title="@string/termux_app_launcher_bw_icons_title"
-            app:summary="@string/termux_app_launcher_bw_icons_summary"
-            android:defaultValue="false" />
+        <EditTextPreference
+            app:key="app_launcher_button_count"
+            app:title="@string/termux_app_launcher_button_count_title"
+            app:summary="@string/termux_app_launcher_button_count_summary"
+            android:defaultValue="5"
+            android:inputType="number" />
 
         <EditTextPreference
             app:key="app_launcher_bar_height"
@@ -102,6 +100,23 @@
             app:summary="@string/termux_app_launcher_icon_scale_summary"
             android:defaultValue="1.0"
             android:inputType="numberDecimal" />
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        app:key="app_launcher_appearance"
+        app:title="@string/termux_app_launcher_appearance_header">
+
+        <SwitchPreferenceCompat
+            app:key="app_launcher_show_icons"
+            app:title="@string/termux_app_launcher_show_icons_title"
+            app:summary="@string/termux_app_launcher_show_icons_summary"
+            android:defaultValue="true" />
+
+        <SwitchPreferenceCompat
+            app:key="app_launcher_bw_icons"
+            app:title="@string/termux_app_launcher_bw_icons_title"
+            app:summary="@string/termux_app_launcher_bw_icons_summary"
+            android:defaultValue="false" />
     </PreferenceCategory>
     
     <PreferenceCategory

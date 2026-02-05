@@ -163,8 +163,8 @@ class TermuxStylePreferencesDataStore extends PreferenceDataStore {
             case "app_launcher_button_count":
                 mPreferences.setAppLauncherButtonCount(DataUtils.getIntFromString(value, mPreferences.getAppLauncherButtonCount()));
                 break;
-            case "app_launcher_search_tolerance":
-                mPreferences.setAppLauncherSearchTolerance(DataUtils.getIntFromString(value, mPreferences.getAppLauncherSearchTolerance()));
+            case "app_launcher_search_mode":
+                mPreferences.setAppLauncherSearchMode(value);
                 break;
             case "app_launcher_input_char":
                 mPreferences.setAppLauncherInputChar(value);
@@ -192,8 +192,8 @@ class TermuxStylePreferencesDataStore extends PreferenceDataStore {
         switch (key) {
             case "app_launcher_button_count":
                 return Integer.toString(mPreferences.getAppLauncherButtonCount());
-            case "app_launcher_search_tolerance":
-                return Integer.toString(mPreferences.getAppLauncherSearchTolerance());
+            case "app_launcher_search_mode":
+                return mPreferences.getAppLauncherSearchMode();
             case "app_launcher_input_char":
                 return mPreferences.getAppLauncherInputChar();
             case "app_launcher_default_buttons":

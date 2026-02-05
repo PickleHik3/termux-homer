@@ -270,12 +270,18 @@
                 <string name="termux_extrakeys_blur_enabled_on">ExtraKeys Blurred Background will be enabled.</string>
 
             <!-- App Launcher Category -->
-            <string name="termux_app_launcher_header">App Launcher</string>
+            <string name="termux_app_launcher_header">Launcher: Settings</string>
+            <string name="termux_app_launcher_search_header">Launcher: Search</string>
+            <string name="termux_app_launcher_layout_header">Launcher: Layout</string>
+            <string name="termux_app_launcher_appearance_header">Launcher: Appearance</string>
 
                 <string name="termux_app_launcher_button_count_title">Icon count</string>
                 <string name="termux_app_launcher_button_count_summary">Set the number of icons shown in the app launcher bar.</string>
-                <string name="termux_app_launcher_search_tolerance_title">Search tolerance</string>
-                <string name="termux_app_launcher_search_tolerance_summary">Minimum fuzzy match score (0-100). Higher means stricter matching.</string>
+                <string name="termux_app_launcher_search_mode_title">Search strictness</string>
+                <string name="termux_app_launcher_search_mode_summary">Controls how strict app matching is (Strict, Balanced, Loose).</string>
+                <string name="termux_app_launcher_search_mode_strict">Strict</string>
+                <string name="termux_app_launcher_search_mode_balanced">Balanced</string>
+                <string name="termux_app_launcher_search_mode_loose">Loose</string>
                 <string name="termux_app_launcher_input_char_title">Input split character</string>
                 <string name="termux_app_launcher_input_char_summary">Character used to split the prompt and input when detecting search text.</string>
                 <string name="termux_app_launcher_default_buttons_title">Default apps</string>

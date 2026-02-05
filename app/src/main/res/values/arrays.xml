@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="app_launcher_search_mode_entries">
+        <item>@string/termux_app_launcher_search_mode_strict</item>
+        <item>@string/termux_app_launcher_search_mode_balanced</item>
+        <item>@string/termux_app_launcher_search_mode_loose</item>
+    </string-array>
+    <string-array name="app_launcher_search_mode_values">
+        <item>strict</item>
+        <item>balanced</item>
+        <item>loose</item>
+    </string-array>
+</resources>

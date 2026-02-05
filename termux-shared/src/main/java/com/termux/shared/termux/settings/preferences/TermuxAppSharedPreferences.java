@@ -88,12 +88,32 @@ public class TermuxAppSharedPreferences extends AppSharedPreferences {
     }
 
     public int getAppLauncherSearchTolerance() {
-        int tolerance = SharedPreferenceUtils.getIntStoredAsString(mSharedPreferences, TERMUX_APP.KEY_APP_LAUNCHER_SEARCH_TOLERANCE, TERMUX_APP.DEFAULT_APP_LAUNCHER_SEARCH_TOLERANCE);
-        return DataUtils.clamp(tolerance, 0, 100);
+        String mode = getAppLauncherSearchMode();
+        if (mode == null || mode.trim().isEmpty()) {
+            int tolerance = SharedPreferenceUtils.getIntStoredAsString(mSharedPreferences, TERMUX_APP.KEY_APP_LAUNCHER_SEARCH_TOLERANCE, TERMUX_APP.DEFAULT_APP_LAUNCHER_SEARCH_TOLERANCE);
+            return DataUtils.clamp(tolerance, 0, 100);
+        }
+        switch (mode) {
+            case "strict":
+                return 85;
+            case "loose":
+                return 55;
+            case "balanced":
+            default:
+                return 70;
+        }
     }
 
     public void setAppLauncherSearchTolerance(int value) {
         SharedPreferenceUtils.setIntStoredAsString(mSharedPreferences, TERMUX_APP.KEY_APP_LAUNCHER_SEARCH_TOLERANCE, value, false);
+    }
+
+    public String getAppLauncherSearchMode() {
+        return SharedPreferenceUtils.getString(mSharedPreferences, TERMUX_APP.KEY_APP_LAUNCHER_SEARCH_MODE, TERMUX_APP.DEFAULT_APP_LAUNCHER_SEARCH_MODE, true);
+    }
+
+    public void setAppLauncherSearchMode(String value) {
+        SharedPreferenceUtils.setString(mSharedPreferences, TERMUX_APP.KEY_APP_LAUNCHER_SEARCH_MODE, value, false);
     }
 
     public String getAppLauncherInputChar() {
