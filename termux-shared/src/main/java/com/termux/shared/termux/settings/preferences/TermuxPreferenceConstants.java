@@ -116,6 +116,20 @@ public final class TermuxPreferenceConstants {
         public static final int DEFAULT_APP_LAUNCHER_BUTTON_COUNT = 5;
 
         /**
+         * Defines the key for app launcher search tolerance (0-100).
+         */
+        public static final String KEY_APP_LAUNCHER_SEARCH_TOLERANCE = "app_launcher_search_tolerance";
+
+        public static final int DEFAULT_APP_LAUNCHER_SEARCH_TOLERANCE = 70;
+
+        /**
+         * Defines the key for app launcher input split character.
+         */
+        public static final String KEY_APP_LAUNCHER_INPUT_CHAR = "app_launcher_input_char";
+
+        public static final String DEFAULT_APP_LAUNCHER_INPUT_CHAR = "\u276F";
+
+        /**
          * Defines the key for app launcher default buttons.
          */
         public static final String KEY_APP_LAUNCHER_DEFAULT_BUTTONS = "app_launcher_default_buttons";
@@ -128,6 +142,20 @@ public final class TermuxPreferenceConstants {
         public static final String KEY_APP_LAUNCHER_BAR_HEIGHT = "app_launcher_bar_height";
 
         public static final float DEFAULT_APP_LAUNCHER_BAR_HEIGHT = 1.2f;
+
+        /**
+         * Defines the key for app launcher show icons.
+         */
+        public static final String KEY_APP_LAUNCHER_SHOW_ICONS = "app_launcher_show_icons";
+
+        public static final boolean DEFAULT_APP_LAUNCHER_SHOW_ICONS = true;
+
+        /**
+         * Defines the key for app launcher black and white icons.
+         */
+        public static final String KEY_APP_LAUNCHER_BW_ICONS = "app_launcher_bw_icons";
+
+        public static final boolean DEFAULT_APP_LAUNCHER_BW_ICONS = false;
 
         /**
          * Defines the key for app launcher icon scale.

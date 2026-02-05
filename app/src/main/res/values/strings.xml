@@ -274,8 +274,16 @@
 
                 <string name="termux_app_launcher_button_count_title">Icon count</string>
                 <string name="termux_app_launcher_button_count_summary">Set the number of icons shown in the app launcher bar.</string>
+                <string name="termux_app_launcher_search_tolerance_title">Search tolerance</string>
+                <string name="termux_app_launcher_search_tolerance_summary">Minimum fuzzy match score (0-100). Higher means stricter matching.</string>
+                <string name="termux_app_launcher_input_char_title">Input split character</string>
+                <string name="termux_app_launcher_input_char_summary">Character used to split the prompt and input when detecting search text.</string>
                 <string name="termux_app_launcher_default_buttons_title">Default apps</string>
                 <string name="termux_app_launcher_default_buttons_summary">Comma-separated list of default apps to pin (for example: phone, telegram, spotify).</string>
+                <string name="termux_app_launcher_show_icons_title">Show icons</string>
+                <string name="termux_app_launcher_show_icons_summary">Display app icons instead of text labels.</string>
+                <string name="termux_app_launcher_bw_icons_title">Black and white icons</string>
+                <string name="termux_app_launcher_bw_icons_summary">Render app icons in grayscale.</string>
                 <string name="termux_app_launcher_bar_height_title">Bar height</string>
                 <string name="termux_app_launcher_bar_height_summary">Height multiplier for the app launcher bar (1.0 = default).</string>
                 <string name="termux_app_launcher_icon_scale_title">Icon scaling</string>

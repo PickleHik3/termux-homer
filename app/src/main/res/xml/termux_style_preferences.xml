@@ -57,11 +57,37 @@
             android:inputType="number" />
 
         <EditTextPreference
+            app:key="app_launcher_search_tolerance"
+            app:title="@string/termux_app_launcher_search_tolerance_title"
+            app:summary="@string/termux_app_launcher_search_tolerance_summary"
+            android:defaultValue="70"
+            android:inputType="number" />
+
+        <EditTextPreference
+            app:key="app_launcher_input_char"
+            app:title="@string/termux_app_launcher_input_char_title"
+            app:summary="@string/termux_app_launcher_input_char_summary"
+            android:defaultValue="&#x276F;"
+            android:inputType="text" />
+
+        <EditTextPreference
             app:key="app_launcher_default_buttons"
             app:title="@string/termux_app_launcher_default_buttons_title"
             app:summary="@string/termux_app_launcher_default_buttons_summary"
             android:defaultValue="phone,bromite,whatsapp,telegram,spotify"
             android:inputType="text" />
+
+        <SwitchPreferenceCompat
+            app:key="app_launcher_show_icons"
+            app:title="@string/termux_app_launcher_show_icons_title"
+            app:summary="@string/termux_app_launcher_show_icons_summary"
+            android:defaultValue="true" />
+
+        <SwitchPreferenceCompat
+            app:key="app_launcher_bw_icons"
+            app:title="@string/termux_app_launcher_bw_icons_title"
+            app:summary="@string/termux_app_launcher_bw_icons_summary"
+            android:defaultValue="false" />
 
         <EditTextPreference
             app:key="app_launcher_bar_height"

@@ -450,6 +450,10 @@ public class TermuxTerminalViewClient extends TermuxTerminalViewClientBase {
             }
             return true;
         } else if (ctrlDown) {
+            if (codePoint == 3 || codePoint == 12 || codePoint == 21 || codePoint == 24) {
+                // Ctrl+C, Ctrl+L, Ctrl+U, Ctrl+X
+                SuggestionBarInputHook.onTerminalCleared(mSuggestionBarCallback);
+            }
             if (codePoint == 106 && /* Ctrl+j or \n */
             !session.isRunning()) {
                 mTermuxTerminalSessionActivityClient.removeFinishedSession(session);

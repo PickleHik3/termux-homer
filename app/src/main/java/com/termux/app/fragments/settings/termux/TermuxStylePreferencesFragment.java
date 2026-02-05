@@ -89,6 +89,12 @@ class TermuxStylePreferencesDataStore extends PreferenceDataStore {
             case "monet_background_enabled":
                 mPreferences.setMonetBackgroundEnabled(value);
                 break;
+            case "app_launcher_show_icons":
+                mPreferences.setAppLauncherShowIconsEnabled(value);
+                break;
+            case "app_launcher_bw_icons":
+                mPreferences.setAppLauncherBwIconsEnabled(value);
+                break;
             default:
                 break;
         }
@@ -109,6 +115,10 @@ class TermuxStylePreferencesDataStore extends PreferenceDataStore {
                 return mPreferences.isSessionsBlurEnabled();
             case "monet_background_enabled":
                 return mPreferences.isMonetBackgroundEnabled();
+            case "app_launcher_show_icons":
+                return mPreferences.isAppLauncherShowIconsEnabled();
+            case "app_launcher_bw_icons":
+                return mPreferences.isAppLauncherBwIconsEnabled();
             default:
                 return false;
         }
@@ -153,6 +163,12 @@ class TermuxStylePreferencesDataStore extends PreferenceDataStore {
             case "app_launcher_button_count":
                 mPreferences.setAppLauncherButtonCount(DataUtils.getIntFromString(value, mPreferences.getAppLauncherButtonCount()));
                 break;
+            case "app_launcher_search_tolerance":
+                mPreferences.setAppLauncherSearchTolerance(DataUtils.getIntFromString(value, mPreferences.getAppLauncherSearchTolerance()));
+                break;
+            case "app_launcher_input_char":
+                mPreferences.setAppLauncherInputChar(value);
+                break;
             case "app_launcher_default_buttons":
                 mPreferences.setAppLauncherDefaultButtons(value);
                 break;
@@ -176,6 +192,10 @@ class TermuxStylePreferencesDataStore extends PreferenceDataStore {
         switch (key) {
             case "app_launcher_button_count":
                 return Integer.toString(mPreferences.getAppLauncherButtonCount());
+            case "app_launcher_search_tolerance":
+                return Integer.toString(mPreferences.getAppLauncherSearchTolerance());
+            case "app_launcher_input_char":
+                return mPreferences.getAppLauncherInputChar();
             case "app_launcher_default_buttons":
                 return mPreferences.getAppLauncherDefaultButtons();
             case "app_launcher_bar_height":

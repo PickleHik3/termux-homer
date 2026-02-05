@@ -178,6 +178,8 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
      * The {@link TermuxActivity} broadcast receiver for various things like terminal style configuration changes.
      */
     private final BroadcastReceiver mTermuxActivityBroadcastReceiver = new TermuxActivityBroadcastReceiver();
+    private final BroadcastReceiver mPackageChangeReceiver = new PackageChangeReceiver();
+    private boolean mPackageChangeReceiverRegistered = false;
 
     /**
      * The last toast shown, used cancel current toast before showing new in {@link #showToast(String, boolean)}.
@@ -379,6 +381,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         configureExtraKeysBackground();
     
         registerTermuxActivityBroadcastReceiver();
+        registerPackageChangeReceiver();
     }
 
     @Override
@@ -517,6 +520,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
             mTermuxTerminalViewClient.onStop();
         removeTermuxActivityRootViewGlobalLayoutListener();
         unregisterTermuxActivityBroadcastReceiver();
+        unregisterPackageChangeReceiver();
         getDrawer().closeDrawers();
     }
 
@@ -676,7 +680,24 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         float iconScale = mPreferences.getAppLauncherIconScale();
         mSuggestionBarView.setBarHeightScale(barHeightScale);
         mSuggestionBarView.setIconScale(iconScale);
+        mSuggestionBarView.setSearchTolerance(mPreferences.getAppLauncherSearchTolerance());
+        mSuggestionBarView.setShowIcons(mPreferences.isAppLauncherShowIconsEnabled());
+        mSuggestionBarView.setBandW(mPreferences.isAppLauncherBwIconsEnabled());
         mSuggestionBarView.reloadAllApps();
+    }
+
+    private void applySuggestionBarInputChar() {
+        if (mTerminalView == null || mPreferences == null)
+            return;
+        String inputChar = mPreferences.getAppLauncherInputChar();
+        char splitChar = ' ';
+        if (inputChar != null) {
+            String trimmed = inputChar.trim();
+            if (!trimmed.isEmpty()) {
+                splitChar = trimmed.charAt(0);
+            }
+        }
+        mTerminalView.setSplitChar(splitChar);
     }
 
     private List<String> getDefaultAppLauncherButtons() {
@@ -715,6 +736,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         // Set termux terminal view
         mTerminalView = findViewById(R.id.terminal_view);
         mTerminalView.setTerminalViewClient(mTermuxTerminalViewClient);
+        applySuggestionBarInputChar();
         if (mTermuxTerminalViewClient != null)
             mTermuxTerminalViewClient.onCreate();
         if (mTermuxTerminalSessionActivityClient != null)
@@ -1279,6 +1301,33 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         unregisterReceiver(mTermuxActivityBroadcastReceiver);
     }
 
+    private void registerPackageChangeReceiver() {
+        if (mPackageChangeReceiverRegistered)
+            return;
+        IntentFilter intentFilter = new IntentFilter();
+        intentFilter.addAction(Intent.ACTION_PACKAGE_ADDED);
+        intentFilter.addAction(Intent.ACTION_PACKAGE_REMOVED);
+        intentFilter.addAction(Intent.ACTION_PACKAGE_CHANGED);
+        intentFilter.addDataScheme("package");
+        if (Build.VERSION.SDK_INT >= 28) {
+            registerReceiver(mPackageChangeReceiver, intentFilter, Context.RECEIVER_NOT_EXPORTED);
+        } else {
+            registerReceiver(mPackageChangeReceiver, intentFilter);
+        }
+        mPackageChangeReceiverRegistered = true;
+    }
+
+    private void unregisterPackageChangeReceiver() {
+        if (!mPackageChangeReceiverRegistered)
+            return;
+        try {
+            unregisterReceiver(mPackageChangeReceiver);
+        } catch (IllegalArgumentException ignored) {
+            // Ignore if already unregistered.
+        }
+        mPackageChangeReceiverRegistered = false;
+    }
+
     private void fixTermuxActivityBroadcastReceiverIntent(Intent intent) {
         if (intent == null)
             return;
@@ -1286,6 +1335,22 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         if ("storage".equals(extraReloadStyle)) {
             intent.removeExtra(TERMUX_ACTIVITY.EXTRA_RELOAD_STYLE);
             intent.setAction(TERMUX_ACTIVITY.ACTION_REQUEST_PERMISSIONS);
+        }
+    }
+
+    class PackageChangeReceiver extends BroadcastReceiver {
+
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            if (intent == null || mSuggestionBarView == null)
+                return;
+            String action = intent.getAction();
+            if (Intent.ACTION_PACKAGE_ADDED.equals(action) ||
+                Intent.ACTION_PACKAGE_REMOVED.equals(action) ||
+                Intent.ACTION_PACKAGE_CHANGED.equals(action)) {
+                mSuggestionBarView.clearAppCache();
+                mSuggestionBarView.reloadAllApps();
+            }
         }
     }
 
@@ -1333,6 +1398,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         setMargins();
         updateAppLauncherBarHeight();
         applySuggestionBarPreferences();
+        applySuggestionBarInputChar();
         setTerminalToolbarHeight();
         configureExtraKeysBackground();
         if (mPreferences != null) {

@@ -26,4 +26,11 @@ public final class SuggestionBarInputHook {
         }
         callback.reloadSuggestionBar((char) codePoint);
     }
+
+    public static void onTerminalCleared(SuggestionBarCallback callback) {
+        if (callback == null) {
+            return;
+        }
+        callback.reloadSuggestionBar(false, true);
+    }
 }

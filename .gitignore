@@ -45,3 +45,13 @@ Thumbs.db
 
 # Local QA snapshots
 .qa/
+
+# Agent documentation
+AGENTS.md
+project-plan.md
+knowledge-base.md
+CLAUDE.md
+project-ledger.md
+
+# Reference repos
+reference-repos/

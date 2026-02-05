@@ -40,6 +40,10 @@ public final class SuggestionBarView extends GridLayout {
     private int searchTolerance = 70;
     private float iconScale = 1.0f;
     private float barHeightScale = 1.0f;
+    private List<SuggestionBarButton> cachedAppButtons;
+    private long lastAppListRefreshMs = 0;
+
+    private static final long APP_LIST_CACHE_MS = 60000L;
 
     public SuggestionBarView(Context context, AttributeSet attrs) {
         super(context, attrs);
@@ -143,6 +147,11 @@ public final class SuggestionBarView extends GridLayout {
         allSuggestionButtons = getInstalledAppButtons();
         defaultButtons = null;
         reloadWithInput("", null);
+    }
+
+    public void clearAppCache() {
+        cachedAppButtons = null;
+        lastAppListRefreshMs = 0;
     }
 
     public void reloadWithInput(String input, final TerminalView terminalView) {
@@ -275,6 +284,10 @@ public final class SuggestionBarView extends GridLayout {
     }
 
     private List<SuggestionBarButton> getInstalledAppButtons() {
+        long now = System.currentTimeMillis();
+        if (cachedAppButtons != null && (now - lastAppListRefreshMs) < APP_LIST_CACHE_MS) {
+            return new ArrayList<>(cachedAppButtons);
+        }
         PackageManager packageManager = getContext().getPackageManager();
         List<ResolveInfo> launchables = getInstalledApps();
         List<SuggestionBarButton> buttons = new ArrayList<>();
@@ -295,6 +308,8 @@ public final class SuggestionBarView extends GridLayout {
                 buttons.add(new SuggetionBarAppButton(getContext(), packageName, className, appName, icon));
             }
         }
+        cachedAppButtons = new ArrayList<>(buttons);
+        lastAppListRefreshMs = now;
         return buttons;
     }
 }

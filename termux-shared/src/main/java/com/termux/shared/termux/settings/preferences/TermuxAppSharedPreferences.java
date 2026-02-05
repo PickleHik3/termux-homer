@@ -87,6 +87,23 @@ public class TermuxAppSharedPreferences extends AppSharedPreferences {
         SharedPreferenceUtils.setIntStoredAsString(mSharedPreferences, TERMUX_APP.KEY_APP_LAUNCHER_BUTTON_COUNT, value, false);
     }
 
+    public int getAppLauncherSearchTolerance() {
+        int tolerance = SharedPreferenceUtils.getIntStoredAsString(mSharedPreferences, TERMUX_APP.KEY_APP_LAUNCHER_SEARCH_TOLERANCE, TERMUX_APP.DEFAULT_APP_LAUNCHER_SEARCH_TOLERANCE);
+        return DataUtils.clamp(tolerance, 0, 100);
+    }
+
+    public void setAppLauncherSearchTolerance(int value) {
+        SharedPreferenceUtils.setIntStoredAsString(mSharedPreferences, TERMUX_APP.KEY_APP_LAUNCHER_SEARCH_TOLERANCE, value, false);
+    }
+
+    public String getAppLauncherInputChar() {
+        return SharedPreferenceUtils.getString(mSharedPreferences, TERMUX_APP.KEY_APP_LAUNCHER_INPUT_CHAR, TERMUX_APP.DEFAULT_APP_LAUNCHER_INPUT_CHAR, true);
+    }
+
+    public void setAppLauncherInputChar(String value) {
+        SharedPreferenceUtils.setString(mSharedPreferences, TERMUX_APP.KEY_APP_LAUNCHER_INPUT_CHAR, value, false);
+    }
+
     public String getAppLauncherDefaultButtons() {
         return SharedPreferenceUtils.getString(mSharedPreferences, TERMUX_APP.KEY_APP_LAUNCHER_DEFAULT_BUTTONS, TERMUX_APP.DEFAULT_APP_LAUNCHER_DEFAULT_BUTTONS, true);
     }
@@ -102,6 +119,22 @@ public class TermuxAppSharedPreferences extends AppSharedPreferences {
 
     public void setAppLauncherBarHeightScale(float value) {
         SharedPreferenceUtils.setFloat(mSharedPreferences, TERMUX_APP.KEY_APP_LAUNCHER_BAR_HEIGHT, value, false);
+    }
+
+    public boolean isAppLauncherShowIconsEnabled() {
+        return SharedPreferenceUtils.getBoolean(mSharedPreferences, TERMUX_APP.KEY_APP_LAUNCHER_SHOW_ICONS, TERMUX_APP.DEFAULT_APP_LAUNCHER_SHOW_ICONS);
+    }
+
+    public void setAppLauncherShowIconsEnabled(boolean value) {
+        SharedPreferenceUtils.setBoolean(mSharedPreferences, TERMUX_APP.KEY_APP_LAUNCHER_SHOW_ICONS, value, false);
+    }
+
+    public boolean isAppLauncherBwIconsEnabled() {
+        return SharedPreferenceUtils.getBoolean(mSharedPreferences, TERMUX_APP.KEY_APP_LAUNCHER_BW_ICONS, TERMUX_APP.DEFAULT_APP_LAUNCHER_BW_ICONS);
+    }
+
+    public void setAppLauncherBwIconsEnabled(boolean value) {
+        SharedPreferenceUtils.setBoolean(mSharedPreferences, TERMUX_APP.KEY_APP_LAUNCHER_BW_ICONS, value, false);
     }
 
     public float getAppLauncherIconScale() {
