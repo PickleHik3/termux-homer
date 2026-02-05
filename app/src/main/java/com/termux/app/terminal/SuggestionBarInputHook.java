@@ -6,6 +6,8 @@ import com.termux.app.SuggestionBarCallback;
 
 public final class SuggestionBarInputHook {
 
+    private static final StringBuilder INPUT_BUFFER = new StringBuilder();
+
     private SuggestionBarInputHook() {
     }
 
@@ -15,8 +17,13 @@ public final class SuggestionBarInputHook {
         }
         boolean delete = keyCode == KeyEvent.KEYCODE_DEL;
         boolean enter = keyCode == KeyEvent.KEYCODE_ENTER;
+        if (delete && INPUT_BUFFER.length() > 0) {
+            INPUT_BUFFER.deleteCharAt(INPUT_BUFFER.length() - 1);
+        } else if (enter) {
+            INPUT_BUFFER.setLength(0);
+        }
         if (delete || enter) {
-            callback.reloadSuggestionBar(delete, enter);
+            callback.reloadSuggestionBar(INPUT_BUFFER.toString());
         }
     }
 
@@ -24,13 +31,15 @@ public final class SuggestionBarInputHook {
         if (callback == null || ctrlDown) {
             return;
         }
-        callback.reloadSuggestionBar((char) codePoint);
+        INPUT_BUFFER.append((char) codePoint);
+        callback.reloadSuggestionBar(INPUT_BUFFER.toString());
     }
 
     public static void onTerminalCleared(SuggestionBarCallback callback) {
         if (callback == null) {
             return;
         }
-        callback.reloadSuggestionBar(false, true);
+        INPUT_BUFFER.setLength(0);
+        callback.reloadSuggestionBar("");
     }
 }

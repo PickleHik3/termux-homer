@@ -1252,38 +1252,19 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
     }
 
     @Override
-    public void reloadSuggestionBar(char inputChar) {
+    public void reloadSuggestionBar(String input) {
         if (mSuggestionBarView == null || mTerminalView == null) {
             return;
         }
-        String rawInput = mTerminalView.getCurrentInputRaw(inputChar);
-        String input = mTerminalView.getCurrentInput(inputChar);
-        input = normalizeSuggestionBarInput(rawInput, input);
-        mSuggestionBarView.reloadWithInput(input, mTerminalView);
+        String normalized = normalizeSuggestionBarInput(input);
+        mSuggestionBarView.reloadWithInput(normalized, mTerminalView);
     }
 
-    @Override
-    public void reloadSuggestionBar(boolean delete, boolean enter) {
-        if (mSuggestionBarView == null || mTerminalView == null) {
-            return;
-        }
-        String input = "";
-        if (!enter) {
-            String rawInput = mTerminalView.getCurrentInputRaw();
-            input = mTerminalView.getCurrentInput();
-            input = normalizeSuggestionBarInput(rawInput, input);
-            if (delete && input.length() > 0) {
-                input = input.substring(0, input.length() - 1);
-            }
-        }
-        mSuggestionBarView.reloadWithInput(input, mTerminalView);
-    }
-
-    private String normalizeSuggestionBarInput(String rawInput, String cleanedInput) {
+    private String normalizeSuggestionBarInput(String rawInput) {
         if (mTerminalView != null && mTerminalView.isAlternateBufferActive()) {
             return "";
         }
-        if (rawInput == null || cleanedInput == null) {
+        if (rawInput == null) {
             return "";
         }
         String trimmedRaw = rawInput.trim();
@@ -1299,7 +1280,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         if (trimmedRaw.length() > SUGGESTION_BAR_MAX_INPUT_CHARS) {
             return "";
         }
-        return cleanedInput;
+        return trimmedRaw;
     }
 
     private boolean containsAppSearchSeparator(String value) {
