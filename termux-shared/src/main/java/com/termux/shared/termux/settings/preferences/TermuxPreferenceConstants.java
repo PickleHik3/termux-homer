@@ -127,7 +127,7 @@ public final class TermuxPreferenceConstants {
          */
         public static final String KEY_APP_LAUNCHER_INPUT_CHAR = "app_launcher_input_char";
 
-        public static final String DEFAULT_APP_LAUNCHER_INPUT_CHAR = "\u276F";
+        public static final String DEFAULT_APP_LAUNCHER_INPUT_CHAR = "";
 
         /**
          * Defines the key for app launcher default buttons.

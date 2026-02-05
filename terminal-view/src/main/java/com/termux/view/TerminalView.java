@@ -745,6 +745,9 @@ public final class TerminalView extends View {
             }
         }
         int splitIndex = workingText.indexOf(splitChar);
+        if (splitIndex < 0 && splitChar != ' ') {
+            splitIndex = workingText.indexOf(' ');
+        }
         if (splitIndex < 0) {
             return null;
         }
