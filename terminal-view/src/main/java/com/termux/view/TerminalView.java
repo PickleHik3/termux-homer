@@ -728,6 +728,24 @@ public final class TerminalView extends View {
         return extractCurrentInputFromLine(originalText, mEmulator.getCursorCol(), mSplitChar, currentChar);
     }
 
+    public String getCurrentInputRaw() {
+        if (mEmulator == null) {
+            return null;
+        }
+        int rowAbs = mTopRow + mEmulator.getCursorRow();
+        String originalText = mEmulator.getScreen().getSelectedText(0, rowAbs, mEmulator.mColumns, rowAbs);
+        return extractCurrentInputFromLineRaw(originalText, mEmulator.getCursorCol(), mSplitChar, null);
+    }
+
+    public String getCurrentInputRaw(char currentChar) {
+        if (mEmulator == null) {
+            return null;
+        }
+        int rowAbs = mTopRow + mEmulator.getCursorRow();
+        String originalText = mEmulator.getScreen().getSelectedText(0, rowAbs, mEmulator.mColumns, rowAbs);
+        return extractCurrentInputFromLineRaw(originalText, mEmulator.getCursorCol(), mSplitChar, currentChar);
+    }
+
     public boolean isAlternateBufferActive() {
         return mEmulator != null && mEmulator.isAlternateBufferActive();
     }
@@ -759,6 +777,32 @@ public final class TerminalView extends View {
         text = text.replaceAll("[^a-zA-Z ]", "");
         text = text.replaceAll(" {2,}", " ");
         return text.trim();
+    }
+
+    static String extractCurrentInputFromLineRaw(String originalText, int cut, char splitChar, Character insertCharOrNull) {
+        if (originalText == null) {
+            return null;
+        }
+        String workingText = originalText;
+        if (insertCharOrNull != null) {
+            if (cut == 0 || cut >= workingText.length()) {
+                workingText = workingText + insertCharOrNull.charValue();
+            } else if (cut > 0) {
+                StringBuilder builder = new StringBuilder(workingText.length() + 1);
+                builder.append(workingText, 0, cut);
+                builder.append(insertCharOrNull.charValue());
+                builder.append(workingText.substring(cut));
+                workingText = builder.toString();
+            }
+        }
+        int splitIndex = workingText.indexOf(splitChar);
+        if (splitIndex < 0 && splitChar != ' ') {
+            splitIndex = workingText.indexOf(' ');
+        }
+        if (splitIndex < 0) {
+            return null;
+        }
+        return workingText.substring(splitIndex + 1).trim();
     }
 
     /**

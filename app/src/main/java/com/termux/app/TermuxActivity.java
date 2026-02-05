@@ -251,7 +251,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
     private static final String LOG_TAG = "TermuxActivity";
 
     private static final int SUGGESTION_BAR_MIN_BUTTON_DP = 56;
-    private static final int SUGGESTION_BAR_MAX_INPUT_CHARS = 32;
+    private static final int SUGGESTION_BAR_MAX_INPUT_CHARS = 20;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -1256,11 +1256,9 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         if (mSuggestionBarView == null || mTerminalView == null) {
             return;
         }
+        String rawInput = mTerminalView.getCurrentInputRaw(inputChar);
         String input = mTerminalView.getCurrentInput(inputChar);
-        input = normalizeSuggestionBarInput(input);
-        if (input.length() > SUGGESTION_BAR_MAX_INPUT_CHARS) {
-            input = "";
-        }
+        input = normalizeSuggestionBarInput(rawInput, input);
         mSuggestionBarView.reloadWithInput(input, mTerminalView);
     }
 
@@ -1271,11 +1269,9 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         }
         String input = "";
         if (!enter) {
+            String rawInput = mTerminalView.getCurrentInputRaw();
             input = mTerminalView.getCurrentInput();
-            input = normalizeSuggestionBarInput(input);
-            if (input.length() > SUGGESTION_BAR_MAX_INPUT_CHARS) {
-                input = "";
-            }
+            input = normalizeSuggestionBarInput(rawInput, input);
             if (delete && input.length() > 0) {
                 input = input.substring(0, input.length() - 1);
             }
@@ -1283,17 +1279,43 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         mSuggestionBarView.reloadWithInput(input, mTerminalView);
     }
 
-    private String normalizeSuggestionBarInput(String input) {
+    private String normalizeSuggestionBarInput(String rawInput, String cleanedInput) {
         if (mTerminalView != null && mTerminalView.isAlternateBufferActive()) {
             return "";
         }
-        if (input == null) {
+        if (rawInput == null || cleanedInput == null) {
             return "";
         }
-        if (input.indexOf(' ') >= 0) {
+        String trimmedRaw = rawInput.trim();
+        if (trimmedRaw.isEmpty()) {
             return "";
         }
-        return input;
+        if (trimmedRaw.indexOf(' ') >= 0) {
+            return "";
+        }
+        if (containsAppSearchSeparator(trimmedRaw)) {
+            return "";
+        }
+        if (trimmedRaw.length() > SUGGESTION_BAR_MAX_INPUT_CHARS) {
+            return "";
+        }
+        return cleanedInput;
+    }
+
+    private boolean containsAppSearchSeparator(String value) {
+        for (int i = 0; i < value.length(); i++) {
+            switch (value.charAt(i)) {
+                case '/':
+                case '.':
+                case '-':
+                case '_':
+                case ':':
+                    return true;
+                default:
+                    break;
+            }
+        }
+        return false;
     }
 
     public static void updateTermuxActivityStyling(Context context, boolean recreateActivity) {
