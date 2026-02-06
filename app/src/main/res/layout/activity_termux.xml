@@ -6,7 +6,21 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:fitsSystemWindows="true">
+    android:fitsSystemWindows="false">
+
+    <View
+        android:id="@+id/terminal_monetbackground"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@color/background_accent"/>
+
+    <com.github.mmin18.widget.RealtimeBlurView
+        android:id="@+id/terminal_backgroundblur"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="gone"
+        app:realtimeBlurRadius="10dp"
+        app:realtimeOverlayColor="@android:color/transparent" />
 
     <RelativeLayout
         android:id="@+id/activity_termux_root_relative_layout"
@@ -15,7 +29,8 @@
         android:layout_weight="1"
         android:layout_marginHorizontal="0dp"
         android:layout_marginVertical="0dp"
-        android:orientation="vertical">
+        android:orientation="vertical"
+        android:fitsSystemWindows="true">
 
         <androidx.drawerlayout.widget.DrawerLayout
             android:id="@+id/drawer_layout"
@@ -23,20 +38,6 @@
             android:layout_height="match_parent"
             android:layout_alignParentTop="true"
             android:layout_above="@+id/apps_bar_container">
-
-            <View
-                android:id="@+id/terminal_monetbackground"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:background="@color/background_accent"/>
-
-            <com.github.mmin18.widget.RealtimeBlurView
-                android:id="@+id/terminal_backgroundblur"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:visibility="gone"
-                app:realtimeBlurRadius="10dp"
-                app:realtimeOverlayColor="@android:color/transparent" />
 
             <com.termux.view.TerminalView
                 android:id="@+id/terminal_view"
