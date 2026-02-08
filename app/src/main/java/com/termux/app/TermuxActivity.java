@@ -101,6 +101,11 @@ import java.util.List;
  */
 public final class TermuxActivity extends AppCompatActivity implements ServiceConnection, SuggestionBarCallback {
 
+    private static final long SUGGESTION_BAR_DEBOUNCE_MS = 50;
+    private final Handler mSuggestionBarHandler = new Handler(Looper.getMainLooper());
+    private Runnable mSuggestionBarPendingUpdate;
+    private String mLastSuggestionBarInput = null;
+
     /**
      * The connection to the {@link TermuxService}. Requested in {@link #onCreate(Bundle)} with a call to
      * {@link #bindService(Intent, ServiceConnection, int)}, and obtained and stored in
@@ -1270,9 +1275,20 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         if (mSuggestionBarView == null || mTerminalView == null) {
             return;
         }
-        String input = mTerminalView.getCurrentInput(inputChar);
-        String normalized = normalizeSuggestionBarInput(input);
-        mSuggestionBarView.reloadWithInput(normalized, mTerminalView);
+        // Debounce the update to avoid flickering from rapid keystrokes
+        if (mSuggestionBarPendingUpdate != null) {
+            mSuggestionBarHandler.removeCallbacks(mSuggestionBarPendingUpdate);
+        }
+        mSuggestionBarPendingUpdate = () -> {
+            String input = mTerminalView.getCurrentInput(inputChar);
+            String normalized = normalizeSuggestionBarInput(input);
+            // Only update if input changed
+            if (!normalized.equals(mLastSuggestionBarInput)) {
+                mLastSuggestionBarInput = normalized;
+                mSuggestionBarView.reloadWithInput(normalized, mTerminalView);
+            }
+        };
+        mSuggestionBarHandler.postDelayed(mSuggestionBarPendingUpdate, SUGGESTION_BAR_DEBOUNCE_MS);
     }
 
     @Override
@@ -1280,12 +1296,20 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         if (mSuggestionBarView == null || mTerminalView == null) {
             return;
         }
+        // Cancel any pending char updates
+        if (mSuggestionBarPendingUpdate != null) {
+            mSuggestionBarHandler.removeCallbacks(mSuggestionBarPendingUpdate);
+        }
         if (enter) {
+            mLastSuggestionBarInput = "";
             mSuggestionBarView.reloadWithInput("", mTerminalView);
         } else if (delete) {
             String input = mTerminalView.getCurrentInput();
             String normalized = normalizeSuggestionBarInput(input);
-            mSuggestionBarView.reloadWithInput(normalized, mTerminalView);
+            if (!normalized.equals(mLastSuggestionBarInput)) {
+                mLastSuggestionBarInput = normalized;
+                mSuggestionBarView.reloadWithInput(normalized, mTerminalView);
+            }
         }
     }
 
