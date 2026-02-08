@@ -232,14 +232,6 @@ public class TermuxTerminalViewClient extends TermuxTerminalViewClientBase {
     public boolean onKeyDown(int keyCode, KeyEvent e, TerminalSession currentSession) {
         if (handleVirtualKeys(keyCode, e, true))
             return true;
-        if (e.isCtrlPressed()) {
-            int unicodeChar = e.getUnicodeChar(0);
-            if (unicodeChar == 3 || unicodeChar == 12 || unicodeChar == 21 || unicodeChar == 24) {
-                if (mSuggestionBarCallback != null) {
-                    mSuggestionBarCallback.reloadSuggestionBar(false, true);
-                }
-            }
-        }
         if (keyCode == KeyEvent.KEYCODE_ENTER && !currentSession.isRunning()) {
             mTermuxTerminalSessionActivityClient.removeFinishedSession(currentSession);
             return true;
@@ -362,12 +354,6 @@ public class TermuxTerminalViewClient extends TermuxTerminalViewClientBase {
 
     @Override
     public boolean onCodePoint(final int codePoint, boolean ctrlDown, TerminalSession session) {
-        if (codePoint == 3 || codePoint == 12 || codePoint == 21 || codePoint == 24) {
-            // Ctrl+C, Ctrl+L, Ctrl+U, Ctrl+X
-            if (mSuggestionBarCallback != null) {
-                mSuggestionBarCallback.reloadSuggestionBar(false, true);
-            }
-        }
         if (mVirtualFnKeyDown) {
             int resultingKeyCode = -1;
             int resultingCodePoint = -1;
@@ -496,7 +482,10 @@ public class TermuxTerminalViewClient extends TermuxTerminalViewClientBase {
             }
         }
         if (mSuggestionBarCallback != null && !ctrlDown) {
-            mSuggestionBarCallback.reloadSuggestionBar((char) codePoint);
+            char[] chars = Character.toChars(codePoint);
+            if (chars.length == 1) {
+                mSuggestionBarCallback.reloadSuggestionBar(chars[0]);
+            }
         }
         return false;
     }
