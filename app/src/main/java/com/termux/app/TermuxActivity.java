@@ -457,7 +457,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
     }
     
     private void configureExtraKeysBackground() {
-        View appsBarContainer = findViewById(R.id.apps_bar_container);
+        View appsBarViewPager = findViewById(R.id.apps_bar_viewpager);
         View extraKeysBackground = findViewById(R.id.extrakeys_background);
         View extraKeysBackgroundBlur = findViewById(R.id.extrakeys_backgroundblur);
         View appsBarBackground = findViewById(R.id.apps_bar_background);
@@ -666,13 +666,53 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
     }
 
     private void setSuggestionBarView() {
-        FrameLayout appsBarContainer = findViewById(R.id.apps_bar_container);
-        if (appsBarContainer == null) {
+        final ViewPager viewPager = findViewById(R.id.apps_bar_viewpager);
+        if (viewPager == null) {
             return;
         }
-        LayoutInflater.from(this).inflate(R.layout.suggestion_bar, appsBarContainer, true);
-        mSuggestionBarView = appsBarContainer.findViewById(R.id.suggestion_bar);
-        applySuggestionBarPreferences();
+
+        // Set height based on preferences
+        ViewGroup.LayoutParams layoutParams = viewPager.getLayoutParams();
+        float barHeightScale = mPreferences.getAppLauncherBarHeightScale();
+        int defaultHeight = getResources().getDimensionPixelSize(R.dimen.terminal_toolbar_default_height);
+        layoutParams.height = Math.round(defaultHeight * barHeightScale);
+        viewPager.setLayoutParams(layoutParams);
+
+        final SuggestionBarCallback suggestionBarCallback = this;
+        viewPager.setAdapter(new ViewPager.PagerAdapter() {
+            @Override
+            public int getCount() {
+                return 1; // count of pages to scroll through
+            }
+
+            @Override
+            public boolean isViewFromObject(@NonNull View view, @NonNull Object object) {
+                return view == object;
+            }
+
+            @NonNull
+            @Override
+            public Object instantiateItem(@NonNull ViewGroup collection, int position) {
+                LayoutInflater inflater = LayoutInflater.from(TermuxActivity.this);
+                mSuggestionBarView = (SuggestionBarView) inflater.inflate(R.layout.suggestion_bar, collection, false);
+                applySuggestionBarPreferences();
+                mTermuxTerminalViewClient.setSuggestionBarCallback(suggestionBarCallback);
+                collection.addView(mSuggestionBarView);
+                return mSuggestionBarView;
+            }
+
+            @Override
+            public void destroyItem(@NonNull ViewGroup collection, int position, @NonNull Object view) {
+                collection.removeView((View) view);
+            }
+        });
+
+        viewPager.addOnPageChangeListener(new ViewPager.SimpleOnPageChangeListener() {
+            @Override
+            public void onPageSelected(int position) {
+                mTerminalView.requestFocus();
+            }
+        });
     }
 
     static int calculateSuggestionBarMaxButtons(DisplayMetrics displayMetrics) {
@@ -695,10 +735,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         }
         mSuggestionBarView.setMaxButtonCount(maxButtons);
         mSuggestionBarView.setDefaultButtons(getDefaultAppLauncherButtons());
-        float barHeightScale = mPreferences.getAppLauncherBarHeightScale();
-        float iconScale = mPreferences.getAppLauncherIconScale();
-        mSuggestionBarView.setBarHeightScale(barHeightScale);
-        mSuggestionBarView.setIconScale(iconScale);
+        mSuggestionBarView.setTextSize(12f);
         mSuggestionBarView.setSearchTolerance(mPreferences.getAppLauncherSearchTolerance());
         mSuggestionBarView.setShowIcons(mPreferences.isAppLauncherShowIconsEnabled());
         mSuggestionBarView.setBandW(mPreferences.isAppLauncherBwIconsEnabled());
@@ -794,14 +831,14 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         if (barHeightPx < 0) {
             barHeightPx = 0;
         }
-        updateViewHeight(R.id.apps_bar_container, barHeightPx);
+        updateViewHeight(R.id.apps_bar_viewpager, barHeightPx);
         updateViewHeight(R.id.apps_bar_background, barHeightPx);
         updateViewHeight(R.id.apps_bar_backgroundblur, barHeightPx);
     }
 
     public void setTerminalToolbarHeight() {
         final ViewPager terminalToolbarViewPager = getTerminalToolbarViewPager();
-        View appsBarContainer = findViewById(R.id.apps_bar_container);
+        View appsBarViewPager = findViewById(R.id.apps_bar_viewpager);
         View extraKeysBackgroundBlur = findViewById(R.id.extrakeys_backgroundblur);
         View extraKeysBackground = findViewById(R.id.extrakeys_background);
         if (terminalToolbarViewPager == null)

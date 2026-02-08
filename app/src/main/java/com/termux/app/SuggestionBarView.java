@@ -29,24 +29,24 @@ import me.xdrop.fuzzywuzzy.FuzzySearch;
 public final class SuggestionBarView extends GridLayout {
 
     private static final int TEXT_COLOR = 0xFFC0B18B;
-    private TermuxPreferences settings;
     private List<SuggestionBarButton> allSuggestionButtons;
     private List<SuggestionBarButton> defaultButtons;
     private int applicationSequenceNumber = 0;
 
-    // termux-homer compatibility fields
-    private int maxButtonCount = 0;
+    // Settings fields (replaces TermuxPreferences from TEL)
+    private int maxButtonCount = 5;
     private float textSize = 12f;
     private boolean showIcons = true;
     private boolean bandW = false;
     private int searchTolerance = 70;
+    private float iconScale = 1.0f;
     private List<String> defaultButtonStrings = new ArrayList<>();
 
     public SuggestionBarView(Context context, AttributeSet attrs) {
         super(context, attrs);
     }
 
-    // termux-homer compatibility methods
+    // Settings setters (termux-homer compatibility)
     public void setMaxButtonCount(int maxButtonCount) {
         this.maxButtonCount = maxButtonCount;
     }
@@ -67,6 +67,10 @@ public final class SuggestionBarView extends GridLayout {
         this.searchTolerance = searchTolerance;
     }
 
+    public void setIconScale(float iconScale) {
+        this.iconScale = iconScale;
+    }
+
     public void setDefaultButtons(List<String> defaultButtons) {
         if (defaultButtons == null) {
             this.defaultButtonStrings = new ArrayList<>();
@@ -76,45 +80,33 @@ public final class SuggestionBarView extends GridLayout {
         this.defaultButtons = null;
     }
 
+    public void clearAppCache() {
+        allSuggestionButtons = null;
+        defaultButtons = null;
+        applicationSequenceNumber = 0;
+    }
+
     private int getButtonCount() {
-        if (settings != null) {
-            return settings.getButtonCount();
-        }
-        return maxButtonCount > 0 ? maxButtonCount : 5;
+        return maxButtonCount;
     }
 
     private int getSearchTolerance() {
-        if (settings != null) {
-            return settings.getSearchTolerance();
-        }
         return searchTolerance;
     }
 
     private boolean isShowIcons() {
-        if (settings != null) {
-            return settings.isShowIcons();
-        }
         return showIcons;
     }
 
     private boolean getBandW() {
-        if (settings != null) {
-            return settings.getBandW();
-        }
         return bandW;
     }
 
     private float getTextSize() {
-        if (settings != null) {
-            return settings.getTextSize();
-        }
         return textSize;
     }
 
     private List<String> getDefaultButtons() {
-        if (settings != null) {
-            return settings.getDefaultButtons();
-        }
         return defaultButtonStrings;
     }
 
@@ -159,6 +151,7 @@ public final class SuggestionBarView extends GridLayout {
     void reloadAllApps(){
             allSuggestionButtons = getInstalledAppButtons();
     }
+
     void reloadWithInput(String input, final TerminalView terminalView){
         if(allSuggestionButtons == null){
             reloadAllApps();
@@ -232,7 +225,6 @@ public final class SuggestionBarView extends GridLayout {
                 imageButton.setOnClickListener(v->{
                     currentButton.click();
                     if(terminalView != null){
-                        terminalView.clearInputLine();
                         reloadWithInput("",terminalView);
                     }
                 });
@@ -247,7 +239,6 @@ public final class SuggestionBarView extends GridLayout {
                 button.setOnClickListener(v->{
                     currentButton.click();
                     if(terminalView != null){
-                        terminalView.clearInputLine();
                         reloadWithInput("",terminalView);
                     }
                 });
@@ -302,24 +293,12 @@ public final class SuggestionBarView extends GridLayout {
         }
         return buttons;
     }
+
     /**
-     * Reload the view given parameters in termux.properties
-     *
-     * param infos matrix as defined in termux.properties extrakeys
-     * Can Contain The Strings CTRL ALT TAB FN ENTER LEFT RIGHT UP DOWN or normal strings
-     * Some aliases are possible like RETURN for ENTER, LT for LEFT and more (@see controlCharsAliases for the whole list).
-     * Any string of length > 1 in total Uppercase will print a warning
-     *
-     * Examples:
-     * "ENTER" will trigger the ENTER keycode
-     * "LEFT" will trigger the LEFT keycode and be displayed as "←"
-     * "→" will input a "→" character
-     * "−" will input a "−" character
-     * "-_-" will input the string "-_-"
+     * Reload the view with settings
      */
     @SuppressLint("ClickableViewAccessibility")
-    void reload(TermuxPreferences settings) {
-        this.settings = settings;
+    void reload() {
         reloadWithInput("",null);
     }
 
