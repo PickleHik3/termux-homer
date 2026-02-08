@@ -1266,12 +1266,27 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
     }
 
     @Override
-    public void reloadSuggestionBar(String input) {
+    public void reloadSuggestionBar(char inputChar) {
         if (mSuggestionBarView == null || mTerminalView == null) {
             return;
         }
+        String input = mTerminalView.getCurrentInput(inputChar);
         String normalized = normalizeSuggestionBarInput(input);
         mSuggestionBarView.reloadWithInput(normalized, mTerminalView);
+    }
+
+    @Override
+    public void reloadSuggestionBar(boolean delete, boolean enter) {
+        if (mSuggestionBarView == null || mTerminalView == null) {
+            return;
+        }
+        if (enter) {
+            mSuggestionBarView.reloadWithInput("", mTerminalView);
+        } else if (delete) {
+            String input = mTerminalView.getCurrentInput();
+            String normalized = normalizeSuggestionBarInput(input);
+            mSuggestionBarView.reloadWithInput(normalized, mTerminalView);
+        }
     }
 
     private String normalizeSuggestionBarInput(String rawInput) {

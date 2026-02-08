@@ -235,7 +235,9 @@ public class TermuxTerminalViewClient extends TermuxTerminalViewClientBase {
         if (e.isCtrlPressed()) {
             int unicodeChar = e.getUnicodeChar(0);
             if (unicodeChar == 3 || unicodeChar == 12 || unicodeChar == 21 || unicodeChar == 24) {
-                SuggestionBarInputHook.onTerminalCleared(mSuggestionBarCallback);
+                if (mSuggestionBarCallback != null) {
+                    mSuggestionBarCallback.reloadSuggestionBar(false, true);
+                }
             }
         }
         if (keyCode == KeyEvent.KEYCODE_ENTER && !currentSession.isRunning()) {
@@ -284,7 +286,9 @@ public class TermuxTerminalViewClient extends TermuxTerminalViewClientBase {
             return true;
         }
         if (keyCode == KeyEvent.KEYCODE_DEL || keyCode == KeyEvent.KEYCODE_ENTER) {
-            SuggestionBarInputHook.onKeyDown(mSuggestionBarCallback, keyCode);
+            if (mSuggestionBarCallback != null) {
+                mSuggestionBarCallback.reloadSuggestionBar(keyCode == KeyEvent.KEYCODE_DEL, keyCode == KeyEvent.KEYCODE_ENTER);
+            }
         }
         return false;
     }
@@ -489,7 +493,9 @@ public class TermuxTerminalViewClient extends TermuxTerminalViewClientBase {
                 }
             }
         }
-        SuggestionBarInputHook.onCodePoint(mSuggestionBarCallback, codePoint, ctrlDown);
+        if (mSuggestionBarCallback != null && !ctrlDown) {
+            mSuggestionBarCallback.reloadSuggestionBar((char) codePoint);
+        }
         return false;
     }
 
