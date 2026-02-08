@@ -1290,9 +1290,6 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
     }
 
     private String normalizeSuggestionBarInput(String rawInput) {
-        if (mTerminalView != null && mTerminalView.isAlternateBufferActive()) {
-            return "";
-        }
         if (rawInput == null) {
             return "";
         }

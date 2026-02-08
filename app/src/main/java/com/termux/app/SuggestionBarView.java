@@ -11,6 +11,7 @@ import android.graphics.ColorMatrixColorFilter;
 import android.graphics.drawable.Drawable;
 import android.os.Build;
 import android.util.AttributeSet;
+import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.GridLayout;
@@ -43,6 +44,10 @@ public final class SuggestionBarView extends GridLayout {
     private List<SuggestionBarButton> cachedAppButtons;
     private long lastAppListRefreshMs = 0;
 
+    // Track current state to avoid unnecessary rebuilds
+    private String lastInput = null;
+    private List<SuggestionBarButton> currentDisplayedButtons = new ArrayList<>();
+
     private static final long APP_LIST_CACHE_MS = 60000L;
 
     public SuggestionBarView(Context context, AttributeSet attrs) {
@@ -56,6 +61,8 @@ public final class SuggestionBarView extends GridLayout {
             allSuggestionButtons = new ArrayList<>(buttons);
         }
         defaultButtons = null;
+        lastInput = null;
+        currentDisplayedButtons.clear();
         reloadWithInput("", null);
     }
 
@@ -146,6 +153,8 @@ public final class SuggestionBarView extends GridLayout {
     public void reloadAllApps() {
         allSuggestionButtons = getInstalledAppButtons();
         defaultButtons = null;
+        lastInput = null;
+        currentDisplayedButtons.clear();
         reloadWithInput("", null);
     }
 
@@ -155,17 +164,27 @@ public final class SuggestionBarView extends GridLayout {
     }
 
     public void reloadWithInput(String input, final TerminalView terminalView) {
-        List<SuggestionBarButton> suggestionButtons = new ArrayList<>(allSuggestionButtons);
-        removeAllViews();
+        // Normalize input
+        if (input == null) {
+            input = "";
+        }
 
-        int buttonCount = maxButtonCount > 0 ? maxButtonCount : suggestionButtons.size();
-        if (buttonCount <= 0 || suggestionButtons.isEmpty()) {
+        int buttonCount = maxButtonCount > 0 ? maxButtonCount : allSuggestionButtons.size();
+        if (buttonCount <= 0 || allSuggestionButtons.isEmpty()) {
+            if (getChildCount() > 0) {
+                removeAllViews();
+                currentDisplayedButtons.clear();
+            }
             setRowCount(1);
             setColumnCount(0);
+            lastInput = input;
             return;
         }
 
-        if (input != null && input.length() > 0 && !" ".equals(input)) {
+        // Compute the filtered button list
+        List<SuggestionBarButton> suggestionButtons = new ArrayList<>(allSuggestionButtons);
+
+        if (input.length() > 0 && !" ".equals(input)) {
             suggestionButtons = searchButtons(suggestionButtons, input, input.length() > 2);
         } else if (!defaultButtonStrings.isEmpty()) {
             if (defaultButtons == null) {
@@ -194,6 +213,23 @@ public final class SuggestionBarView extends GridLayout {
             }
         }
 
+        // Limit to buttonCount
+        if (suggestionButtons.size() > buttonCount) {
+            suggestionButtons = suggestionButtons.subList(0, buttonCount);
+        }
+
+        // Check if we need to rebuild - compare current vs new button list
+        if (input.equals(lastInput) && areButtonListsEqual(currentDisplayedButtons, suggestionButtons)) {
+            // No change, skip rebuild to avoid flicker
+            return;
+        }
+
+        // Update tracking
+        lastInput = input;
+        currentDisplayedButtons = new ArrayList<>(suggestionButtons);
+
+        // Rebuild the view
+        removeAllViews();
         setRowCount(1);
         setColumnCount(buttonCount);
 
@@ -272,6 +308,21 @@ public final class SuggestionBarView extends GridLayout {
                 addView(imageButton);
             }
         }
+    }
+
+    /**
+     * Compare two button lists for equality (same buttons in same order)
+     */
+    private boolean areButtonListsEqual(List<SuggestionBarButton> list1, List<SuggestionBarButton> list2) {
+        if (list1.size() != list2.size()) {
+            return false;
+        }
+        for (int i = 0; i < list1.size(); i++) {
+            if (list1.get(i) != list2.get(i)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private List<ResolveInfo> getInstalledApps() {
