@@ -228,7 +228,10 @@ public final class SuggestionBarView extends GridLayout {
         lastInput = input;
         currentDisplayedButtons = new ArrayList<>(suggestionButtons);
 
-        // Rebuild the view
+        // Rebuild the view - suppress layout to prevent parent relayout
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR2) {
+            suppressLayout(true);
+        }
         removeAllViews();
         setRowCount(1);
         setColumnCount(buttonCount);
@@ -307,6 +310,9 @@ public final class SuggestionBarView extends GridLayout {
                 imageButton.setVisibility(INVISIBLE);
                 addView(imageButton);
             }
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR2) {
+            suppressLayout(false);
         }
     }
 
