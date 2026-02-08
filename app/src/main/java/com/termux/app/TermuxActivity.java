@@ -281,6 +281,8 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
             mIsInvalidState = true;
             return;
         }
+        // Disable terminal margin adjustment to prevent flicker/jitter from layout oscillations.
+        mPreferences.setTerminalMarginAdjustment(false);
         setMargins();
         setSuggestionBarView();
         mTermuxActivityRootView = findViewById(R.id.activity_termux_root_view);
