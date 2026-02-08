@@ -225,6 +225,7 @@ public final class SuggestionBarView extends GridLayout {
                 imageButton.setOnClickListener(v->{
                     currentButton.click();
                     if(terminalView != null){
+                        terminalView.clearInputLine();
                         reloadWithInput("",terminalView);
                     }
                 });
@@ -239,6 +240,7 @@ public final class SuggestionBarView extends GridLayout {
                 button.setOnClickListener(v->{
                     currentButton.click();
                     if(terminalView != null){
+                        terminalView.clearInputLine();
                         reloadWithInput("",terminalView);
                     }
                 });

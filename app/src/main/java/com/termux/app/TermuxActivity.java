@@ -736,7 +736,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         }
         mSuggestionBarView.setMaxButtonCount(maxButtons);
         mSuggestionBarView.setDefaultButtons(getDefaultAppLauncherButtons());
-        mSuggestionBarView.setTextSize(12f);
+        mSuggestionBarView.setTextSize(10f);
         mSuggestionBarView.setSearchTolerance(mPreferences.getAppLauncherSearchTolerance());
         mSuggestionBarView.setShowIcons(mPreferences.isAppLauncherShowIconsEnabled());
         mSuggestionBarView.setBandW(mPreferences.isAppLauncherBwIconsEnabled());
@@ -1312,8 +1312,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         if (input == null) {
             input = "";
         }
-        String normalized = normalizeSuggestionBarInput(input);
-        mSuggestionBarView.reloadWithInput(normalized, mTerminalView);
+        mSuggestionBarView.reloadWithInput(input, mTerminalView);
     }
 
     @Override
@@ -1323,13 +1322,15 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         }
         if (enter) {
             mSuggestionBarView.reloadWithInput("", mTerminalView);
-        } else if (delete) {
+        } else {
             String input = mTerminalView.getCurrentInput();
             if (input == null) {
                 input = "";
             }
-            String normalized = normalizeSuggestionBarInput(input);
-            mSuggestionBarView.reloadWithInput(normalized, mTerminalView);
+            if (delete && input.length() > 0) {
+                input = input.substring(0, input.length() - 1);
+            }
+            mSuggestionBarView.reloadWithInput(input, mTerminalView);
         }
     }
 
