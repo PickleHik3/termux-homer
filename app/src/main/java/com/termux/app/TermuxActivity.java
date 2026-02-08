@@ -696,6 +696,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
                 LayoutInflater inflater = LayoutInflater.from(TermuxActivity.this);
                 mSuggestionBarView = (SuggestionBarView) inflater.inflate(R.layout.suggestion_bar, collection, false);
                 applySuggestionBarPreferences();
+                mSuggestionBarView.reload();
                 mTermuxTerminalViewClient.setSuggestionBarCallback(suggestionBarCallback);
                 collection.addView(mSuggestionBarView);
                 return mSuggestionBarView;
