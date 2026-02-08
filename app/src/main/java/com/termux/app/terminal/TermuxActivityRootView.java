@@ -212,6 +212,11 @@ public class TermuxActivityRootView extends LinearLayout implements ViewTreeObse
         } else // ELse find the part of the extra keys/terminal that is hidden and add a margin accordingly
         {
             int pxHidden = bottomSpaceViewRect.bottom - windowAvailableRect.bottom;
+            // Avoid tiny margin oscillations that can cause flicker (e.g. 10-15dp jumps during layout passes).
+            int smallMarginThresholdPx = (int) ViewUtils.dpToPx(getContext(), 16);
+            if (pxHidden > 0 && pxHidden <= smallMarginThresholdPx) {
+                pxHidden = 0;
+            }
             if (root_view_logging_enabled)
                 Logger.logVerbose(LOG_TAG, "pxHidden " + pxHidden + ", bottom " + params.bottomMargin);
             boolean setMargin = params.bottomMargin != pxHidden;
