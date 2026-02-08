@@ -99,7 +99,7 @@ public final class TermuxPreferenceConstants {
          */
         public static final String KEY_TERMINAL_MARGIN_ADJUSTMENT = "terminal_margin_adjustment";
 
-        public static final boolean DEFAULT_TERMINAL_MARGIN_ADJUSTMENT = true;
+        public static final boolean DEFAULT_TERMINAL_MARGIN_ADJUSTMENT = false;
 
         /**
          * Defines the key for whether to show terminal toolbar containing extra keys and text input field.

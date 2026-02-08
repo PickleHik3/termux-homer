@@ -281,6 +281,8 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
             mIsInvalidState = true;
             return;
         }
+        // Disable terminal margin adjustment to prevent flicker/jitter from layout oscillations.
+        mPreferences.setTerminalMarginAdjustment(false);
         setMargins();
         setSuggestionBarView();
         mTermuxActivityRootView = findViewById(R.id.activity_termux_root_view);
@@ -457,7 +459,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
     }
     
     private void configureExtraKeysBackground() {
-        View appsBarContainer = findViewById(R.id.apps_bar_container);
+        View appsBarViewPager = findViewById(R.id.apps_bar_viewpager);
         View extraKeysBackground = findViewById(R.id.extrakeys_background);
         View extraKeysBackgroundBlur = findViewById(R.id.extrakeys_backgroundblur);
         View appsBarBackground = findViewById(R.id.apps_bar_background);
@@ -483,14 +485,14 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
             if (appsBarBackground != null) {
                 appsBarBackground.setVisibility(View.GONE);
             }
-            if (appsBarContainer != null) {
-                appsBarContainer.setVisibility(View.GONE);
+            if (appsBarViewPager != null) {
+                appsBarViewPager.setVisibility(View.GONE);
             }
             return;
         }
 
-        if (appsBarContainer != null) {
-            appsBarContainer.setVisibility(View.VISIBLE);
+        if (appsBarViewPager != null) {
+            appsBarViewPager.setVisibility(View.VISIBLE);
         }
 
         if (appsBarBackground != null) {
@@ -666,13 +668,54 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
     }
 
     private void setSuggestionBarView() {
-        FrameLayout appsBarContainer = findViewById(R.id.apps_bar_container);
-        if (appsBarContainer == null) {
+        final ViewPager viewPager = findViewById(R.id.apps_bar_viewpager);
+        if (viewPager == null) {
             return;
         }
-        LayoutInflater.from(this).inflate(R.layout.suggestion_bar, appsBarContainer, true);
-        mSuggestionBarView = appsBarContainer.findViewById(R.id.suggestion_bar);
-        applySuggestionBarPreferences();
+
+        // Set height based on preferences
+        ViewGroup.LayoutParams layoutParams = viewPager.getLayoutParams();
+        float barHeightScale = mPreferences.getAppLauncherBarHeightScale();
+        int defaultHeight = (int) (getResources().getDisplayMetrics().density * 37.5f);
+        layoutParams.height = Math.round(defaultHeight * barHeightScale);
+        viewPager.setLayoutParams(layoutParams);
+
+        final SuggestionBarCallback suggestionBarCallback = this;
+        viewPager.setAdapter(new androidx.viewpager.widget.PagerAdapter() {
+            @Override
+            public int getCount() {
+                return 1; // count of pages to scroll through
+            }
+
+            @Override
+            public boolean isViewFromObject(@NonNull View view, @NonNull Object object) {
+                return view == object;
+            }
+
+            @NonNull
+            @Override
+            public Object instantiateItem(@NonNull ViewGroup collection, int position) {
+                LayoutInflater inflater = LayoutInflater.from(TermuxActivity.this);
+                mSuggestionBarView = (SuggestionBarView) inflater.inflate(R.layout.suggestion_bar, collection, false);
+                applySuggestionBarPreferences();
+                mSuggestionBarView.reload();
+                mTermuxTerminalViewClient.setSuggestionBarCallback(suggestionBarCallback);
+                collection.addView(mSuggestionBarView);
+                return mSuggestionBarView;
+            }
+
+            @Override
+            public void destroyItem(@NonNull ViewGroup collection, int position, @NonNull Object view) {
+                collection.removeView((View) view);
+            }
+        });
+
+        viewPager.addOnPageChangeListener(new ViewPager.SimpleOnPageChangeListener() {
+            @Override
+            public void onPageSelected(int position) {
+                mTerminalView.requestFocus();
+            }
+        });
     }
 
     static int calculateSuggestionBarMaxButtons(DisplayMetrics displayMetrics) {
@@ -695,10 +738,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         }
         mSuggestionBarView.setMaxButtonCount(maxButtons);
         mSuggestionBarView.setDefaultButtons(getDefaultAppLauncherButtons());
-        float barHeightScale = mPreferences.getAppLauncherBarHeightScale();
-        float iconScale = mPreferences.getAppLauncherIconScale();
-        mSuggestionBarView.setBarHeightScale(barHeightScale);
-        mSuggestionBarView.setIconScale(iconScale);
+        mSuggestionBarView.setTextSize(10f);
         mSuggestionBarView.setSearchTolerance(mPreferences.getAppLauncherSearchTolerance());
         mSuggestionBarView.setShowIcons(mPreferences.isAppLauncherShowIconsEnabled());
         mSuggestionBarView.setBandW(mPreferences.isAppLauncherBwIconsEnabled());
@@ -794,14 +834,14 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         if (barHeightPx < 0) {
             barHeightPx = 0;
         }
-        updateViewHeight(R.id.apps_bar_container, barHeightPx);
+        updateViewHeight(R.id.apps_bar_viewpager, barHeightPx);
         updateViewHeight(R.id.apps_bar_background, barHeightPx);
         updateViewHeight(R.id.apps_bar_backgroundblur, barHeightPx);
     }
 
     public void setTerminalToolbarHeight() {
         final ViewPager terminalToolbarViewPager = getTerminalToolbarViewPager();
-        View appsBarContainer = findViewById(R.id.apps_bar_container);
+        View appsBarViewPager = findViewById(R.id.apps_bar_viewpager);
         View extraKeysBackgroundBlur = findViewById(R.id.extrakeys_backgroundblur);
         View extraKeysBackground = findViewById(R.id.extrakeys_background);
         if (terminalToolbarViewPager == null)
@@ -823,8 +863,8 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         terminalToolbarViewPager.setLayoutParams(toolbarLayoutParams);
 
         int appsBarHeightPx = 0;
-        if (appsBarContainer != null) {
-            ViewGroup.LayoutParams appsBarLayoutParams = appsBarContainer.getLayoutParams();
+        if (appsBarViewPager != null) {
+            ViewGroup.LayoutParams appsBarLayoutParams = appsBarViewPager.getLayoutParams();
             if (appsBarLayoutParams != null) {
                 appsBarHeightPx = appsBarLayoutParams.height;
                 if (appsBarHeightPx < 0) {
@@ -1266,18 +1306,37 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
     }
 
     @Override
-    public void reloadSuggestionBar(String input) {
+    public void reloadSuggestionBar(char inputChar) {
         if (mSuggestionBarView == null || mTerminalView == null) {
             return;
         }
-        String normalized = normalizeSuggestionBarInput(input);
-        mSuggestionBarView.reloadWithInput(normalized, mTerminalView);
+        String input = mTerminalView.getCurrentInput(inputChar);
+        if (input == null) {
+            input = "";
+        }
+        mSuggestionBarView.reloadWithInput(input, mTerminalView);
+    }
+
+    @Override
+    public void reloadSuggestionBar(boolean delete, boolean enter) {
+        if (mSuggestionBarView == null || mTerminalView == null) {
+            return;
+        }
+        if (enter) {
+            mSuggestionBarView.reloadWithInput("", mTerminalView);
+        } else {
+            String input = mTerminalView.getCurrentInput();
+            if (input == null) {
+                input = "";
+            }
+            if (delete && input.length() > 0) {
+                input = input.substring(0, input.length() - 1);
+            }
+            mSuggestionBarView.reloadWithInput(input, mTerminalView);
+        }
     }
 
     private String normalizeSuggestionBarInput(String rawInput) {
-        if (mTerminalView != null && mTerminalView.isAlternateBufferActive()) {
-            return "";
-        }
         if (rawInput == null) {
             return "";
         }

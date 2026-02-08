@@ -714,18 +714,38 @@ public final class TerminalView extends View {
         if (mEmulator == null) {
             return null;
         }
-        int rowAbs = mTopRow + mEmulator.getCursorRow();
-        String originalText = mEmulator.getScreen().getSelectedText(0, rowAbs, mEmulator.mColumns, rowAbs);
-        return extractCurrentInputFromLine(originalText, mEmulator.getCursorCol(), mSplitChar, null);
+        int row = mEmulator.getCursorRow();
+        String text = mEmulator.getScreen().getSelectedText(0, row, 99, row);
+        if (text.indexOf(mSplitChar) >= 0) {
+            text = text.substring(text.indexOf(mSplitChar) + 1);
+            text = text.replaceAll("[^a-zA-Z ]", "");
+            text = text.replaceAll(" {2,}", " ");
+            return text.trim();
+        }
+        return null;
     }
 
     public String getCurrentInput(char currentChar) {
         if (mEmulator == null) {
             return null;
         }
-        int rowAbs = mTopRow + mEmulator.getCursorRow();
-        String originalText = mEmulator.getScreen().getSelectedText(0, rowAbs, mEmulator.mColumns, rowAbs);
-        return extractCurrentInputFromLine(originalText, mEmulator.getCursorCol(), mSplitChar, currentChar);
+        int row = mEmulator.getCursorRow();
+        int cut = mEmulator.getCursorCol();
+        String originalText = mEmulator.getScreen().getSelectedText(0, row, 99, row);
+        if (originalText.indexOf(mSplitChar) >= 0) {
+            if (cut >= originalText.length()) {
+                originalText = originalText + currentChar;
+            } else if (cut > 0) {
+                originalText = originalText.substring(0, cut) + currentChar + originalText.substring(cut);
+            } else if (cut == 0) {
+                originalText = originalText + currentChar;
+            }
+            String text = originalText.substring(originalText.indexOf(mSplitChar) + 1);
+            text = text.replaceAll("[^a-zA-Z ]", "");
+            text = text.replaceAll(" {2,}", " ");
+            return text.trim();
+        }
+        return null;
     }
 
     public boolean isAlternateBufferActive() {
@@ -759,6 +779,17 @@ public final class TerminalView extends View {
         text = text.replaceAll("[^a-zA-Z ]", "");
         text = text.replaceAll(" {2,}", " ");
         return text.trim();
+    }
+
+    public void clearInputLine() {
+        KeyEvent deleteKey = new KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DEL);
+        String input = getCurrentInput();
+        if (input != null) {
+            int width = input.length() + 10;
+            for (int i = 0; i < width; i++) {
+                onKeyDown(KeyEvent.KEYCODE_DEL, deleteKey);
+            }
+        }
     }
 
 

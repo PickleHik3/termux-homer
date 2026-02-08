@@ -4,70 +4,49 @@ import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ActivityInfo;
+import android.content.pm.ChangedPackages;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.graphics.ColorFilter;
 import android.graphics.ColorMatrixColorFilter;
 import android.graphics.drawable.Drawable;
-import android.os.Build;
 import android.util.AttributeSet;
-import android.view.ViewGroup;
-import android.widget.Button;
-import android.widget.GridLayout;
-import android.widget.ImageButton;
-import android.widget.ImageView;
-
-import com.termux.view.TerminalView;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 
+import android.widget.Button;
+import android.widget.GridLayout;
+import android.widget.ImageButton;
+
+import com.termux.view.TerminalView;
+
 import me.xdrop.fuzzywuzzy.FuzzySearch;
+
 
 public final class SuggestionBarView extends GridLayout {
 
     private static final int TEXT_COLOR = 0xFFC0B18B;
-
-    private List<SuggestionBarButton> allSuggestionButtons = new ArrayList<>();
+    private List<SuggestionBarButton> allSuggestionButtons;
     private List<SuggestionBarButton> defaultButtons;
-    private List<String> defaultButtonStrings = new ArrayList<>();
-    private int maxButtonCount = 0;
+    private int applicationSequenceNumber = 0;
+
+    // Settings fields (replaces TermuxPreferences from TEL)
+    private int maxButtonCount = 5;
     private float textSize = 12f;
     private boolean showIcons = true;
     private boolean bandW = false;
     private int searchTolerance = 70;
     private float iconScale = 1.0f;
-    private float barHeightScale = 1.0f;
-    private List<SuggestionBarButton> cachedAppButtons;
-    private long lastAppListRefreshMs = 0;
-
-    private static final long APP_LIST_CACHE_MS = 60000L;
+    private List<String> defaultButtonStrings = new ArrayList<>();
 
     public SuggestionBarView(Context context, AttributeSet attrs) {
         super(context, attrs);
     }
 
-    public void setSuggestionButtons(List<SuggestionBarButton> buttons) {
-        if (buttons == null) {
-            allSuggestionButtons = new ArrayList<>();
-        } else {
-            allSuggestionButtons = new ArrayList<>(buttons);
-        }
-        defaultButtons = null;
-        reloadWithInput("", null);
-    }
-
-    public void setDefaultButtons(List<String> defaultButtons) {
-        if (defaultButtons == null) {
-            defaultButtonStrings = new ArrayList<>();
-        } else {
-            defaultButtonStrings = new ArrayList<>(defaultButtons);
-        }
-        this.defaultButtons = null;
-    }
-
+    // Settings setters (termux-homer compatibility)
     public void setMaxButtonCount(int maxButtonCount) {
         this.maxButtonCount = maxButtonCount;
     }
@@ -92,89 +71,113 @@ public final class SuggestionBarView extends GridLayout {
         this.iconScale = iconScale;
     }
 
-    public void setBarHeightScale(float barHeightScale) {
-        this.barHeightScale = barHeightScale;
+    public void setDefaultButtons(List<String> defaultButtons) {
+        if (defaultButtons == null) {
+            this.defaultButtonStrings = new ArrayList<>();
+        } else {
+            this.defaultButtonStrings = new ArrayList<>(defaultButtons);
+        }
+        this.defaultButtons = null;
     }
 
-    private List<SuggestionBarButton> searchButtons(List<SuggestionBarButton> list, String input, boolean fuzzy) {
+    public void clearAppCache() {
+        allSuggestionButtons = null;
+        defaultButtons = null;
+        applicationSequenceNumber = 0;
+    }
+
+    private int getButtonCount() {
+        return maxButtonCount;
+    }
+
+    private int getSearchTolerance() {
+        return searchTolerance;
+    }
+
+    private boolean isShowIcons() {
+        return showIcons;
+    }
+
+    private boolean getBandW() {
+        return bandW;
+    }
+
+    private float getTextSize() {
+        return textSize;
+    }
+
+    private List<String> getDefaultButtons() {
+        return defaultButtonStrings;
+    }
+
+    private List<SuggestionBarButton> searchButtons(List<SuggestionBarButton> list, String input, int buttonCount, boolean fuzzy){
         List<SuggestionBarButton> newList = new ArrayList<>();
-        if (input == null) {
-            input = "";
-        }
-        String lowered = input.toLowerCase();
-        for (int i = 0; i < list.size(); i++) {
+        int tolerance = getSearchTolerance();
+        input = input.toLowerCase();
+        for(int i=0;i<list.size();i++){
             SuggestionBarButton currentButton = list.get(i);
-            String buttonText = currentButton.getText() == null ? "" : currentButton.getText();
-            if (fuzzy) {
-                int ratio = FuzzySearch.partialRatio(buttonText.toLowerCase(), lowered);
-                currentButton.setRatio(ratio);
-                if (ratio > searchTolerance) {
+            if(fuzzy){
+                int ratio = FuzzySearch.partialRatio(input,currentButton.getText().toLowerCase());
+                if(ratio >=tolerance){
+                    currentButton.setRatio(ratio);
                     newList.add(currentButton);
                 }
-            } else if (buttonText.toLowerCase().startsWith(lowered)) {
+            }else if(currentButton.getText().toLowerCase().startsWith(input.toLowerCase())){
                 newList.add(currentButton);
             }
+
         }
-        if (fuzzy) {
+        if(fuzzy){
             Collections.sort(newList, new Comparator<SuggestionBarButton>() {
                 @Override
                 public int compare(SuggestionBarButton suggestionBarButton, SuggestionBarButton t1) {
                     int r1 = suggestionBarButton.getRatio();
                     int r2 = t1.getRatio();
-                    if (r1 > r2) {
+                    if (r1 >r2){
                         return -1;
-                    } else if (r1 < r2) {
+                    }else if(r1< r2){
                         return 1;
-                    } else {
+                    }else{
                         return 0;
                     }
                 }
             });
         }
+
         return newList;
+
     }
 
-    @SuppressLint("ClickableViewAccessibility")
-    public void reload() {
-        if (allSuggestionButtons.isEmpty()) {
+    void reloadAllApps(){
+            allSuggestionButtons = getInstalledAppButtons();
+    }
+
+    void reloadWithInput(String input, final TerminalView terminalView){
+        if(allSuggestionButtons == null){
             reloadAllApps();
-        } else {
-            reloadWithInput("", null);
         }
-    }
-
-    public void reloadAllApps() {
-        allSuggestionButtons = getInstalledAppButtons();
-        defaultButtons = null;
-        reloadWithInput("", null);
-    }
-
-    public void clearAppCache() {
-        cachedAppButtons = null;
-        lastAppListRefreshMs = 0;
-    }
-
-    public void reloadWithInput(String input, final TerminalView terminalView) {
+        PackageManager packageManager = getContext().getPackageManager();
+        ChangedPackages changedPackages = packageManager.getChangedPackages(applicationSequenceNumber);
+        if(changedPackages != null){
+            applicationSequenceNumber = changedPackages.getSequenceNumber();
+            reloadAllApps();
+        }
         List<SuggestionBarButton> suggestionButtons = new ArrayList<>(allSuggestionButtons);
+        setRowCount(suggestionButtons.size());
+        setColumnCount(suggestionButtons.size());
         removeAllViews();
-
-        int buttonCount = maxButtonCount > 0 ? maxButtonCount : suggestionButtons.size();
-        if (buttonCount <= 0 || suggestionButtons.isEmpty()) {
-            setRowCount(1);
-            setColumnCount(0);
-            return;
-        }
-
-        if (input != null && input.length() > 0 && !" ".equals(input)) {
-            suggestionButtons = searchButtons(suggestionButtons, input, input.length() > 2);
-        } else if (!defaultButtonStrings.isEmpty()) {
-            if (defaultButtons == null) {
-                defaultButtons = new ArrayList<>();
-                ArrayList<String> reversedDefaults = new ArrayList<>(defaultButtonStrings);
-                Collections.reverse(reversedDefaults);
-                for (int i = 0; i < reversedDefaults.size(); i++) {
-                    List<SuggestionBarButton> currentButtons = searchButtons(suggestionButtons, reversedDefaults.get(i), false);
-                    if (!currentButtons.isEmpty()) {
+        int buttonCount = getButtonCount();
+        int addedCount = 0;
+        if(input.length()> 0 && !input.equals(" ")){
+            suggestionButtons = searchButtons(suggestionButtons,input, buttonCount,input.length() >2);
+        }else{
+            if(defaultButtons == null) {
+                defaultButtons = new ArrayList<SuggestionBarButton>();
+                ArrayList<String> defaultButtonStrings = new ArrayList<>(getDefaultButtons());
+                Collections.reverse(defaultButtonStrings);
+                for (int i = 0; i < defaultButtonStrings.size(); i++) {
+                    List<SuggestionBarButton> currentButtons = searchButtons(suggestionButtons, defaultButtonStrings.get(i), 1, false);
+                    if (currentButtons.size() > 0) {
                         SuggestionBarButton currentButton = currentButtons.get(0);
                         if (suggestionButtons.indexOf(currentButton) >= 0) {
                             suggestionButtons.remove(suggestionButtons.indexOf(currentButton));
@@ -182,9 +185,11 @@ public final class SuggestionBarView extends GridLayout {
                         suggestionButtons.add(0, currentButton);
                         defaultButtons.add(currentButton);
                     }
+
                 }
-            } else {
-                for (int i = 0; i < defaultButtons.size(); i++) {
+                Collections.reverse(defaultButtonStrings);
+            }else{
+                for(int i=0; i<defaultButtons.size();i++){
                     SuggestionBarButton currentButton = defaultButtons.get(i);
                     if (suggestionButtons.indexOf(currentButton) >= 0) {
                         suggestionButtons.remove(suggestionButtons.indexOf(currentButton));
@@ -192,124 +197,111 @@ public final class SuggestionBarView extends GridLayout {
                     suggestionButtons.add(0, currentButton);
                 }
             }
+
         }
-
-        setRowCount(1);
-        setColumnCount(buttonCount);
-
-        int addedCount = 0;
-        for (int col = 0; col < suggestionButtons.size() && col < buttonCount; col++) {
+        for (int col = 0; col < suggestionButtons.size() && col <buttonCount; col++) {
             final SuggestionBarButton currentButton = suggestionButtons.get(col);
             LayoutParams param = new GridLayout.LayoutParams();
             param.width = 0;
-            param.height = ViewGroup.LayoutParams.MATCH_PARENT;
+            param.height = 0;
             param.setMargins(0, 0, 0, 0);
             param.columnSpec = GridLayout.spec(col, GridLayout.FILL, 1.f);
             param.rowSpec = GridLayout.spec(0, GridLayout.FILL, 1.f);
-            if (currentButton.hasIcon() && showIcons) {
-                ImageButton imageButton = new ImageButton(getContext(), null, android.R.attr.buttonBarButtonStyle);
+            if(currentButton.hasIcon() && isShowIcons()){
+                ImageButton imageButton = new ImageButton(getContext(),null,android.R.attr.buttonBarButtonStyle);
                 imageButton.setImageDrawable(currentButton.getIcon());
-                imageButton.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
-                imageButton.setAdjustViewBounds(true);
-                imageButton.setBackground(null);
-                imageButton.setScaleX(iconScale);
-                imageButton.setScaleY(iconScale);
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                    imageButton.setImageTintList(null);
-                }
-                if (bandW) {
+                if(getBandW()){
                     float[] colorMatrix = {
-                        0.33f, 0.33f, 0.33f, 0, 0,
-                        0.33f, 0.33f, 0.33f, 0, 0,
-                        0.33f, 0.33f, 0.33f, 0, 0,
-                        0, 0, 0, 1, 0
+                        0.33f, 0.33f, 0.33f, 0, 0, //red
+                        0.33f, 0.33f, 0.33f, 0, 0, //green
+                        0.33f, 0.33f, 0.33f, 0, 03, //blue
+                        0, 0, 0, 1, 0    //alpha
                     };
                     ColorFilter colorFilter = new ColorMatrixColorFilter(colorMatrix);
                     imageButton.setColorFilter(colorFilter);
+
                 }
                 imageButton.setLayoutParams(param);
-                imageButton.setOnClickListener(v -> {
+                imageButton.setOnClickListener(v->{
                     currentButton.click();
-                    if (terminalView != null) {
-                        reloadWithInput("", terminalView);
+                    if(terminalView != null){
+                        terminalView.clearInputLine();
+                        reloadWithInput("",terminalView);
                     }
                 });
                 addView(imageButton);
-            } else {
-                Button button = new Button(getContext(), null, android.R.attr.buttonBarButtonStyle);
-                button.setTextSize(textSize);
+            }else{
+                Button button;
+                button = new Button(getContext(), null, android.R.attr.buttonBarButtonStyle);
+                button.setTextSize(getTextSize());
                 button.setText(currentButton.getText());
                 button.setTextColor(TEXT_COLOR);
                 button.setPadding(0, 0, 0, 0);
-                button.setLayoutParams(param);
-                button.setOnClickListener(v -> {
+                button.setOnClickListener(v->{
                     currentButton.click();
-                    if (terminalView != null) {
-                        reloadWithInput("", terminalView);
+                    if(terminalView != null){
+                        terminalView.clearInputLine();
+                        reloadWithInput("",terminalView);
                     }
                 });
                 addView(button);
             }
             addedCount++;
         }
-
-        int missingButtons = buttonCount - addedCount;
-        if (!suggestionButtons.isEmpty() && missingButtons > 0) {
+        int missing_buttons = buttonCount-addedCount;
+        if(suggestionButtons.size() > 0 && missing_buttons > 0){
             Drawable filler = suggestionButtons.get(0).getIcon();
-            for (int i = 0; i < missingButtons; i++) {
+            for(int i=0;i<missing_buttons;i++){
                 LayoutParams param = new GridLayout.LayoutParams();
                 param.width = 0;
                 param.height = 0;
                 param.setMargins(0, 0, 0, 0);
-                param.columnSpec = GridLayout.spec(i + addedCount, GridLayout.FILL, 1.f);
+                param.columnSpec = GridLayout.spec(i+addedCount, GridLayout.FILL, 1.f);
                 param.rowSpec = GridLayout.spec(0, GridLayout.FILL, 1.f);
-                ImageButton imageButton = new ImageButton(getContext(), null, android.R.attr.buttonBarButtonStyle);
+                ImageButton imageButton = new ImageButton(getContext(),null,android.R.attr.buttonBarButtonStyle);
                 imageButton.setImageDrawable(filler);
                 imageButton.setLayoutParams(param);
-                imageButton.setScaleX(iconScale);
-                imageButton.setScaleY(iconScale);
                 imageButton.setVisibility(INVISIBLE);
                 addView(imageButton);
             }
         }
+
     }
 
     private List<ResolveInfo> getInstalledApps() {
         PackageManager packageManager = getContext().getPackageManager();
-        Intent main = new Intent(Intent.ACTION_MAIN, null);
+        Intent main=new Intent(Intent.ACTION_MAIN, null);
+
         main.addCategory(Intent.CATEGORY_LAUNCHER);
-        List<ResolveInfo> launchables = packageManager.queryIntentActivities(main, 0);
-        Collections.sort(launchables, new ResolveInfo.DisplayNameComparator(packageManager));
+
+        List<ResolveInfo> launchables=packageManager.queryIntentActivities(main, 0);
+
+        Collections.sort(launchables,
+            new ResolveInfo.DisplayNameComparator(packageManager));
         return launchables;
     }
 
-    private List<SuggestionBarButton> getInstalledAppButtons() {
-        long now = System.currentTimeMillis();
-        if (cachedAppButtons != null && (now - lastAppListRefreshMs) < APP_LIST_CACHE_MS) {
-            return new ArrayList<>(cachedAppButtons);
-        }
+    private List<SuggestionBarButton> getInstalledAppButtons(){
         PackageManager packageManager = getContext().getPackageManager();
         List<ResolveInfo> launchables = getInstalledApps();
         List<SuggestionBarButton> buttons = new ArrayList<>();
-        for (int i = 0; i < launchables.size(); i++) {
-            ResolveInfo resolveInfo = launchables.get(i);
-            ActivityInfo info = resolveInfo.activityInfo;
-            if (info == null || info.packageName == null || info.name == null) {
-                continue;
-            }
+        for(int i=1; i<launchables.size();i++){
+            ActivityInfo info = launchables.get(i).activityInfo;
             String packageName = info.packageName;
-            String className = info.name;
-            CharSequence label = info.loadLabel(packageManager);
-            String appName = label != null ? label.toString() : packageName;
-            Drawable icon = resolveInfo.loadIcon(packageManager);
-            if (icon == null) {
-                buttons.add(new SuggetionBarAppButton(getContext(), packageName, className, appName));
-            } else {
-                buttons.add(new SuggetionBarAppButton(getContext(), packageName, className, appName, icon));
-            }
+            String appName = info.loadLabel(packageManager).toString();
+            Drawable icon = info.loadIcon(packageManager);
+
+            buttons.add(new SuggetionBarAppButton(getContext(),packageName,appName,icon));
         }
-        cachedAppButtons = new ArrayList<>(buttons);
-        lastAppListRefreshMs = now;
         return buttons;
     }
+
+    /**
+     * Reload the view with settings
+     */
+    @SuppressLint("ClickableViewAccessibility")
+    void reload() {
+        reloadWithInput("",null);
+    }
+
 }

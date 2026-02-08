@@ -1,5 +1,6 @@
 package com.termux.app;
 
 public interface SuggestionBarCallback {
-    void reloadSuggestionBar(String input);
+    public void reloadSuggestionBar(char inputChar);
+    public void reloadSuggestionBar(boolean delete, boolean enter);
 }
