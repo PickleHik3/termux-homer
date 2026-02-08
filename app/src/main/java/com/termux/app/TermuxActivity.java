@@ -483,14 +483,14 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
             if (appsBarBackground != null) {
                 appsBarBackground.setVisibility(View.GONE);
             }
-            if (appsBarContainer != null) {
-                appsBarContainer.setVisibility(View.GONE);
+            if (appsBarViewPager != null) {
+                appsBarViewPager.setVisibility(View.GONE);
             }
             return;
         }
 
-        if (appsBarContainer != null) {
-            appsBarContainer.setVisibility(View.VISIBLE);
+        if (appsBarViewPager != null) {
+            appsBarViewPager.setVisibility(View.VISIBLE);
         }
 
         if (appsBarBackground != null) {
@@ -674,12 +674,12 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         // Set height based on preferences
         ViewGroup.LayoutParams layoutParams = viewPager.getLayoutParams();
         float barHeightScale = mPreferences.getAppLauncherBarHeightScale();
-        int defaultHeight = getResources().getDimensionPixelSize(R.dimen.terminal_toolbar_default_height);
+        int defaultHeight = (int) (getResources().getDisplayMetrics().density * 37.5f);
         layoutParams.height = Math.round(defaultHeight * barHeightScale);
         viewPager.setLayoutParams(layoutParams);
 
         final SuggestionBarCallback suggestionBarCallback = this;
-        viewPager.setAdapter(new ViewPager.PagerAdapter() {
+        viewPager.setAdapter(new androidx.viewpager.widget.PagerAdapter() {
             @Override
             public int getCount() {
                 return 1; // count of pages to scroll through
@@ -860,8 +860,8 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         terminalToolbarViewPager.setLayoutParams(toolbarLayoutParams);
 
         int appsBarHeightPx = 0;
-        if (appsBarContainer != null) {
-            ViewGroup.LayoutParams appsBarLayoutParams = appsBarContainer.getLayoutParams();
+        if (appsBarViewPager != null) {
+            ViewGroup.LayoutParams appsBarLayoutParams = appsBarViewPager.getLayoutParams();
             if (appsBarLayoutParams != null) {
                 appsBarHeightPx = appsBarLayoutParams.height;
                 if (appsBarHeightPx < 0) {
