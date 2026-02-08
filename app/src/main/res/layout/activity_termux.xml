@@ -176,6 +176,13 @@
         android:visibility="gone"
         android:background="@color/background_accent"/>
 
+    <androidx.viewpager.widget.ViewPager
+        android:id="@+id/apps_bar_viewpager"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_above="@+id/terminal_toolbar_view_pager"
+        android:visibility="gone" />
+
     <FrameLayout
         android:id="@+id/apps_bar_container"
         android:layout_width="match_parent"
