@@ -1,10 +1,14 @@
-# Termux Homer (Frankenstein Launcher)
+# Termux: Launcher, Tooie
 
 This is a personal proof-of-concept I vibecoded for myself.
 
 It combines ideas from Termux Monet and TEL to make a modern Android launcher workflow that is basically just Termux.
 
 I do not claim credit for upstream work. If a real Android developer wants to take this further, please do.
+
+<p align="center">
+  <img src="resources/assets/tooie.png" width="220" alt="Tooie mascot"/>
+</p>
 
 ## Credits
 
@@ -22,6 +26,7 @@ Everything below is bundled in this repo under `resources/`:
 | Tmux config | `resources/config/tmux/.tmux.conf` |
 | Termux properties | `resources/config/termux/termux.properties` |
 | Unexpected Keyboard layout | `resources/config/termux/unexp-keyb-layout.txt` |
+| Tooie mascot image | `resources/assets/tooie.png` |
 | btop restore script | `resources/scripts/restore_btop.sh` |
 | tmux status script (kew ticker) | `resources/scripts/statusbar/kew-now-playing` |
 | tmux status script (weather ticker) | `resources/scripts/statusbar/weather-cache` |
@@ -75,6 +80,10 @@ termux-reload-settings
 - Set an uncommon input split character, for example `@` or `#`, to trigger Android app search via suggestions bar.
 - Set default apps as comma-separated values, for example:
   `phone,whatsapp,chrome`
+- Set wallpaper from inside the app:
+  long-press terminal -> Style -> Background.
+- For more styling and behavior details (this app is roughly 90% Termux-Monet, with app suggestion bar and blur-view additions), see:
+  https://github.com/Termux-Monet/termux-monet
 
 ### 5) Optional dev stack references
 
@@ -148,6 +157,9 @@ cp resources/optional/termux-init/crush/crush.example.json ~/.config/crush/crush
 - `tooie-shelf` is experimental and not fully functional in this setup:
   https://github.com/PickleHik3/tooie-shelf
 - Install `termux-api` for wallpaper sync-to-system features.
+- In settings, keep terminal margin adjustment OFF:
+  `Termux:Launcher -> Terminal View -> Terminal Margin Adjustment`.
+  If enabled, extra-keys bar and app suggestions may flicker while interacting.
 - `btop` needs Shizuku + `rish`, plus generic Linux btop from:
   https://github.com/aristocratos/btop/releases
   Then use `resources/scripts/restore_btop.sh`.
@@ -182,26 +194,29 @@ cp resources/optional/termux-init/crush/crush.example.json ~/.config/crush/crush
   </tr>
   <tr>
     <td><img src="screenshots/app-search.png" width="360" alt="App search"/></td>
-    <td><img src="screenshots/app-settings.png" width="360" alt="App settings"/></td>
-  </tr>
-  <tr>
     <td><img src="screenshots/shell-env.png" width="360" alt="Shell environment"/></td>
+  </tr>
+  <tr>
     <td><img src="screenshots/pacman-termux.png" width="360" alt="Pacman in Termux"/></td>
-  </tr>
-  <tr>
     <td><img src="screenshots/lazyvim.png" width="360" alt="LazyVim"/></td>
+  </tr>
+  <tr>
     <td><img src="screenshots/btop-android.png" width="360" alt="btop on Android"/></td>
-  </tr>
-  <tr>
     <td><img src="screenshots/TUI-crush-ai.png" width="360" alt="Crush AI"/></td>
+  </tr>
+  <tr>
     <td><img src="screenshots/TUI-sigye-clock.png" width="360" alt="Sigye clock"/></td>
-  </tr>
-  <tr>
     <td><img src="screenshots/TUI-yazi.png" width="360" alt="Yazi"/></td>
-    <td><img src="screenshots/TUI-kew-music.png" width="360" alt="Kew music"/></td>
   </tr>
   <tr>
+    <td><img src="screenshots/TUI-kew-music.png" width="360" alt="Kew music"/></td>
     <td><img src="screenshots/TUI-calcure.png" width="360" alt="Calcure"/></td>
+  </tr>
+  <tr>
     <td><img src="screenshots/TUI-tooie-shelf.png" width="360" alt="Tooie shelf"/></td>
+    <td></td>
+  </tr>
+  <tr>
+    <td colspan="2" align="center"><img src="screenshots/app-settings.png" width="360" alt="App settings"/></td>
   </tr>
 </table>
