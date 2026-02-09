@@ -14,7 +14,7 @@ I do not claim credit for upstream work. If a real Android developer wants to ta
 
 - Termux app: https://github.com/termux/termux-app
 - Termux Monet: https://github.com/Termux-Monet/termux-monet
-- TEL project/wiki: https://github.com/t-e-l/wiki
+- TEL project: https://github.com/t-e-l/tel
 
 ## Included Files
 
