@@ -121,6 +121,31 @@ cp resources/bin/termux-restart $PREFIX/bin/termux-restart
 chmod +x ~/files/btop/restore_btop.sh $PREFIX/bin/termux-restart ~/.local/bin/kew-now-playing ~/.local/bin/weather-cache
 ```
 
+## Optional: termux-init references (nvim/lsp/mcp)
+
+If you want the fuller dev environment style I use, check:
+- https://github.com/PickleHik3/termux-init
+
+I added a few reference files from that project here:
+
+| Purpose | Path |
+| --- | --- |
+| Pacman bootstrap guide | `resources/optional/termux-init/bootstrap.md` |
+| Neovim Termux LSP config | `resources/optional/termux-init/nvim/termux.lua` |
+| Crush LSP + MCP config example | `resources/optional/termux-init/crush/crush.example.json` |
+
+Example copy commands:
+
+```sh
+# Neovim Termux LSP plugin config
+mkdir -p ~/.config/nvim/lua/plugins
+cp resources/optional/termux-init/nvim/termux.lua ~/.config/nvim/lua/plugins/termux.lua
+
+# Crush config example
+mkdir -p ~/.config/crush
+cp resources/optional/termux-init/crush/crush.example.json ~/.config/crush/crush.json
+```
+
 ## Easy setup (for non-terminal users)
 
 Follow this exactly in Termux:

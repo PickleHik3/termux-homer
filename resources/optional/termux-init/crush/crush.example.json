@@ -1,0 +1,86 @@
+{
+  "$schema": "https://charm.land/crush.json",
+  "lsp": {
+    "go": {
+      "command": "gopls"
+    },
+    "typescript": {
+      "command": "typescript-language-server",
+      "args": ["--stdio"]
+    },
+    "python": {
+      "command": "pyright-langserver",
+      "args": ["--stdio"]
+    },
+    "rust": {
+      "command": "rust-analyzer"
+    },
+    "bash": {
+      "command": "bash-language-server",
+      "args": ["start"]
+    },
+    "lua": {
+      "command": "lua-language-server"
+    },
+    "yaml": {
+      "command": "yaml-language-server",
+      "args": ["--stdio"]
+    },
+    "json": {
+      "command": "vscode-json-language-server",
+      "args": ["--stdio"]
+    },
+    "html": {
+      "command": "vscode-html-language-server",
+      "args": ["--stdio"]
+    },
+    "css": {
+      "command": "vscode-css-language-server",
+      "args": ["--stdio"]
+    }
+  },
+  "mcp": {
+    "filesystem": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["/data/data/com.termux/files/usr/lib/node_modules/@modelcontextprotocol/server-filesystem/dist/index.js", "/data/data/com.termux/files/home"],
+      "timeout": 60
+    },
+    "github": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["/data/data/com.termux/files/usr/lib/node_modules/@modelcontextprotocol/server-github/dist/index.js"],
+      "timeout": 60,
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "$GITHUB_TOKEN"
+      }
+    },
+    "memory": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["/data/data/com.termux/files/usr/lib/node_modules/@modelcontextprotocol/server-memory/dist/index.js"],
+      "timeout": 60
+    },
+    "fetch": {
+      "type": "stdio",
+      "command": "uvx",
+      "args": ["mcp-server-fetch"],
+      "timeout": 120
+    },
+    "brave-search": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["/data/data/com.termux/files/usr/lib/node_modules/@modelcontextprotocol/server-brave-search/dist/index.js"],
+      "timeout": 60,
+      "env": {
+        "BRAVE_API_KEY": "$BRAVE_API_KEY"
+      }
+    },
+    "sequential-thinking": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["/data/data/com.termux/files/usr/lib/node_modules/@modelcontextprotocol/server-sequential-thinking/dist/index.js"],
+      "timeout": 60
+    }
+  }
+}
