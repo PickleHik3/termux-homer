@@ -1,0 +1,20 @@
+https://github.com/charmbracelet/crush
+https://github.com/am2rican5/sigye
+https://github.com/octobanana/peaclock
+https://github.com/sxyazi/yazi
+https://github.com/ravachol/kew
+https://github.com/anufrievroman/calcure
+https://github.com/antonmedv/walk
+
+configure your tmux:
+https://tmuxai.dev/tmux-config/
+
+tmux plugins;
+https://github.com/vaaleyard/tmux-dotbar
+https://github.com/charlietag/tmux-split-statusbar
+https://github.com/joshmedeski/tmux-nerd-font-window-name
+https://github.com/graemedavidson/tmux-pane-focus
+
+more tuis:
+https://terminaltrove.com/
+

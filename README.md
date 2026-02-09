@@ -1,312 +1,268 @@
-<p align="center">
-  <img src="/art/logo_dark.png#gh-dark-mode-only">
-  <img src="/art/logo_light.png#gh-light-mode-only">
-</p>
-<div align="center">
-  <a href="https://github.com/Termux-Monet/termux-monet/actions/workflows/debug_build.yml?query=branch%3Amaster">
-    <img src="https://img.shields.io/github/actions/workflow/status/Termux-Monet/termux-monet/debug_build.yml?branch=master&label=Build&logo=gradle"/>
-  </a>
-  <a href="https://github.com/Termux-Monet/termux-monet/actions/workflows/run_tests.yml?query=branch%3Amaster">
-    <img src="https://img.shields.io/github/actions/workflow/status/Termux-Monet/termux-monet/run_tests.yml?branch=master&label=Test&logo=gradle"/>
-  </a>
-  <a href="https://hosted.weblate.org/engage/termux-monet/">
-    <img src="https://hosted.weblate.org/widgets/termux-monet/-/svg-badge.svg" alt="Translation status" />
-  </a>
-</div>
-<br />
-<div align="center">
-  <a href="https://www.android.com/versions/oreo-8-0/">
-    <img src="https://img.shields.io/static/v1?label=Android&message=8%2B&color=brightgreen&style=flat&logo=android&logoColor=white"/>
-  </a>
-  <a href="https://github.com/Termux-Monet/termux-monet/commits/master">
-    <img src="https://img.shields.io/github/last-commit/Termux-Monet/termux-monet/master?color=informational&label=Updated&logo=github"/>
-  </a>
-  <a href="https://github.com/Termux-Monet/termux-monet/releases">
-    <img src="https://badgen.net/github/tag/Termux-Monet/termux-monet?icon=terminal&color=orange&label=Latest"/>
-  </a>
-  <a href="/LICENSE">
-    <img src="https://img.shields.io/badge/License-GPLv3_only-informational.svg?logo=gnu&label=License"/>
-  </a>
-</div>
-<br />
+# Termux Homer (Frankenstein Launcher)
 
-<p align="center">
-  <img src="/art/screenshot_dark.png#gh-dark-mode-only" height=50%>
-  <img src="/art/screenshot_light.png#gh-light-mode-only" height=50%>
-</p>
+This repo is a **proof of concept** I vibecoded for my personal use.
 
-***
+It is a fork/mashup of:
+- Termux + Termux Monet ideas
+- TEL launcher ideas
 
-## [Termux-Monet](https://github.com/Termux-Monet/termux-monet) is a discontinued (unmaintained) unofficial, modified fork of [Termux](https://github.com/termux/termux-app), an Android terminal application and Linux environment, with Monet Theming Implementations and Community-made changes.
-This project has been developed on my spare time, for me to learn more about Android development. Dont expect consistency, professionality or stability. Feel free to fork and continue the project, if you want to do so. All the commits have been squashed, for ease of development of the next maintainer.
-**Good luck!**
+Goal: make a modern Android launcher experience that is basically just **Termux**.
 
+I do **not** want to take credit for the original work. This is just my personal experiment, and I would love for a real developer to take this idea further.
 
-***
-## MONET IS ONLY AVAILABLE ON `ANDROID 12+`!
-#### LOWER VERSIONS WILL DISPLAY A STATIC, BLACK AND WHITE MONET THEME
-***
+## Credits
 
-# Termux-Monet can be updated by using [Obtainium](https://github.com/ImranR98/Obtainium)
-Here's a quick tutorial on how to add it to the app.
-<img src="https://raw.githubusercontent.com/Termux-Monet/termux-monet/master/art/obtainium.png">
-***
+All major credit goes upstream:
+- Termux app: https://github.com/termux/termux-app
+- Termux Monet: https://github.com/Termux-Monet/termux-monet
+- TEL project/wiki: https://github.com/t-e-l/wiki
 
-## Contents
-- [Phantom Process Killer](#Phantom-Process-Killer)
-- [Nightly Releases](#Nightly-Builds)
-- [Wikis](#Wikis)
-- [Miscellaneous](#Miscellaneous)
-- [True italic fonts](#True-italic-fonts)
-- [Displaying images in Termux](#Displaying-images-in-Termux)
-- [Running termux from ADB](#Running-termux-from-ADB)
-- [Debugging](#Debugging)
-- [Disclaimer](#Disclaimer)
-- [Forking Instructions](#Forking)
-- [Special Thanks](#Special-Thanks)
-***
+## Screenshots
 
-## Termux Monet and Plugins
+All screenshots are in `screenshots/`.
 
-> The [Termux Monet](https://github.com/Termux-Monet/termux-monet) fork app comes with the following optional modified plugin apps:
->
-> **These are Modified Plugins. All these repos are Forks from termux-app**
-> - [Termux:Styling](https://github.com/Termux-Monet/termux-styling)
-> - [Termux:API](https://github.com/Termux-Monet/termux-api)
-> - [Termux:Boot](https://github.com/Termux-Monet/termux-boot)
-> - [Termux:Float](https://github.com/Termux-Monet/termux-float)
-> - [Termux:Tasker](https://github.com/Termux-Monet/termux-tasker)
-> - [Termux:Widget](https://github.com/Termux-Monet/termux-widget)
-> - [Termux:GUI](https://github.com/Termux-Monet/termux-gui)
+### Launcher / app flow
+- `screenshots/home-screen.png`
 
-***
+  ![Home screen](screenshots/home-screen.png)
 
-## Phantom Process Killer
+- `screenshots/home-screen-blur.png`
 
-**NOTICE:**
-> **Termux may be unstable on Android 12+.** Android OS will kill any (phantom) processes greater than 32 (limit is for all apps combined) and also kill any processes using excessive CPU. You may get `[Process completed (signal 9) - press Enter]` message in the terminal without actually exiting the shell process yourself. Check the related issue [#2366](https://github.com/termux/termux-app/issues/2366), [issue tracker](https://issuetracker.google.com/u/1/issues/205156966), [gist with details](https://gist.github.com/agnostic-apollo/dc7e47991c512755ff26bd2d31e72ca8) and [this TLDR comment](https://github.com/termux/termux-app/issues/2366#issuecomment-1009269410) on how to disable trimming of phantom processes.
+  ![Home screen blur](screenshots/home-screen-blur.png)
 
-#### Deactivation Instructions (ADB):
-- On an ADB console, paste the following commands on the following order:
-```
-adb shell "/system/bin/device_config set_sync_disabled_for_tests persistent"
-```
-```
-adb shell "/system/bin/device_config put activity_manager max_phantom_processes 2147483647"
-```
-```
-adb shell settings put global settings_enable_monitor_phantom_procs false
-```
+- `screenshots/app-search.png`
 
-#### Deactivation Instructions (ROOT):
-- On Termux (or any Terminal Emulator), paste the following commands on the following order:
-```
-su -c /system/bin/device_config set_sync_disabled_for_tests persistent
-```
-```
-su -c /system/bin/device_config put activity_manager max_phantom_processes 2147483647
-```
-```
-su -c setprop persist.sys.fflag.override.settings_enable_monitor_phantom_procs false
-```
+  ![App search](screenshots/app-search.png)
 
-#### Experimental Method (MAGISK)
+- `screenshots/app-settings.png`
 
-- On a Rooted phone with Magisk installed, flash the following module:
+  ![App settings](screenshots/app-settings.png)
 
-    > [![](https://img.shields.io/static/v1?message=LetTheGhostsOut.zip&logo=magisk&labelColor=5c5c5c&color=00af9c&logoColor=white&label=%20&style=for-the-badge)](https://raw.githubusercontent.com/Termux-Monet/termux-monet/master/ppr/PhantomProcessRetainer-main.zip)
+### Shell + tools
+- `screenshots/shell-env.png`
 
-- After that, `PhantomProcessKiller might be deactivated on every device boot.` Please make an [issue](https://github.com/Termux-Monet/termux-monet/issues) on this repo if the module didn't work for you.
+  ![Shell environment](screenshots/shell-env.png)
 
-#### Check if PhantomProcessKiller was Disabled (ROOT):
-```
-su -c /system/bin/dumpsys activity settings | grep max_phantom_processes
-```
-```
-su -c /system/bin/device_config get activity_manager max_phantom_processes
-```
-- Both commands above should return `2147483647`
+- `screenshots/pacman-termux.png`
 
-```
-su -c getprop persist.sys.fflag.override.settings_enable_monitor_phantom_procs
-```
-- It should return "false"
+  ![Pacman in Termux](screenshots/pacman-termux.png)
 
-***
+- `screenshots/lazyvim.png`
 
-## Nightly Builds
+  ![LazyVim](screenshots/lazyvim.png)
 
-> Termux-Monet application can be obtained on **GitHub** either from [`GitHub Releases`](https://github.com/Termux-Monet/termux-monet/releases) for **stablier releases** or from [`GitHub Actions`](https://github.com/Termux-Monet/termux-monet/actions/workflows/debug_build.yml) for the latest **unstable releases**.
+- `screenshots/btop-android.png`
 
-#### Releases (Stablier)
- - The APKs for `GitHub Releases` will be listed under `Assets` drop-down of a release. These are automatically attached when a new version is released.
+  ![btop on Android](screenshots/btop-android.png)
 
-#### Nightly (Unstable)
- - The APKs for `GitHub Actions` will be listed under `Artifacts` section of a workflow run. These are created for each commit/push done to the repository and can be used by users who don't want to wait for releases and want to try out the latest features immediately. Note that for seeing action workflows, you **need** to be [**logged into a `GitHub` account**](https://github.com/login) for the `Artifacts` links to be enabled/clickable. If you are using the [`GitHub` app](https://github.com/mobile), then make sure to open workflow link in a browser like Chrome or Firefox that has your GitHub account logged in since the in-app browser may not be logged in. 
+### TUI apps
+- `screenshots/TUI-crush-ai.png`
 
-**Security warning**: APK files on GitHub are signed with a test key that has been [shared with community](https://github.com/termux/termux-app/blob/master/app/testkey_untrusted.jks). This IS NOT an official developer key and everyone can use it to generate releases for own testing. Be very careful when using Termux GitHub builds obtained elsewhere except https://github.com/termux/termux-app. Everyone is able to use it to forge a malicious Termux update installable over the GitHub build. Think twice about installing Termux builds distributed via Telegram or other social media. If your device get caught by malware, we will not be able to help you.
+  ![Crush AI](screenshots/TUI-crush-ai.png)
 
-The [test key](https://github.com/termux/termux-app/blob/master/app/testkey_untrusted.jks) shall not be used to impersonate @termux and can't be used for this anyway. This key is not trusted by us and it is quite easy to detect its use in user generated content.
+- `screenshots/TUI-sigye-clock.png`
 
-Keystore information:
-```
-Alias name: alias
-Creation date: Oct 4, 2019
-Entry type: PrivateKeyEntry
-Certificate chain length: 1
-Certificate[1]:
-Owner: CN=APK Signer, OU=Earth, O=Earth
-Issuer: CN=APK Signer, OU=Earth, O=Earth
-Serial number: 29be297b
-Valid from: Wed Sep 04 02:03:24 EEST 2019 until: Tue Oct 26 02:03:24 EEST 2049
-Certificate fingerprints:
-         SHA1: 51:79:55:EA:BF:69:FC:05:7C:41:C7:D3:79:DB:BC:EF:20:AD:85:F2
-         SHA256: B6:DA:01:48:0E:EF:D5:FB:F2:CD:37:71:B8:D1:02:1E:C7:91:30:4B:DD:6C:4B:F4:1D:3F:AA:BA:D4:8E:E5:E1
-Signature algorithm name: SHA1withRSA (disabled)
-Subject Public Key Algorithm: 2048-bit RSA key
-Version: 3
+  ![Sigye clock](screenshots/TUI-sigye-clock.png)
+
+- `screenshots/TUI-yazi.png`
+
+  ![Yazi](screenshots/TUI-yazi.png)
+
+- `screenshots/TUI-kew-music.png`
+
+  ![Kew music](screenshots/TUI-kew-music.png)
+
+- `screenshots/TUI-calcure.png`
+
+  ![Calcure](screenshots/TUI-calcure.png)
+
+- `screenshots/TUI-tooie-shelf.png`
+
+  ![Tooie shelf](screenshots/TUI-tooie-shelf.png)
+
+## TUI apps currently installed
+
+From `tui.txt`:
+- https://github.com/charmbracelet/crush
+- https://github.com/am2rican5/sigye
+- https://github.com/octobanana/peaclock
+- https://github.com/sxyazi/yazi
+- https://github.com/ravachol/kew
+- https://github.com/anufrievroman/calcure
+- https://github.com/antonmedv/walk
+
+More TUIs: https://terminaltrove.com/
+
+## Included files (download/use directly)
+
+Everything below is now included in this repo under `resources/`:
+
+| Type | Path |
+| --- | --- |
+| Fish config | `resources/config/fish/config.fish` |
+| Tmux config | `resources/config/tmux/.tmux.conf` |
+| Termux properties | `resources/config/termux/termux.properties` |
+| btop restore script | `resources/scripts/restore_btop.sh` |
+| tmux status script (kew ticker) | `resources/scripts/statusbar/kew-now-playing` |
+| tmux status script (weather ticker) | `resources/scripts/statusbar/weather-cache` |
+| `termux-restart` helper | `resources/bin/termux-restart` |
+
+Quick setup example:
+
+```sh
+cp resources/config/fish/config.fish ~/.config/fish/config.fish
+cp resources/config/tmux/.tmux.conf ~/.tmux.conf
+cp resources/config/termux/termux.properties ~/.termux/termux.properties
+cp resources/scripts/restore_btop.sh ~/files/btop/restore_btop.sh
+mkdir -p ~/.local/bin
+cp resources/scripts/statusbar/kew-now-playing ~/.local/bin/kew-now-playing
+cp resources/scripts/statusbar/weather-cache ~/.local/bin/weather-cache
+cp resources/bin/termux-restart $PREFIX/bin/termux-restart
+chmod +x ~/files/btop/restore_btop.sh $PREFIX/bin/termux-restart ~/.local/bin/kew-now-playing ~/.local/bin/weather-cache
 ```
 
-***
+## Easy setup (for non-terminal users)
 
-## Wikis
+Follow this exactly in Termux:
 
-- [Termux Wiki](https://wiki.termux.com/wiki/)
-- [Termux App Wiki](https://github.com/termux/termux-app/wiki)
-- [Termux Packages Wiki](https://github.com/termux/termux-packages/wiki)
+1. Install required packages:
 
-***
-
-## True italic fonts
-> As described in https://github.com/termux/termux-app/pull/2829, true italic fonts support can be enabled when placing an italic font in `~/.termux/font-italic.ttf`
-
-***
-
-## Displaying images in Termux
-
-> As described in https://github.com/termux/termux-app/pull/2973, Termux can display images and gifs using sixel and iterm2 protocols.
-
-> For displaying images and gifs using `Sixel`, do `pkg install libsixel` and use `img2sixel image.png`
-
-> For displaying images using `iTerm2`, download the [imgcat](https://iterm2.com/utilities/imgcat) script, and use it with the command `./imgcat image.png`
-
-***
-
-## Dynamic Motd
-
-> As described in [motds: add static motd back and use it as default instead of dynamic motd and add support for custom motd](https://github.com/termux/termux-tools/commit/6a0f5cc138c2c87fef91807fe0244e3531821d4c), in https://github.com/termux/termux-tools/pull/8, and in https://github.com/termux/termux-packages/pull/11250, Termux can now display both standard and dynamic motds.
-
-> For using your own custom dynamic motd, place a `motd.sh` executable file at `~/.termux/`.
-
-> To use the dynamic motd provided by the latest termux-tools package, run `ln -sf $PREFIX/etc/motd.sh ~/.termux/motd.sh`.
-
-***
-
-## Wallpaper support
-> As described in https://github.com/termux/termux-app/pull/3079, Wallpapers can be defined either by placing `background_landscape.jpeg` and `background.jpeg` on `.termux` folder or by selecting the option `Set background image` inside the terminal context menu, under "Appearance".
-> Background image loading can also be enabled/disabled from settings. From Termux Settings -> Termux -> Termux Style -> Background Image.
-
-> An wallpaper overlay color can be defined through `termux.properties`, by using the key `background-overlay-color=#COLOR`. Supported color formats are `#AARRGGBB` and `#RRGGBB`
-
-***
-
-## Running termux from ADB
-> As described in https://github.com/termux/termux-app/pull/1969, it is possible to access Termux directrly from adb shell via run-as. see the following example:
-
-```% adb shell
-dreamlte:/ $ run-as com.termux
-dreamlte:/data/data/com.termux $ PATH=/data/data/com.termux/files/usr/bin LD_PRELOAD=/data/data/com.termux/files/usr/lib/libtermux-exec.so /data/data/com.termux/files/usr/bin/bash -l
-~ $ python
-Python 3.9.2 (default, Feb 22 2021, 12:26:04)
-[Clang 9.0.8 (https://android.googlesource.com/toolchain/llvm-project 98c855489 on linux
-Type "help", "copyright", "credits" or "license" for more information.
->>>
+```sh
+pkg update && pkg upgrade -y
+pkg install -y fish tmux termux-api git curl
 ```
 
-***
+2. Copy included configs from this repo:
 
-## Miscellaneous
-- [FAQ](https://wiki.termux.com/wiki/FAQ)
-- [Termux File System Layout](https://github.com/termux/termux-packages/wiki/Termux-file-system-layout)
-- [Differences From Linux](https://wiki.termux.com/wiki/Differences_from_Linux)
-- [Package Management](https://wiki.termux.com/wiki/Package_Management)
-- [Remote Access](https://wiki.termux.com/wiki/Remote_Access)
-- [Backing up Termux](https://wiki.termux.com/wiki/Backing_up_Termux)
-- [Terminal Settings](https://wiki.termux.com/wiki/Terminal_Settings)
-- [Touch Keyboard](https://wiki.termux.com/wiki/Touch_Keyboard)
-- [Android Storage and Sharing Data with Other Apps](https://wiki.termux.com/wiki/Internal_and_external_storage)
-- [Android APIs](https://wiki.termux.com/wiki/Termux:API)
-- [Moved Termux Packages Hosting From Bintray to IPFS](https://github.com/termux/termux-packages/issues/6348)
-- [Running Commands in Termux From Other Apps via `RUN_COMMAND` intent](https://github.com/termux/termux-app/wiki/RUN_COMMAND-Intent)
-- [Termux and Android 10](https://github.com/termux/termux-packages/wiki/Termux-and-Android-10)
+```sh
+mkdir -p ~/.config/fish ~/.termux ~/files/btop
+cp resources/config/fish/config.fish ~/.config/fish/config.fish
+cp resources/config/tmux/.tmux.conf ~/.tmux.conf
+cp resources/config/termux/termux.properties ~/.termux/termux.properties
+cp resources/scripts/restore_btop.sh ~/files/btop/restore_btop.sh
+mkdir -p ~/.local/bin
+cp resources/scripts/statusbar/kew-now-playing ~/.local/bin/kew-now-playing
+cp resources/scripts/statusbar/weather-cache ~/.local/bin/weather-cache
+cp resources/bin/termux-restart $PREFIX/bin/termux-restart
+chmod +x ~/files/btop/restore_btop.sh $PREFIX/bin/termux-restart ~/.local/bin/kew-now-playing ~/.local/bin/weather-cache
+termux-reload-settings
+```
 
-***
+3. Make Fish your default shell:
 
-## Debugging
+```sh
+chsh -s fish
+```
 
-You can help debug problems of the `Termux` app and its plugins by setting appropriate `logcat` `Log Level` in `Termux` app settings -> `<APP_NAME>` -> `Debugging` -> `Log Level` (Requires `Termux` app version `>= 0.118.0`). The `Log Level` defaults to `Normal` and log level `Verbose` currently logs additional information. Its best to revert log level to `Normal` after you have finished debugging since private data may otherwise be passed to `logcat` during normal operation and moreover, additional logging increases execution time.
+4. Restart Termux completely:
+- Close the app from recent apps and open it again.
+- If it stutters, run `termux-restart`.
 
-The plugin apps **do not execute the commands themselves** but send execution intents to `Termux` app, which has its own log level which can be set in `Termux` app settings -> `Termux` -> `Debugging` -> `Log Level`. So you must set log level for both `Termux` and the respective plugin app settings to get all the info.
+5. In app settings:
+- Enable wallpaper sync option if you want Monet colors to apply correctly.
+- Set an uncommon input split character (like `@` or `#`) for better app-search behavior.
+- Set default apps as comma-separated values (example: `phone,whatsapp,chrome`).
 
-Once log levels have been set, you can run the `logcat` command in `Termux` app terminal to view the logs in realtime (`Ctrl+c` to stop) or use `logcat -d > logcat.txt` to take a dump of the log. You can also view the logs from a PC over `ADB`. For more information, check official android `logcat` guide [here](https://developer.android.com/studio/command-line/logcat).
+6. Optional but recommended:
+- Install Unexpected Keyboard:
+  https://play.google.com/store/apps/details?id=juloo.keyboard2
+- For Android app launching, use BlueLineConsole:
+  https://github.com/nhirokinet/bluelineconsole
+- `tooie-shelf` is experimental; track it upstream:
+  https://github.com/PickleHik3/tooie-shelf
 
-Moreover, users can generate termux files `stat` info and `logcat` dump automatically too with terminal's long hold options menu `More` -> `Report Issue` option and selecting `YES` in the prompt shown to add debug info. This can be helpful for reporting and debugging other issues. If the report generated is too large, then `Save To File` option in context menu (3 dots on top right) of `ReportActivity` can be used and the file viewed/shared instead.
+## Keyboard + keybind setup
 
-Users must post complete report (optionally without sensitive info) when reporting issues. Issues opened with **(partial) screenshots of error reports** instead of text will likely be automatically closed/deleted.
+### Fish keybinds (`$HOME/.config/fish/config.fish`)
 
-##### Log Levels
+| Key | Action |
+| --- | --- |
+| `Alt+e` | Send current command to `aichat` (`_aichat_fish`) |
 
-- `Off` - Log nothing.
-- `Normal` - Start logging error, warn and info messages and stacktraces.
-- `Debug` - Start logging debug messages.
-- `Verbose` - Start logging verbose messages.
-##
+### Tmux keybinds (`$HOME/.tmux.conf`)
 
-***
+| Key | Action |
+| --- | --- |
+| `Prefix` = `Ctrl+b` | Main tmux prefix |
+| `Alt+1..9` | Jump to window 1..9 |
+| `Alt+c` | New window |
+| `Alt+x` | Kill current window |
+| `Alt+z` | Last active window |
+| `Alt+r` | Replace current window (new + kill previous) |
+| `Alt+Arrow` | Move between panes |
+| `Ctrl+Shift+Arrow` | Resize pane |
+| `Prefix + |` | Split pane horizontally |
+| `Prefix + -` | Split pane vertically |
+| `Prefix + R` | Reload tmux config |
+| `Ctrl+Space` | Open app launcher (`tooie-shelf`) |
+| `Alt+w` | Launch WhatsApp |
+| `Alt+y` | Launch YouTube |
+| `Alt+b` | Launch Brave |
+| `Alt+t` | Launch Mihon |
+| `Alt+f` | Launch Solid Explorer |
+| `Alt+s` | Launch Android Settings |
+| `Alt+Space` | Launch Blue Line Console |
 
-## Disclaimer
-> There's no termux monet official groups other than github.com/termux-monet. If you see any Telegram or Threads group, that's not made by me! Any group that's not mentioned in this README.md is not official.
+### Termux extra-keys (`$HOME/.termux/termux.properties`)
 
-> Do not report issues occurred in Termux Monet on termux-app repo, unless you're completely certain that this problem is also present in the regular Termux App.
->
-> By installing this app, you agree that you're aware of its unstableness.
-> 
-> I am not responsible for bricked devices, dead SD cards, thermonuclear war, or you getting fired because Termux didn't load. Please do some research if you have any concerns about features and code included in this forked App before installing it! YOU are choosing to replace your Termux app with this one, and if you point the finger at me for messing up your terminal and device, I will laugh at you.
->
-> Usage of Termux for attacking/hacking targets without prior mutual consent is illegal. It is the end user's responsibility to obey all applicable local, state and federal laws. Developers assume no liability and are not responsible for any misuse or damage caused by this program.
+Visible in screenshots; configured as two rows.
 
-***
+| Extra key | Sends | Result |
+| --- | --- | --- |
+| `🔥` | `Ctrl+b` `Backspace` | Open btop mini window |
+| `🕞` | `Ctrl+b` `Tab` | Open peaclock |
+| `🎧` | `Ctrl+b` `Esc` | Open kew |
+| `📂` | `Ctrl+b` `Enter` | Open yazi |
+| `🌠` | `Ctrl+b` `Del` | Open crush |
+| `📒` | `Ctrl+b` `PgUp` | Open nvim |
+| `🗓️` | `Ctrl+b` `PgDn` | Open calcure |
+| `🔍` | `Ctrl+b` `End` | Launch Blue Line Console |
+| `⇄` | `Alt+z` | Switch to last tmux window |
+| `𝍣` | `Ctrl+b` `-` | Split pane vertically |
+| `𝍬` (popup) | `Ctrl+b` `|` | Split pane horizontally |
+| `⓵` `⓶` `⓷` | `Ctrl+b` `1/2/3` | Switch tmux window |
+| `✎` | `Ctrl+b` `[` | Enter copy mode |
+| `㋡` | `Ctrl+b` | Prefix helper key |
 
-## Forking
+## Recommended keyboard
 
-- Check [`TermuxConstants`](https://github.com/Termux-Monet/termux-monet/blob/master/termux-shared/src/main/java/com/termux/shared/termux/TermuxConstants.java) javadocs for instructions on what changes to make in the app to change package name.
-- Keep targetSdk 28 to avoid login error `not exec("/data/data/com.termux/files/usr/bin/login"): Permission denied`.
-- You also need to recompile bootstrap zip for the new package name. Check [building bootstrap](https://github.com/termux/termux-packages/wiki/For-maintainers#build-bootstrap-archives), [here](https://github.com/termux/termux-app/issues/1983) and [here](https://github.com/termux/termux-app/issues/2081#issuecomment-865280111).
-- Currently, not all plugins use `TermuxConstants` from `termux-shared` library and have hardcoded `com.termux` values and will need to be manually patched.
-- If forking termux plugins, check [Forking and Local Development](https://github.com/Termux-Monet/termux-monet/wiki/Termux-Libraries#forking-and-local-development) for info on how to use termux libraries for plugins.
-- Enable GitHub actions and do any commit to build termux. e.g. upload a placeholder file.
-- Create empty releases. You don't need to manually upload termux apks, GitHub Actions will do all the job for you.
+For this style of launcher, I strongly recommend **Unexpected Keyboard**:
+- https://play.google.com/store/apps/details?id=juloo.keyboard2
 
-## Special Thanks
+## Quirks / important notes
 
-- Thanks for [Android Repository](https://t.me/AndroidRepo) and [MódulOS.tk](https://t.me/moduloyappstk) for sharing and supporting the project!
-- Thanks for [Termux](https://github.com/termux/termux-app) for creating this incredible app!
+- Set an uncommon **input split character** in app settings (for example `@` or `#`).
+  This makes it easier to trigger Android app search via the suggestions bar.
+- Default apps can be configured as comma-separated values, for example: `phone,whatsapp,chrome`.
+- `tooie-shelf` is experimental and currently not fully functional in this setup.
+  Use the upstream repo directly: https://github.com/PickleHik3/tooie-shelf
+- Enable **Sync system wallpaper** in settings so in-app wallpaper and system wallpaper stay aligned.
+  This helps Monet colors apply properly.
+- Install the `termux-api` package if you want wallpaper sync-to-system to work.
+- For easier Android app launching, I recommend:
+  https://github.com/nhirokinet/bluelineconsole
+- Alternative launcher panel:
+  https://play.google.com/store/apps/details?id=com.fossor.panels
+- `btop` setup requires Shizuku + `rish`: set up Shizuku first, place `rish` in `~/.rish`, download generic Linux btop from
+  https://github.com/aristocratos/btop/releases, then use `resources/scripts/restore_btop.sh` and make files executable.
+- A custom `termux-restart` helper is provided at `resources/bin/termux-restart`.
+  Copy it to `$PREFIX/bin/termux-restart` and make it executable.
+  It uses `rish` capability to force-stop and restart the app.
+- tmux status-right uses two local scripts:
+  `~/.local/bin/kew-now-playing` and `~/.local/bin/weather-cache`.
+  You can copy them from `resources/scripts/statusbar/`.
+- `weather-cache` uses a fixed location (`Kuwait`) by default.
+  Edit `~/.local/bin/weather-cache` if you want a different city.
+- If you exit the shell with normal `exit`, the app can become stuttery.
+  If that happens, force-close from Android settings or run `termux-restart`.
+- Battery usage is untested. On my device (Nothing Phone 2, around 3 years old), it has mostly been fine.
+- Termux:X11 currently does not seem to work with this setup.
+- I recommend using the Pacman package manager to access TUR packages more easily (including Python-related packages):
+  - https://wiki.termux.com/wiki/Switching_package_manager
+- Users are encouraged to build APKs themselves, or use artifacts from the nightly workflow.
 
-***
+## Notes
 
-<p align="center">
-<img src="https://raw.githubusercontent.com/Termux-Monet/termux-monet/master/art/ic_monet_dark.svg#gh-dark-mode-only" width=50% height=50%>
-<img src="https://raw.githubusercontent.com/Termux-Monet/termux-monet/master/art/ic_monet_light.svg#gh-light-mode-only" width=50% height=50%>
-</p>
+This is not polished and not production-ready.
 
-<div align="center">
-  <a href="https://github.com/Termux-Monet/termux-monet/releases">
-    <img src="https://img.shields.io/github/downloads/Termux-Monet/termux-monet/total?color=brightgreen&label=Downloads"/>
-  </a>
-  <a href="https://github.com/Termux-Monet/termux-monet/releases">
-    <img src="https://badgen.net/github/assets-dl/Termux-Monet/termux-monet?label=Updates"/>
-  </a>
-  <a href="https://github.com/Termux-Monet/termux-monet/forks?activity_threshold=5y&include=active%2Carchived%2Cinactive&page=1&sort_by=last_updated">
-    <img src="https://img.shields.io/github/forks/Termux-Monet/termux-monet?style=social"/>
-  </a>
-</div>
+It is a personal vibecoded concept that proves the UX can work. If you are an actual Android/launcher developer and want to build this properly, please do.

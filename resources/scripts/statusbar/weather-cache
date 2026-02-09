@@ -1,0 +1,482 @@
+#!/bin/sh
+CACHE="$HOME/.cache/weather"
+MAX_AGE=300  # 5 minutes in seconds
+
+# Check if it's currently night (between 6PM and 6AM)
+is_night() {
+    hour=$(date +%H)
+    if [ "$hour" -ge 18 ] || [ "$hour" -lt 6 ]; then
+        return 0  # true - it is night
+    else
+        return 1  # false - it is day
+    fi
+}
+
+# Map wttr.in weather codes to Nerd Font icons
+# Codes from: https://github.com/chubin/wttr.in/blob/master/lib/constants.py
+# Original icons preserved, night variants added where available
+map_weather_icon() {
+    code="$1"
+    is_night="$2"
+
+    case "$code" in
+        # Clear/Sunny
+        113)
+            if [ "$is_night" -eq 1 ]; then
+                echo "󰖔"  # Night clear (moon)
+            else
+                echo "󰖙"  # Sunny
+            fi
+            ;;
+        # Partly cloudy
+        116)
+            if [ "$is_night" -eq 1 ]; then
+                echo ''  # nf-weather-night_alt_partly_cloudy (moon behind cloud)
+            else
+                echo "󰖕"  # Partly cloudy (day)
+            fi
+            ;;
+        # Cloudy
+        119)
+            if [ "$is_night" -eq 1 ]; then
+                echo ''  # nf-weather-night_alt_cloudy
+            else
+                echo "󰖐"  # Cloudy
+            fi
+            ;;
+        # Overcast
+        122)
+            echo "󰖐"  # Overcast (same as cloudy)
+            ;;
+        # Mist/Fog
+        143|248|260)
+            if [ "$is_night" -eq 1 ]; then
+                echo ''  # nf-weather-night_fog
+            else
+                echo "󰖑"  # Fog
+            fi
+            ;;
+        # Patchy rain nearby
+        176)
+            if [ "$is_night" -eq 1 ]; then
+                echo ''  # nf-weather-night_alt_rain
+            else
+                echo "󰖗"  # Patchy rain
+            fi
+            ;;
+        # Patchy snow nearby
+        179)
+            if [ "$is_night" -eq 1 ]; then
+                echo ''  # nf-weather-night_alt_snow
+            else
+                echo "󰖘"  # Patchy snow
+            fi
+            ;;
+        # Patchy sleet nearby
+        182)
+            if [ "$is_night" -eq 1 ]; then
+                echo ''  # nf-weather-night_alt_sleet
+            else
+                echo "󰙿"  # Sleet
+            fi
+            ;;
+        # Patchy freezing drizzle nearby
+        185)
+            if [ "$is_night" -eq 1 ]; then
+                echo ''  # nf-weather-night_alt_sleet
+            else
+                echo "󰙿"  # Freezing drizzle
+            fi
+            ;;
+        # Thundery outbreaks nearby
+        200)
+            if [ "$is_night" -eq 1 ]; then
+                echo ''  # nf-weather-night_alt_thunderstorm
+            else
+                echo "󰖓"  # Thunder
+            fi
+            ;;
+        # Blowing snow
+        227)
+            if [ "$is_night" -eq 1 ]; then
+                echo ''  # nf-weather-night_alt_snow_wind
+            else
+                echo "󰖘"  # Blowing snow
+            fi
+            ;;
+        # Blizzard
+        230)
+            if [ "$is_night" -eq 1 ]; then
+                echo ''  # nf-weather-night_alt_snow_wind
+            else
+                echo "󰼶"  # Blizzard
+            fi
+            ;;
+        # Freezing fog
+        263)
+            if [ "$is_night" -eq 1 ]; then
+                echo ''  # nf-weather-night_fog
+            else
+                echo "󰖑"  # Fog
+            fi
+            ;;
+        # Patchy light drizzle
+        266)
+            if [ "$is_night" -eq 1 ]; then
+                echo ''  # nf-weather-night_alt_showers
+            else
+                echo "󰖗"  # Light drizzle
+            fi
+            ;;
+        # Light drizzle
+        293)
+            if [ "$is_night" -eq 1 ]; then
+                echo ''  # nf-weather-night_alt_showers
+            else
+                echo "󰖗"  # Drizzle
+            fi
+            ;;
+        # Freezing drizzle
+        296|299)
+            if [ "$is_night" -eq 1 ]; then
+                echo ''  # nf-weather-night_alt_sleet
+            else
+                echo "󰙿"  # Freezing drizzle
+            fi
+            ;;
+        # Heavy freezing drizzle
+        302)
+            if [ "$is_night" -eq 1 ]; then
+                echo ''  # nf-weather-night_alt_sleet
+            else
+                echo "󰙿"  # Heavy freezing drizzle
+            fi
+            ;;
+        # Patchy light rain
+        305|308)
+            if [ "$is_night" -eq 1 ]; then
+                echo ''  # nf-weather-night_alt_rain
+            else
+                echo "󰖗"  # Light rain
+            fi
+            ;;
+        # Light rain
+        311|314)
+            if [ "$is_night" -eq 1 ]; then
+                echo ''  # nf-weather-night_alt_rain
+            else
+                echo "󰖗"  # Light rain
+            fi
+            ;;
+        # Moderate rain at times
+        317)
+            if [ "$is_night" -eq 1 ]; then
+                echo ''  # nf-weather-night_alt_rain
+            else
+                echo "󰖗"  # Moderate rain
+            fi
+            ;;
+        # Moderate rain
+        320)
+            if [ "$is_night" -eq 1 ]; then
+                echo ''  # nf-weather-night_alt_rain
+            else
+                echo "󰖗"  # Moderate rain
+            fi
+            ;;
+        # Heavy rain at times
+        323)
+            if [ "$is_night" -eq 1 ]; then
+                echo ''  # nf-weather-night_alt_rain_wind
+            else
+                echo "󰖖"  # Heavy rain
+            fi
+            ;;
+        # Heavy rain
+        326)
+            if [ "$is_night" -eq 1 ]; then
+                echo ''  # nf-weather-night_alt_rain_wind
+            else
+                echo "󰖖"  # Heavy rain
+            fi
+            ;;
+        # Light freezing rain
+        329)
+            if [ "$is_night" -eq 1 ]; then
+                echo ''  # nf-weather-night_alt_sleet
+            else
+                echo "󰙿"  # Freezing rain
+            fi
+            ;;
+        # Moderate or heavy freezing rain
+        332|335)
+            if [ "$is_night" -eq 1 ]; then
+                echo ''  # nf-weather-night_alt_sleet
+            else
+                echo "󰙿"  # Heavy freezing rain
+            fi
+            ;;
+        # Light sleet
+        338)
+            if [ "$is_night" -eq 1 ]; then
+                echo ''  # nf-weather-night_alt_sleet
+            else
+                echo "󰙿"  # Sleet
+            fi
+            ;;
+        # Moderate or heavy sleet
+        350|353)
+            if [ "$is_night" -eq 1 ]; then
+                echo ''  # nf-weather-night_alt_sleet
+            else
+                echo "󰙿"  # Heavy sleet
+            fi
+            ;;
+        # Patchy light snow
+        356|359)
+            if [ "$is_night" -eq 1 ]; then
+                echo ''  # nf-weather-night_alt_snow
+            else
+                echo "󰖘"  # Light snow
+            fi
+            ;;
+        # Light snow
+        362|365)
+            if [ "$is_night" -eq 1 ]; then
+                echo ''  # nf-weather-night_alt_snow
+            else
+                echo "󰖘"  # Light snow
+            fi
+            ;;
+        # Patchy moderate snow
+        368)
+            if [ "$is_night" -eq 1 ]; then
+                echo ''  # nf-weather-night_alt_snow
+            else
+                echo "󰖘"  # Moderate snow
+            fi
+            ;;
+        # Moderate snow
+        371)
+            if [ "$is_night" -eq 1 ]; then
+                echo ''  # nf-weather-night_alt_snow
+            else
+                echo "󰖘"  # Moderate snow
+            fi
+            ;;
+        # Patchy heavy snow
+        374)
+            if [ "$is_night" -eq 1 ]; then
+                echo ''  # nf-weather-night_alt_snow_wind
+            else
+                echo "󰼶"  # Heavy snow
+            fi
+            ;;
+        # Heavy snow
+        377)
+            if [ "$is_night" -eq 1 ]; then
+                echo ''  # nf-weather-night_alt_snow_wind
+            else
+                echo "󰼶"  # Heavy snow
+            fi
+            ;;
+        # Ice pellets
+        386)
+            if [ "$is_night" -eq 1 ]; then
+                echo ''  # nf-weather-night_alt_snow
+            else
+                echo "󰖘"  # Ice pellets
+            fi
+            ;;
+        # Light rain shower
+        389)
+            if [ "$is_night" -eq 1 ]; then
+                echo ''  # nf-weather-night_alt_showers
+            else
+                echo "󰖗"  # Rain shower
+            fi
+            ;;
+        # Moderate or heavy rain shower
+        392)
+            if [ "$is_night" -eq 1 ]; then
+                echo ''  # nf-weather-night_alt_storm_showers
+            else
+                echo "󰖖"  # Heavy rain shower
+            fi
+            ;;
+        # Torrential rain shower
+        395)
+            if [ "$is_night" -eq 1 ]; then
+                echo ''  # nf-weather-night_alt_storm_showers
+            else
+                echo "󰖖"  # Torrential rain
+            fi
+            ;;
+        # Light sleet showers
+        398)
+            if [ "$is_night" -eq 1 ]; then
+                echo ''  # nf-weather-night_alt_sleet
+            else
+                echo "󰙿"  # Sleet showers
+            fi
+            ;;
+        # Moderate or heavy sleet showers
+        401|404)
+            if [ "$is_night" -eq 1 ]; then
+                echo ''  # nf-weather-night_alt_sleet
+            else
+                echo "󰙿"  # Heavy sleet showers
+            fi
+            ;;
+        # Light snow showers
+        407)
+            if [ "$is_night" -eq 1 ]; then
+                echo ''  # nf-weather-night_alt_snow
+            else
+                echo "󰖘"  # Snow showers
+            fi
+            ;;
+        # Moderate or heavy snow showers
+        410|413)
+            if [ "$is_night" -eq 1 ]; then
+                echo ''  # nf-weather-night_alt_snow_wind
+            else
+                echo "󰼶"  # Heavy snow showers
+            fi
+            ;;
+        # Light showers of ice pellets
+        416)
+            if [ "$is_night" -eq 1 ]; then
+                echo ''  # nf-weather-night_alt_snow
+            else
+                echo "󰖘"  # Ice pellet showers
+            fi
+            ;;
+        # Moderate or heavy showers of ice pellets
+        419)
+            if [ "$is_night" -eq 1 ]; then
+                echo ''  # nf-weather-night_alt_snow_wind
+            else
+                echo "󰼶"  # Heavy ice pellet showers
+            fi
+            ;;
+        # Patchy light rain with thunder
+        422)
+            if [ "$is_night" -eq 1 ]; then
+                echo ''  # nf-weather-night_alt_thunderstorm
+            else
+                echo "󰖓"  # Thunderstorm
+            fi
+            ;;
+        # Moderate or heavy rain with thunder
+        425)
+            if [ "$is_night" -eq 1 ]; then
+                echo ''  # nf-weather-night_alt_thunderstorm
+            else
+                echo "󰖓"  # Thunderstorm
+            fi
+            ;;
+        # Patchy light snow with thunder
+        428)
+            if [ "$is_night" -eq 1 ]; then
+                echo ''  # nf-weather-night_alt_snow_thunderstorm
+            else
+                echo "󰖓"  # Thunder snow
+            fi
+            ;;
+        # Moderate or heavy snow with thunder
+        431)
+            if [ "$is_night" -eq 1 ]; then
+                echo ''  # nf-weather-night_alt_snow_thunderstorm
+            else
+                echo "󰖓"  # Thunder snow
+            fi
+            ;;
+        *)
+            # Fallback based on first digit
+            case "${code%${code#?}}" in
+                1)
+                    if [ "$is_night" -eq 1 ]; then
+                        echo "󰖔"  # Night clear
+                    else
+                        echo "󰖙"  # Clear/Sunny
+                    fi
+                    ;;
+                2)
+                    if [ "$is_night" -eq 1 ]; then
+                        echo ''  # Night thunderstorm
+                    else
+                        echo "󰖓"  # Thunder
+                    fi
+                    ;;
+                3)
+                    if [ "$is_night" -eq 1 ]; then
+                        echo ''  # Night snow
+                    else
+                        echo "󰖘"  # Snow
+                    fi
+                    ;;
+                *)
+                    if [ "$is_night" -eq 1 ]; then
+                        echo ''  # Night cloudy
+                    else
+                        echo "󰖐"  # Default cloudy
+                    fi
+                    ;;
+            esac
+            ;;
+    esac
+}
+
+# Fetch and display weather data
+fetch_and_display() {
+    json=$(curl -s -m 10 'wttr.in/Kuwait?format=j1' 2>/dev/null)
+    if [ -n "$json" ] && echo "$json" | grep -q '"temp_C"'; then
+        # Extract current condition data
+        temp=$(echo "$json" | grep -o '"temp_C"[^,]*' | head -1 | cut -d'"' -f4)
+        code=$(echo "$json" | grep -o '"weatherCode"[^,]*' | head -1 | cut -d'"' -f4)
+        
+        # Extract weather description - get first weatherDesc value from current_condition
+        weather_desc=$(echo "$json" | grep -o '"weatherDesc".*"value".*"[^"]*"' | head -1 | sed 's/.*"value"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/')
+
+        # Check if night
+        fetch_night=0
+        fetch_hour=$(date +%H)
+        if [ "$fetch_hour" -ge 18 ] || [ "$fetch_hour" -lt 6 ]; then
+            fetch_night=1
+        fi
+
+        weather_icon=$(map_weather_icon "$code" "$fetch_night")
+
+        # Format: weather_icon temp description
+        output="$weather_icon ${temp}°C"
+        if [ -n "$weather_desc" ]; then
+            output="$output $weather_desc"
+        fi
+        
+        echo "$output" > "$CACHE.tmp" && mv "$CACHE.tmp" "$CACHE"
+        echo "$output"
+    else
+        # Fetch failed - return empty so caller can use cache
+        return 1
+    fi
+}
+
+# Check if cache exists and is fresh
+if [ -f "$CACHE" ]; then
+    age=$(($(date +%s) - $(date -r "$CACHE" +%s 2>/dev/null || echo 0)))
+    if [ "$age" -lt "$MAX_AGE" ]; then
+        cat "$CACHE"
+        exit 0
+    fi
+fi
+
+# No cache or stale cache - fetch synchronously
+if ! fetch_and_display; then
+    # Fetch failed, show placeholder
+    if is_night; then
+        echo "󰖔 ..."
+    else
+        echo "󰖙 ..."
+    fi
+fi

@@ -1,0 +1,2 @@
+#!/data/data/com.termux/files/usr/bin/sh
+~/.rish/rish -c "am force-stop com.termux; am start com.termux/.app.TermuxActivity"
