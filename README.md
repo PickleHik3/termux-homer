@@ -85,22 +85,14 @@ termux-reload-settings
 - For more styling and behavior details (this app is roughly 90% Termux-Monet, with app suggestion bar and blur-view additions), see:
   https://github.com/Termux-Monet/termux-monet
 
-### 5) Optional dev stack references
+### 5) Optional references (manual, not automated)
 
-If you want the fuller setup I use, see:
+The `termux-init` flow is currently not functioning end-to-end here.
+Use these files as reference only:
+- `resources/optional/termux-init/bootstrap.md`
+- `resources/optional/termux-init/nvim/termux.lua`
+- `resources/optional/termux-init/crush/crush.example.json`
 - https://github.com/PickleHik3/termux-init
-
-This repo includes quick references from there:
-
-```sh
-# Neovim Termux LSP plugin config
-mkdir -p ~/.config/nvim/lua/plugins
-cp resources/optional/termux-init/nvim/termux.lua ~/.config/nvim/lua/plugins/termux.lua
-
-# Crush config example
-mkdir -p ~/.config/crush
-cp resources/optional/termux-init/crush/crush.example.json ~/.config/crush/crush.json
-```
 
 ## Keybinds
 
