@@ -6,11 +6,7 @@ android {
     compileSdkVersion project.properties.compileSdkVersion.toInteger()
 
     dependencies {
-<<<<<<< HEAD
-        implementation "androidx.annotation:annotation:1.8.0"
-=======
         implementation "androidx.annotation:annotation:1.9.0"
->>>>>>> upstream/master
         api project(":terminal-emulator")
     }
 
@@ -48,13 +44,6 @@ dependencies {
 task sourceJar(type: Jar) {
     from android.sourceSets.main.java.srcDirs
     archiveClassifier = "sources"
-<<<<<<< HEAD
-}
-
-tasks.withType(JavaCompile) {
-    options.compilerArgs << "-Xlint:deprecation"
-=======
->>>>>>> upstream/master
 }
 
 afterEvaluate {
@@ -62,11 +51,7 @@ afterEvaluate {
         publications {
             // Creates a Maven publication called "release".
             release(MavenPublication) {
-<<<<<<< HEAD
-                from components.findByName('release')
-=======
                 from components.default
->>>>>>> upstream/master
                 groupId = 'com.termux'
                 artifactId = 'terminal-view'
                 version = '0.118.0'
@@ -75,4 +60,3 @@ afterEvaluate {
         }
     }
 }
-

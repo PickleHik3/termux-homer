@@ -118,25 +118,6 @@ public final class TerminalSession extends TerminalOutput {
             mEmulator.updateTerminalSessionClient(client);
     }
 
-<<<<<<< HEAD
-    /**
-     * Update the setting to render bold text with bright colors. This takes effect on
-     * the next call to updateSize().
-     */
-    public void setBoldWithBright(boolean boldWithBright) {
-        this.mBoldWithBright = boldWithBright;
-    }
-
-    /**
-     * Inform the attached pty of the new size and reflow or initialize the emulator.
-     */
-    public void updateSize(int columns, int rows, int fontWidth, int fontHeight) {
-        if (mEmulator == null) {
-            initializeEmulator(columns, rows, fontWidth, fontHeight);
-        } else {
-            JNI.setPtyWindowSize(mTerminalFileDescriptor, rows, columns, fontWidth, fontHeight);
-            mEmulator.resize(columns, rows);
-=======
     /** Inform the attached pty of the new size and reflow or initialize the emulator. */
     public void updateSize(int columns, int rows, int cellWidthPixels, int cellHeightPixels) {
         if (mEmulator == null) {
@@ -144,7 +125,6 @@ public final class TerminalSession extends TerminalOutput {
         } else {
             JNI.setPtyWindowSize(mTerminalFileDescriptor, rows, columns, cellWidthPixels, cellHeightPixels);
             mEmulator.resize(columns, rows, cellWidthPixels, cellHeightPixels);
->>>>>>> upstream/master
         }
     }
 
@@ -161,18 +141,11 @@ public final class TerminalSession extends TerminalOutput {
      * @param columns The number of columns in the terminal window.
      * @param rows    The number of rows in the terminal window.
      */
-<<<<<<< HEAD
-    public void initializeEmulator(int columns, int rows, int cellWidth, int cellHeight) {
-        mEmulator = new TerminalEmulator(this, mBoldWithBright, columns, rows, mTranscriptRows, mClient);
-        int[] processId = new int[1];
-        mTerminalFileDescriptor = JNI.createSubprocess(mShellPath, mCwd, mArgs, mEnv, processId, rows, columns, cellWidth, cellHeight);
-=======
     public void initializeEmulator(int columns, int rows, int cellWidthPixels, int cellHeightPixels) {
         mEmulator = new TerminalEmulator(this, columns, rows, cellWidthPixels, cellHeightPixels, mTranscriptRows, mClient);
 
         int[] processId = new int[1];
         mTerminalFileDescriptor = JNI.createSubprocess(mShellPath, mCwd, mArgs, mEnv, processId, rows, columns, cellWidthPixels, cellHeightPixels);
->>>>>>> upstream/master
         mShellPid = processId[0];
         mClient.setTerminalShellPid(this, mShellPid);
         final FileDescriptor terminalFileDescriptorWrapped = wrapFileDescriptor(mTerminalFileDescriptor, mClient);

@@ -2,11 +2,8 @@ package com.termux.shared.models;
 
 import android.graphics.Color;
 import android.graphics.Typeface;
-<<<<<<< HEAD
-=======
 
 import androidx.annotation.Keep;
->>>>>>> upstream/master
 import androidx.annotation.NonNull;
 import com.termux.shared.activities.TextIOActivity;
 import com.termux.shared.data.DataUtils;

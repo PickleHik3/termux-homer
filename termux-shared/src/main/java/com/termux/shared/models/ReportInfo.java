@@ -12,10 +12,6 @@ import java.io.Serializable;
 public class ReportInfo implements Serializable {
 
     /**
-<<<<<<< HEAD
-     * The user action that was being processed for which the report was generated.
-     */
-=======
      * Explicitly define `serialVersionUID` to prevent exceptions on deserialization.
      *
      * Like when calling `Bundle.getSerializable()` on Android.
@@ -32,10 +28,7 @@ public class ReportInfo implements Serializable {
     @Keep
     private static final long serialVersionUID = 1L;
 
-
-
     /** The user action that was being processed for which the report was generated. */
->>>>>>> upstream/master
     public final String userAction;
 
     /**
