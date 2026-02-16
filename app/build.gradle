@@ -14,37 +14,11 @@ ext {
 
 android {
     namespace "com.termux"
-<<<<<<< HEAD
-=======
 
->>>>>>> upstream/master
     compileSdkVersion project.properties.compileSdkVersion.toInteger()
     def appVersionName = System.getenv("TERMUX_APP_VERSION_NAME") ?: ""
     def apkVersionTag = System.getenv("TERMUX_APK_VERSION_TAG") ?: ""
-    def splitAPKsForDebugBuilds = System.getenv("TERMUX_SPLIT_APKS_FOR_DEBUG_BUILDS") ?: "1"
-<<<<<<< HEAD
-    def splitAPKsForReleaseBuilds = System.getenv("TERMUX_SPLIT_APKS_FOR_RELEASE_BUILDS") ?: "1"
-=======
     def splitAPKsForReleaseBuilds = System.getenv("TERMUX_SPLIT_APKS_FOR_RELEASE_BUILDS") ?: "0" // F-Droid does not support split APKs #1904
-
-    dependencies {
-        implementation "androidx.annotation:annotation:1.9.0"
-        implementation "androidx.core:core:1.13.1"
-        implementation "androidx.drawerlayout:drawerlayout:1.2.0"
-        implementation "androidx.preference:preference:1.2.1"
-        implementation "androidx.viewpager:viewpager:1.0.0"
-        implementation "com.google.android.material:material:1.12.0"
-        implementation "com.google.guava:guava:24.1-jre"
-        implementation "io.noties.markwon:core:$markwonVersion"
-        implementation "io.noties.markwon:ext-strikethrough:$markwonVersion"
-        implementation "io.noties.markwon:linkify:$markwonVersion"
-        implementation "io.noties.markwon:recycler:$markwonVersion"
-        implementation 'com.google.guava:listenablefuture:9999.0-empty-to-avoid-conflict-with-guava'
-
-        implementation project(":terminal-view")
-        implementation project(":termux-shared")
-    }
->>>>>>> upstream/master
 
     defaultConfig {
         minSdkVersion project.properties.minSdkVersion.toInteger()
@@ -109,15 +83,12 @@ android {
         targetCompatibility JavaVersion.VERSION_11
     }
 
-<<<<<<< HEAD
-=======
     externalNativeBuild {
         ndkBuild {
             path "src/main/cpp/Android.mk"
         }
     }
 
->>>>>>> upstream/master
     lint {
         disable 'ProtectedPermissions'
         disable 'HardcodedDebugMode'
@@ -141,13 +112,10 @@ android {
             outputFileName = new File("termux-app_" + (apkVersionTag ? apkVersionTag : project.ext.packageVariant + "-" + variant.buildType.name) + "_" + (abi ? abi : "universal") + ".apk")
         }
     }
-<<<<<<< HEAD
-=======
 
     buildFeatures {
         buildConfig true
     }
->>>>>>> upstream/master
 }
 
 dependencies {
@@ -193,11 +161,57 @@ def validateVersionName(String versionName) {
     }
 }
 
-<<<<<<< HEAD
+def downloadBootstrap(String arch, String expectedChecksum, String version) {
+    def digest = java.security.MessageDigest.getInstance("SHA-256")
+
+    def localUrl = "src/main/cpp/bootstrap-" + arch + ".zip"
+    def file = new File(projectDir, localUrl)
+    if (file.exists()) {
+        def buffer = new byte[8192]
+        def input = new FileInputStream(file)
+        while (true) {
+            def readBytes = input.read(buffer)
+            if (readBytes < 0) break
+            digest.update(buffer, 0, readBytes)
+        }
+        def checksum = new BigInteger(1, digest.digest()).toString(16)
+        while (checksum.length() < 64) { checksum = "0" + checksum }
+        if (checksum == expectedChecksum) {
+            return
+        } else {
+            logger.quiet("Deleting old local file with wrong hash: " + localUrl + ": expected: " + expectedChecksum + ", actual: " + checksum)
+            file.delete()
+        }
+    }
+
+    def remoteUrl = "https://github.com/termux/termux-packages/releases/download/bootstrap-" + version + "/bootstrap-" + arch + "-" + version + ".zip"
+    logger.quiet("Downloading " + remoteUrl + " to " + localUrl)
+    
+    def connection = new URL(remoteUrl).openConnection()
+    connection.connect()
+    
+    def output = new FileOutputStream(file)
+    def input = connection.inputStream
+    def buffer = new byte[8192]
+    while (true) {
+        def readBytes = input.read(buffer)
+        if (readBytes < 0) break
+        digest.update(buffer, 0, readBytes)
+        output.write(buffer, 0, readBytes)
+    }
+    def checksum = new BigInteger(1, digest.digest()).toString(16)
+    while (checksum.length() < 64) { checksum = "0" + checksum }
+    if (checksum != expectedChecksum) {
+        file.delete()
+        throw new GradleException("Downloaded file has wrong hash: " + localUrl + ": expected: " + expectedChecksum + ", actual: " + checksum)
+    }
+}
+
 // https://stackoverflow.com/questions/75274720/a-failure-occurred-while-executing-appcheckdebugduplicateclasses/
 configurations.implementation {
    exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jdk8'
-=======
+}
+
 clean {
     doLast {
         def tree = fileTree(new File(projectDir, 'src/main/cpp'))
@@ -231,5 +245,4 @@ afterEvaluate {
     android.applicationVariants.all { variant ->
         variant.javaCompileProvider.get().dependsOn(downloadBootstraps)
     }
->>>>>>> upstream/master
 }
