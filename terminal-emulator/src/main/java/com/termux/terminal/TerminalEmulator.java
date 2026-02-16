@@ -1424,7 +1424,6 @@ public final class TerminalEmulator {
     }
 
     /** Process byte while in the {@link #ESC_CSI_QUESTIONMARK} escape state. */
->>>>>>> upstream/master
     private void doCsiQuestionMark(int b) {
         switch(b) {
             // Selective erase in display (DECSED) - http://www.vt100.net/docs/vt510-rm/DECSED.
@@ -2115,9 +2114,6 @@ public final class TerminalEmulator {
             '>':
                 continueSequence(ESC_CSI_BIGGERTHAN);
                 break;
-            case // Horizontal position absolute (HPA - http://www.vt100.net/docs/vt510-rm/HPA).
-            '`':
-=======
             case '?': // Esc [ ? -- start of a private parameter byte
                 continueSequence(ESC_CSI_QUESTIONMARK);
                 break;
@@ -2129,7 +2125,6 @@ public final class TerminalEmulator {
                 continueSequence(ESC_CSI_UNSUPPORTED_PARAMETER_BYTE);
                 break;
             case '`': // Horizontal position absolute (HPA - http://www.vt100.net/docs/vt510-rm/HPA).
->>>>>>> upstream/master
                 setCursorColRespectingOriginMode(getArg0(1) - 1);
                 break;
             case // Repeat the preceding graphic character Ps times (REP).
