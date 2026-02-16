@@ -155,22 +155,8 @@ public final class TerminalEmulator {
     /** Escape processing: ESC [ <parameter bytes> <intermediate bytes> */
     private static final int ESC_CSI_UNSUPPORTED_INTERMEDIATE_BYTE = 23;
 
-<<<<<<< HEAD
-    /**
-     * Escape processing: APC
-     */
-    private static final int ESC_APC = 20;
-
-    private static final int ESC_APC_ESC = 21;
-
-    /**
-     * The number of parameter arguments. This name comes from the ANSI standard for terminal escape codes.
-     */
-    private static final int MAX_ESCAPE_PARAMETERS = 16;
-=======
     /** The number of parameter arguments including colon separated sub-parameters. */
     private static final int MAX_ESCAPE_PARAMETERS = 32;
->>>>>>> upstream/master
 
     /**
      * Needs to be large enough to contain reasonable OSC 52 pastes.
@@ -257,16 +243,10 @@ public final class TerminalEmulator {
      */
     public int mRows, mColumns;
 
-<<<<<<< HEAD
-    /**
-     * The number of terminal transcript rows that can be scrolled back to.
-     */
-=======
     /** Size of a terminal cell in pixels. */
     private int mCellWidthPixels, mCellHeightPixels;
 
     /** The number of terminal transcript rows that can be scrolled back to. */
->>>>>>> upstream/master
     public static final int TERMINAL_TRANSCRIPT_ROWS_MIN = 100;
 
     public static final int TERMINAL_TRANSCRIPT_ROWS_MAX = 50000;
