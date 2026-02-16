@@ -391,15 +391,8 @@ public final class TerminalEmulator {
      */
     int mForeColor, mBackColor, mUnderlineColor;
 
-<<<<<<< HEAD
-    /**
-     * Current {@link TextStyle} effect.
-     */
-    private int mEffect;
-=======
     /** Current {@link TextStyle} effect. */
     int mEffect;
->>>>>>> upstream/master
 
     /**
      * The number of scrolled lines since last calling {@link #clearScrollCounter()}. Used for moving selection up along
@@ -482,11 +475,7 @@ public final class TerminalEmulator {
         }
     }
 
-<<<<<<< HEAD
-    public TerminalEmulator(TerminalOutput session, boolean boldWithBright, int columns, int rows, Integer transcriptRows, TerminalSessionClient client) {
-=======
-    public TerminalEmulator(TerminalOutput session, int columns, int rows, int cellWidthPixels, int cellHeightPixels, Integer transcriptRows, TerminalSessionClient client) {
->>>>>>> upstream/master
+    public TerminalEmulator(TerminalOutput session, boolean boldWithBright, int columns, int rows, int cellWidthPixels, int cellHeightPixels, Integer transcriptRows, TerminalSessionClient client) {
         mSession = session;
         mScreen = mMainBuffer = new TerminalBuffer(columns, getTerminalTranscriptRows(transcriptRows), rows);
         mAltBuffer = new TerminalBuffer(columns, rows, rows);
@@ -738,12 +727,6 @@ public final class TerminalEmulator {
     }
 
     public void processCodePoint(int b) {
-<<<<<<< HEAD
-        mScreen.bitmapGC(300000);
-        switch(b) {
-            case // Null character (NUL, ^@). Do nothing.
-            0:
-=======
         // The Application Program-Control (APC) string might be arbitrary non-printable characters, so handle that early.
         if (mEscapeState == ESC_APC) {
             doApc(b);
@@ -755,7 +738,6 @@ public final class TerminalEmulator {
 
         switch (b) {
             case 0: // Null character (NUL, ^@). Do nothing.
->>>>>>> upstream/master
                 break;
             case // Bell (BEL, ^G, \a). If in an OSC sequence, BEL may terminate a string; otherwise signal bell.
             7:
