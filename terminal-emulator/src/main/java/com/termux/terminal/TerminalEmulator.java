@@ -146,7 +146,16 @@ public final class TerminalEmulator {
      * Escape processing: CSI !
      */
     private static final int ESC_CSI_EXCLAMATION = 19;
+    /** Escape processing: "ESC _" or Application Program Command (APC). */
+    private static final int ESC_APC = 20;
+    /** Escape processing: "ESC _" or Application Program Command (APC), followed by Escape. */
+    private static final int ESC_APC_ESCAPE = 21;
+    /** Escape processing: ESC [ <parameter bytes> */
+    private static final int ESC_CSI_UNSUPPORTED_PARAMETER_BYTE = 22;
+    /** Escape processing: ESC [ <parameter bytes> <intermediate bytes> */
+    private static final int ESC_CSI_UNSUPPORTED_INTERMEDIATE_BYTE = 23;
 
+<<<<<<< HEAD
     /**
      * Escape processing: APC
      */
@@ -158,6 +167,10 @@ public final class TerminalEmulator {
      * The number of parameter arguments. This name comes from the ANSI standard for terminal escape codes.
      */
     private static final int MAX_ESCAPE_PARAMETERS = 16;
+=======
+    /** The number of parameter arguments including colon separated sub-parameters. */
+    private static final int MAX_ESCAPE_PARAMETERS = 32;
+>>>>>>> upstream/master
 
     /**
      * Needs to be large enough to contain reasonable OSC 52 pastes.
@@ -244,9 +257,16 @@ public final class TerminalEmulator {
      */
     public int mRows, mColumns;
 
+<<<<<<< HEAD
     /**
      * The number of terminal transcript rows that can be scrolled back to.
      */
+=======
+    /** Size of a terminal cell in pixels. */
+    private int mCellWidthPixels, mCellHeightPixels;
+
+    /** The number of terminal transcript rows that can be scrolled back to. */
+>>>>>>> upstream/master
     public static final int TERMINAL_TRANSCRIPT_ROWS_MIN = 100;
 
     public static final int TERMINAL_TRANSCRIPT_ROWS_MAX = 50000;
@@ -303,6 +323,8 @@ public final class TerminalEmulator {
      * Holds the arguments of the current escape sequence.
      */
     private final int[] mArgs = new int[MAX_ESCAPE_PARAMETERS];
+    /** Holds the bit flags which arguments are sub parameters (after a colon) - bit N is set if <code>mArgs[N]</code> is a sub parameter. */
+    private int mArgsSubParamsBitSet = 0;
 
     /**
      * Holds OSC and device control arguments, which can be strings.
@@ -380,17 +402,24 @@ public final class TerminalEmulator {
     private boolean mCursorBlinkState;
 
     /**
-     * Current foreground and background colors. Can either be a color index in [0,259] or a truecolor (24-bit) value.
+     * Current foreground, background and underline colors. Can either be a color index in [0,259] or a truecolor (24-bit) value.
      * For a 24-bit value the top byte (0xff000000) is set.
+     *
+     * <p>Note that the underline color is currently parsed but not yet used during rendering.
      *
      * @see TextStyle
      */
-    int mForeColor, mBackColor;
+    int mForeColor, mBackColor, mUnderlineColor;
 
+<<<<<<< HEAD
     /**
      * Current {@link TextStyle} effect.
      */
     private int mEffect;
+=======
+    /** Current {@link TextStyle} effect. */
+    int mEffect;
+>>>>>>> upstream/master
 
     /**
      * The number of scrolled lines since last calling {@link #clearScrollCounter()}. Used for moving selection up along
@@ -473,7 +502,11 @@ public final class TerminalEmulator {
         }
     }
 
+<<<<<<< HEAD
     public TerminalEmulator(TerminalOutput session, boolean boldWithBright, int columns, int rows, Integer transcriptRows, TerminalSessionClient client) {
+=======
+    public TerminalEmulator(TerminalOutput session, int columns, int rows, int cellWidthPixels, int cellHeightPixels, Integer transcriptRows, TerminalSessionClient client) {
+>>>>>>> upstream/master
         mSession = session;
         mScreen = mMainBuffer = new TerminalBuffer(columns, getTerminalTranscriptRows(transcriptRows), rows);
         mAltBuffer = new TerminalBuffer(columns, rows, rows);
@@ -481,6 +514,8 @@ public final class TerminalEmulator {
         mBoldWithBright = boldWithBright;
         mRows = rows;
         mColumns = columns;
+        mCellWidthPixels = cellWidthPixels;
+        mCellHeightPixels = cellHeightPixels;
         mTabStop = new boolean[mColumns];
         reset();
     }
@@ -534,7 +569,10 @@ public final class TerminalEmulator {
         }
     }
 
-    public void resize(int columns, int rows) {
+    public void resize(int columns, int rows, int cellWidthPixels, int cellHeightPixels) {
+        this.mCellWidthPixels = cellWidthPixels;
+        this.mCellHeightPixels = cellHeightPixels;
+
         if (mRows == rows && mColumns == columns) {
             return;
         } else if (columns < 2 || rows < 2) {
@@ -720,10 +758,24 @@ public final class TerminalEmulator {
     }
 
     public void processCodePoint(int b) {
+<<<<<<< HEAD
         mScreen.bitmapGC(300000);
         switch(b) {
             case // Null character (NUL, ^@). Do nothing.
             0:
+=======
+        // The Application Program-Control (APC) string might be arbitrary non-printable characters, so handle that early.
+        if (mEscapeState == ESC_APC) {
+            doApc(b);
+            return;
+        } else if (mEscapeState == ESC_APC_ESCAPE) {
+            doApcEscape(b);
+            return;
+        }
+
+        switch (b) {
+            case 0: // Null character (NUL, ^@). Do nothing.
+>>>>>>> upstream/master
                 break;
             case // Bell (BEL, ^G, \a). If in an OSC sequence, BEL may terminate a string; otherwise signal bell.
             7:
@@ -836,6 +888,10 @@ public final class TerminalEmulator {
                         break;
                     case ESC_CSI:
                         doCsi(b);
+                        break;
+                    case ESC_CSI_UNSUPPORTED_PARAMETER_BYTE:
+                    case ESC_CSI_UNSUPPORTED_INTERMEDIATE_BYTE:
+                        doCsiUnsupportedParameterOrIntermediateByte(b);
                         break;
                     case ESC_CSI_EXCLAMATION:
                         if (b == 'p') {
@@ -1340,6 +1396,30 @@ public final class TerminalEmulator {
         }
     }
 
+    /**
+     * When in {@link #ESC_APC} (APC, Application Program Command) sequence.
+     */
+    private void doApc(int b) {
+        if (b == 27) {
+            continueSequence(ESC_APC_ESCAPE);
+        }
+        // Eat APC sequences silently for now.
+    }
+
+    /**
+     * When in {@link #ESC_APC} (APC, Application Program Command) sequence.
+     */
+    private void doApcEscape(int b) {
+        if (b == '\\') {
+            // A String Terminator (ST), ending the APC escape sequence.
+            finishSequence();
+        } else {
+            // The Escape character was not the start of a String Terminator (ST),
+            // but instead just data inside of the APC escape sequence.
+            continueSequence(ESC_APC);
+        }
+    }
+
     private int nextTabStop(int numTabs) {
         for (int i = mCursorCol + 1; i < mColumns; i++) if (mTabStop[i] && --numTabs == 0)
             return Math.min(i, mRightMargin);
@@ -1347,8 +1427,42 @@ public final class TerminalEmulator {
     }
 
     /**
+<<<<<<< HEAD
      * Process byte while in the {@link #ESC_CSI_QUESTIONMARK} escape state.
      */
+=======
+     * Process byte while in the {@link #ESC_CSI_UNSUPPORTED_PARAMETER_BYTE} or
+     * {@link #ESC_CSI_UNSUPPORTED_INTERMEDIATE_BYTE} escape state.
+     *
+     * Parse unsupported parameter, intermediate and final bytes but ignore them.
+     *
+     * > For Control Sequence Introducer, ... the ESC [ is followed by
+     * > - any number (including none) of "parameter bytes" in the range 0x30–0x3F (ASCII 0–9:;<=>?),
+     * > - then by any number of "intermediate bytes" in the range 0x20–0x2F (ASCII space and !"#$%&'()*+,-./),
+     * > - then finally by a single "final byte" in the range 0x40–0x7E (ASCII @A–Z[\]^_`a–z{|}~).
+     *
+     * - https://en.wikipedia.org/wiki/ANSI_escape_code#Control_Sequence_Introducer_commands
+     * - https://invisible-island.net/xterm/ecma-48-parameter-format.html#section5.4
+     */
+    private void doCsiUnsupportedParameterOrIntermediateByte(int b) {
+        if (mEscapeState == ESC_CSI_UNSUPPORTED_PARAMETER_BYTE && b >= 0x30 && b <= 0x3F) {
+            // Supported `0–9:;>?` or unsupported `<=` parameter byte after an
+            // initial unsupported parameter byte in `doCsi()`, or a sequential parameter byte.
+            continueSequence(ESC_CSI_UNSUPPORTED_PARAMETER_BYTE);
+        } else if (b >= 0x20 && b <= 0x2F) {
+            // Optional intermediate byte `!"#$%&'()*+,-./` after parameter or intermediate byte.
+            continueSequence(ESC_CSI_UNSUPPORTED_INTERMEDIATE_BYTE);
+        } else if (b >= 0x40 && b <= 0x7E) {
+            // Final byte `@A–Z[\]^_`a–z{|}~` after parameter or intermediate byte.
+            // Calling `unknownSequence()` would log an error with only a final byte, so ignore it for now.
+            finishSequence();
+        } else {
+            unknownSequence(b);
+        }
+    }
+
+    /** Process byte while in the {@link #ESC_CSI_QUESTIONMARK} escape state. */
+>>>>>>> upstream/master
     private void doCsiQuestionMark(int b) {
         switch(b) {
             // Selective erase in display (DECSED) - http://www.vt100.net/docs/vt510-rm/DECSED.
@@ -1643,6 +1757,7 @@ public final class TerminalEmulator {
         mEscapeState = ESC;
         mArgIndex = 0;
         Arrays.fill(mArgs, -1);
+        mArgsSubParamsBitSet = 0;
     }
 
     private void doLinefeed() {
@@ -1784,9 +1899,13 @@ public final class TerminalEmulator {
             '>':
                 setDecsetinternalBit(DECSET_BIT_APPLICATION_KEYPAD, false);
                 break;
+<<<<<<< HEAD
             case // APC
             '_':
                 mOSCOrDeviceControlArgs.setLength(0);
+=======
+            case '_': // APC - Application Program Command.
+>>>>>>> upstream/master
                 continueSequence(ESC_APC);
                 break;
             default:
@@ -2025,6 +2144,7 @@ public final class TerminalEmulator {
                 }
                 mCursorCol = newCol;
                 break;
+<<<<<<< HEAD
             case // Esc [ ? -- start of a private mode set
             '?':
                 continueSequence(ESC_CSI_QUESTIONMARK);
@@ -2035,6 +2155,19 @@ public final class TerminalEmulator {
                 break;
             case // Horizontal position absolute (HPA - http://www.vt100.net/docs/vt510-rm/HPA).
             '`':
+=======
+            case '?': // Esc [ ? -- start of a private parameter byte
+                continueSequence(ESC_CSI_QUESTIONMARK);
+                break;
+            case '>': // "Esc [ >" -- start of a private parameter byte
+                continueSequence(ESC_CSI_BIGGERTHAN);
+                break;
+            case '<': // "Esc [ <" -- start of a private parameter byte
+            case '=': // "Esc [ =" -- start of a private parameter byte
+                continueSequence(ESC_CSI_UNSUPPORTED_PARAMETER_BYTE);
+                break;
+            case '`': // Horizontal position absolute (HPA - http://www.vt100.net/docs/vt510-rm/HPA).
+>>>>>>> upstream/master
                 setCursorColRespectingOriginMode(getArg0(1) - 1);
                 break;
             case // Repeat the preceding graphic character Ps times (REP).
@@ -2148,9 +2281,17 @@ public final class TerminalEmulator {
                     13:
                         mSession.write("\033[3;0;0t");
                         break;
+<<<<<<< HEAD
                     case // Report xterm window in pixels. Result is CSI 4 ; height ; width t
                     14:
                         mSession.write(String.format(Locale.US, "\033[4;%d;%dt", mRows * cellH, mColumns * cellW));
+=======
+                    case 14: // Report xterm window in pixels. Result is CSI 4 ; height ; width t
+                        mSession.write(String.format(Locale.US, "\033[4;%d;%dt", mRows * mCellHeightPixels, mColumns * mCellWidthPixels));
+                        break;
+                    case 16: // Report xterm character cell size in pixels. Result is CSI 6 ; height ; width t
+                        mSession.write(String.format(Locale.US, "\033[6;%d;%dt", mCellHeightPixels, mCellWidthPixels));
+>>>>>>> upstream/master
                         break;
                     case // Report xterm window in pixels. Result is CSI 4 ; height ; width t
                     16:
@@ -2213,6 +2354,11 @@ public final class TerminalEmulator {
         if (mArgIndex >= mArgs.length)
             mArgIndex = mArgs.length - 1;
         for (int i = 0; i <= mArgIndex; i++) {
+            // Skip leading sub parameters:
+            if ((mArgsSubParamsBitSet & (1 << i)) != 0) {
+                continue;
+            }
+
             int code = getArg(i, 0, false);
             if (code < 0) {
                 if (mArgIndex > 0) {
@@ -2233,7 +2379,19 @@ public final class TerminalEmulator {
             } else if (code == 3) {
                 mEffect |= TextStyle.CHARACTER_ATTRIBUTE_ITALIC;
             } else if (code == 4) {
-                mEffect |= TextStyle.CHARACTER_ATTRIBUTE_UNDERLINE;
+                if (i + 1 <= mArgIndex && ((mArgsSubParamsBitSet & (1 << (i + 1))) != 0)) {
+                    // Sub parameter, see https://sw.kovidgoyal.net/kitty/underlines/
+                    i++;
+                    if (mArgs[i] == 0) {
+                        // No underline.
+                        mEffect &= ~TextStyle.CHARACTER_ATTRIBUTE_UNDERLINE;
+                    } else {
+                        // Different variations of underlines: https://sw.kovidgoyal.net/kitty/underlines/
+                        mEffect |= TextStyle.CHARACTER_ATTRIBUTE_UNDERLINE;
+                    }
+                } else {
+                    mEffect |= TextStyle.CHARACTER_ATTRIBUTE_UNDERLINE;
+                }
             } else if (code == 5) {
                 mEffect |= TextStyle.CHARACTER_ATTRIBUTE_BLINK;
             } else if (code == 7) {
@@ -2267,8 +2425,8 @@ public final class TerminalEmulator {
                 mEffect &= ~TextStyle.CHARACTER_ATTRIBUTE_STRIKETHROUGH;
             } else if (code >= 30 && code <= 37) {
                 mForeColor = code - 30;
-            } else if (code == 38 || code == 48) {
-                // Extended set foreground(38)/background (48) color.
+            } else if (code == 38 || code == 48 || code == 58) {
+                // Extended set foreground(38)/background(48)/underline(58) color.
                 // This is followed by either "2;$R;$G;$B" to set a 24-bit color or
                 // "5;$INDEX" to set an indexed color.
                 if (i + 2 > mArgIndex)
@@ -2285,11 +2443,11 @@ public final class TerminalEmulator {
                         if (red < 0 || green < 0 || blue < 0 || red > 255 || green > 255 || blue > 255) {
                             finishSequenceAndLogError("Invalid RGB: " + red + "," + green + "," + blue);
                         } else {
-                            int argbColor = 0xff000000 | (red << 16) | (green << 8) | blue;
-                            if (code == 38) {
-                                mForeColor = argbColor;
-                            } else {
-                                mBackColor = argbColor;
+                            int argbColor = 0xff_00_00_00 | (red << 16) | (green << 8) | blue;
+                            switch (code) {
+                                case 38: mForeColor = argbColor; break;
+                                case 48: mBackColor = argbColor; break;
+                                case 58: mUnderlineColor = argbColor; break;
                             }
                         }
                         // "2;P_r;P_g;P_r"
@@ -2299,10 +2457,10 @@ public final class TerminalEmulator {
                     int color = getArg(i + 2, 0, false);
                     i += 2; // "5;P_s"
                     if (color >= 0 && color < TextStyle.NUM_INDEXED_COLORS) {
-                        if (code == 38) {
-                            mForeColor = color;
-                        } else {
-                            mBackColor = color;
+                        switch (code) {
+                            case 38: mForeColor = color; break;
+                            case 48: mBackColor = color; break;
+                            case 58: mUnderlineColor = color; break;
                         }
                     } else {
                         if (LOG_ESCAPE_SEQUENCES)
@@ -2320,8 +2478,14 @@ public final class TerminalEmulator {
             } else if (code == 49) {
                 // Set default background color.
                 mBackColor = TextStyle.COLOR_INDEX_BACKGROUND;
+<<<<<<< HEAD
             } else if (code >= 90 && code <= 97) {
                 // Bright foreground colors (aixterm codes).
+=======
+            } else if (code == 59) { // Set default underline color.
+                mUnderlineColor = TextStyle.COLOR_INDEX_FOREGROUND;
+            } else if (code >= 90 && code <= 97) { // Bright foreground colors (aixterm codes).
+>>>>>>> upstream/master
                 mForeColor = code - 90 + 8;
             } else if (code >= 100 && code <= 107) {
                 // Bright background color (aixterm codes).
@@ -2736,15 +2900,21 @@ public final class TerminalEmulator {
     /**
      * Process the next ASCII character of a parameter.
      *
-     * Parameter characters modify the action or interpretation of the sequence. You can use up to
-     * 16 parameters per sequence. You must use the ; character to separate parameters.
-     * All parameters are unsigned, positive decimal integers, with the most significant
+     * <p>You must use the ; character to separate parameters and : to separate sub-parameters.
+     *
+     * <p>Parameter characters modify the action or interpretation of the sequence. Originally
+     * you can use up to 16 parameters per sequence, but following at least xterm and alacritty
+     * we use a common space for parameters and sub-parameters, allowing 32 in total.
+     *
+     * <p>All parameters are unsigned, positive decimal integers, with the most significant
      * digit sent first. Any parameter greater than 9999 (decimal) is set to 9999
      * (decimal). If you do not specify a value, a 0 value is assumed. A 0 value
      * or omitted parameter indicates a default value for the sequence. For most
      * sequences, the default value is 1.
      *
-     * https://vt100.net/docs/vt510-rm/chapter4.html#S4.3.3
+     * <p>References:
+     * <a href="https://vt100.net/docs/vt510-rm/chapter4.html#S4.3.3">VT510 Video Terminal Programmer Information: Control Sequences</a>
+     * <a href="https://github.com/alacritty/vte/issues/22">alacritty/vte: Implement colon separated CSI parameters</a>
      * */
     private void parseArg(int b) {
         if (b >= '0' && b <= '9') {
@@ -2762,9 +2932,14 @@ public final class TerminalEmulator {
                 mArgs[mArgIndex] = value;
             }
             continueSequence(mEscapeState);
-        } else if (b == ';') {
-            if (mArgIndex < mArgs.length) {
+        } else if (b == ';' || b == ':') {
+            if (mArgIndex + 1 < mArgs.length) {
                 mArgIndex++;
+                if (b == ':') {
+                    mArgsSubParamsBitSet |= 1 << mArgIndex;
+                }
+            } else {
+                logError("Too many parameters when in state: " + mEscapeState);
             }
             continueSequence(mEscapeState);
         } else {

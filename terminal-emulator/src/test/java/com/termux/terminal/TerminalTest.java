@@ -134,6 +134,7 @@ public class TerminalTest extends TerminalTestCase {
         assertEquals("hi", mOutput.getOutputAndClear());
     }
 
+<<<<<<< HEAD
     public void testSelectGraphics() {
         withTerminalSized(5, 5);
         enterString("\033[31m");
@@ -148,19 +149,106 @@ public class TerminalTest extends TerminalTestCase {
         assertEquals(TextStyle.COLOR_INDEX_FOREGROUND, mTerminal.mForeColor);
         assertEquals(TextStyle.COLOR_INDEX_BACKGROUND, mTerminal.mBackColor);
         // Test CSI resetting to default if sequence starts with ; or has sequential ;;
+=======
+	/** On "\e[18t" xterm replies with "\e[8;${HEIGHT};${WIDTH}t" */
+	public void testReportTerminalSize() throws Exception {
+		withTerminalSized(5, 5);
+		assertEnteringStringGivesResponse("\033[18t", "\033[8;5;5t");
+		for (int width = 3; width < 12; width++) {
+			for (int height = 3; height < 12; height++) {
+				resize(width, height);
+				assertEnteringStringGivesResponse("\033[18t", "\033[8;" + height + ";" + width + "t");
+			}
+		}
+	}
+
+	/** Device Status Report (DSR) and Report Cursor Position (CPR). */
+	public void testDeviceStatusReport() throws Exception {
+		withTerminalSized(5, 5);
+		assertEnteringStringGivesResponse("\033[5n", "\033[0n");
+
+		assertEnteringStringGivesResponse("\033[6n", "\033[1;1R");
+		enterString("AB");
+		assertEnteringStringGivesResponse("\033[6n", "\033[1;3R");
+		enterString("\r\n");
+		assertEnteringStringGivesResponse("\033[6n", "\033[2;1R");
+	}
+
+	/** Test the cursor shape changes using DECSCUSR. */
+	public void testSetCursorStyle() throws Exception {
+		withTerminalSized(5, 5);
+		assertEquals(TerminalEmulator.TERMINAL_CURSOR_STYLE_BLOCK, mTerminal.getCursorStyle());
+		enterString("\033[3 q");
+		assertEquals(TerminalEmulator.TERMINAL_CURSOR_STYLE_UNDERLINE, mTerminal.getCursorStyle());
+		enterString("\033[5 q");
+		assertEquals(TerminalEmulator.TERMINAL_CURSOR_STYLE_BAR, mTerminal.getCursorStyle());
+		enterString("\033[0 q");
+		assertEquals(TerminalEmulator.TERMINAL_CURSOR_STYLE_BLOCK, mTerminal.getCursorStyle());
+		enterString("\033[6 q");
+		assertEquals(TerminalEmulator.TERMINAL_CURSOR_STYLE_BAR, mTerminal.getCursorStyle());
+		enterString("\033[4 q");
+		assertEquals(TerminalEmulator.TERMINAL_CURSOR_STYLE_UNDERLINE, mTerminal.getCursorStyle());
+		enterString("\033[1 q");
+		assertEquals(TerminalEmulator.TERMINAL_CURSOR_STYLE_BLOCK, mTerminal.getCursorStyle());
+		enterString("\033[4 q");
+		assertEquals(TerminalEmulator.TERMINAL_CURSOR_STYLE_UNDERLINE, mTerminal.getCursorStyle());
+		enterString("\033[2 q");
+		assertEquals(TerminalEmulator.TERMINAL_CURSOR_STYLE_BLOCK, mTerminal.getCursorStyle());
+	}
+
+	public void testPaste() {
+		withTerminalSized(5, 5);
+		mTerminal.paste("hi");
+		assertEquals("hi", mOutput.getOutputAndClear());
+
+		enterString("\033[?2004h");
+		mTerminal.paste("hi");
+		assertEquals("\033[200~" + "hi" + "\033[201~", mOutput.getOutputAndClear());
+
+		enterString("\033[?2004l");
+		mTerminal.paste("hi");
+		assertEquals("hi", mOutput.getOutputAndClear());
+	}
+
+	public void testSelectGraphics() {
+		selectGraphicsTestRun(';');
+		selectGraphicsTestRun(':');
+	}
+
+	public void selectGraphicsTestRun(char separator) {
+		withTerminalSized(5, 5);
+		enterString("\033[31m");
+		assertEquals(mTerminal.mForeColor, 1);
+		enterString("\033[32m");
+		assertEquals(mTerminal.mForeColor, 2);
+		enterString("\033[43m");
+		assertEquals(2, mTerminal.mForeColor);
+		assertEquals(3, mTerminal.mBackColor);
+
+		// SGR 0 should reset both foreground and background color.
+		enterString("\033[0m");
+		assertEquals(TextStyle.COLOR_INDEX_FOREGROUND, mTerminal.mForeColor);
+		assertEquals(TextStyle.COLOR_INDEX_BACKGROUND, mTerminal.mBackColor);
+
+		// Test CSI resetting to default if sequence starts with ; or has sequential ;;
+>>>>>>> upstream/master
         // Check TerminalEmulator.parseArg()
         enterString("\033[31m\033[m");
         assertEquals(TextStyle.COLOR_INDEX_FOREGROUND, mTerminal.mForeColor);
-        enterString("\033[31m\033[;m");
+        enterString("\033[31m\033[;m".replace(';', separator));
         assertEquals(TextStyle.COLOR_INDEX_FOREGROUND, mTerminal.mForeColor);
         enterString("\033[31m\033[0m");
         assertEquals(TextStyle.COLOR_INDEX_FOREGROUND, mTerminal.mForeColor);
-        enterString("\033[31m\033[0;m");
+        enterString("\033[31m\033[0;m".replace(';', separator));
         assertEquals(TextStyle.COLOR_INDEX_FOREGROUND, mTerminal.mForeColor);
         enterString("\033[31;;m");
         assertEquals(TextStyle.COLOR_INDEX_FOREGROUND, mTerminal.mForeColor);
+        enterString("\033[31::m");
+        assertEquals(1, mTerminal.mForeColor);
         enterString("\033[31;m");
         assertEquals(TextStyle.COLOR_INDEX_FOREGROUND, mTerminal.mForeColor);
+        enterString("\033[31:m");
+        assertEquals(1, mTerminal.mForeColor);
         enterString("\033[31;;41m");
         assertEquals(TextStyle.COLOR_INDEX_FOREGROUND, mTerminal.mForeColor);
         assertEquals(1, mTerminal.mBackColor);
@@ -168,38 +256,38 @@ public class TerminalTest extends TerminalTestCase {
         assertEquals(TextStyle.COLOR_INDEX_BACKGROUND, mTerminal.mBackColor);
 
 		// 256 colors:
-		enterString("\033[38;5;119m");
+		enterString("\033[38;5;119m".replace(';', separator));
 		assertEquals(119, mTerminal.mForeColor);
 		assertEquals(TextStyle.COLOR_INDEX_BACKGROUND, mTerminal.mBackColor);
-		enterString("\033[48;5;129m");
+		enterString("\033[48;5;129m".replace(';', separator));
 		assertEquals(119, mTerminal.mForeColor);
 		assertEquals(129, mTerminal.mBackColor);
 
 		// Invalid parameter:
-		enterString("\033[48;8;129m");
+		enterString("\033[48;8;129m".replace(';', separator));
 		assertEquals(119, mTerminal.mForeColor);
 		assertEquals(129, mTerminal.mBackColor);
 
 		// Multiple parameters at once:
-		enterString("\033[38;5;178;48;5;179m");
+		enterString("\033[38;5;178".replace(';', separator) + ";" + "48;5;179m".replace(';', separator));
 		assertEquals(178, mTerminal.mForeColor);
 		assertEquals(179, mTerminal.mBackColor);
 
 		// Omitted parameter means zero:
-		enterString("\033[38;5;m");
+		enterString("\033[38;5;m".replace(';', separator));
 		assertEquals(0, mTerminal.mForeColor);
 		assertEquals(179, mTerminal.mBackColor);
-		enterString("\033[48;5;m");
+		enterString("\033[48;5;m".replace(';', separator));
 		assertEquals(0, mTerminal.mForeColor);
 		assertEquals(0, mTerminal.mBackColor);
 
 		// 24 bit colors:
 		enterString(("\033[0m")); // Reset fg and bg colors.
-		enterString("\033[38;2;255;127;2m");
+		enterString("\033[38;2;255;127;2m".replace(';', separator));
 		int expectedForeground = 0xff000000 | (255 << 16) | (127 << 8) | 2;
 		assertEquals(expectedForeground, mTerminal.mForeColor);
 		assertEquals(TextStyle.COLOR_INDEX_BACKGROUND, mTerminal.mBackColor);
-		enterString("\033[48;2;1;2;254m");
+		enterString("\033[48;2;1;2;254m".replace(';', separator));
 		int expectedBackground = 0xff000000 | (1 << 16) | (2 << 8) | 254;
 		assertEquals(expectedForeground, mTerminal.mForeColor);
 		assertEquals(expectedBackground, mTerminal.mBackColor);
@@ -208,24 +296,30 @@ public class TerminalTest extends TerminalTestCase {
 		enterString(("\033[0m")); // Reset fg and bg colors.
 		assertEquals(TextStyle.COLOR_INDEX_FOREGROUND, mTerminal.mForeColor);
 		assertEquals(TextStyle.COLOR_INDEX_BACKGROUND, mTerminal.mBackColor);
-		enterString("\033[38;2;255;127;2;48;2;1;2;254m");
+		enterString("\033[38;2;255;127;2".replace(';', separator) + ";" + "48;2;1;2;254m".replace(';', separator));
 		assertEquals(expectedForeground, mTerminal.mForeColor);
 		assertEquals(expectedBackground, mTerminal.mBackColor);
 
 		// 24 bit colors, invalid input:
-		enterString("\033[38;2;300;127;2;48;2;1;300;254m");
+		enterString("\033[38;2;300;127;2;48;2;1;300;254m".replace(';', separator));
 		assertEquals(expectedForeground, mTerminal.mForeColor);
 		assertEquals(expectedBackground, mTerminal.mBackColor);
 
 		// 24 bit colors, omitted parameter means zero:
-		enterString("\033[38;2;255;127;m");
+		enterString("\033[38;2;255;127;m".replace(';', separator));
 		expectedForeground = 0xff000000 | (255 << 16) | (127 << 8);
 		assertEquals(expectedForeground, mTerminal.mForeColor);
 		assertEquals(expectedBackground, mTerminal.mBackColor);
-		enterString("\033[38;2;123;;77m");
+		enterString("\033[38;2;123;;77m".replace(';', separator));
 		expectedForeground = 0xff000000 | (123 << 16) | 77;
 		assertEquals(expectedForeground, mTerminal.mForeColor);
 		assertEquals(expectedBackground, mTerminal.mBackColor);
+
+		// 24 bit colors, extra sub-parameters are skipped:
+		expectedForeground = 0xff000000 | (255 << 16) | (127 << 8) | 2;
+		enterString("\033[0;38:2:255:127:2:48:2:1:2:254m");
+		assertEquals(expectedForeground, mTerminal.mForeColor);
+		assertEquals(TextStyle.COLOR_INDEX_BACKGROUND, mTerminal.mBackColor);
 	}
 
     public void testBackgroundColorErase() {

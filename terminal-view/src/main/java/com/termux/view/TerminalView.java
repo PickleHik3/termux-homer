@@ -133,6 +133,20 @@ public final class TerminalView extends View {
     private int mAutoFillType = AUTOFILL_TYPE_NONE;
 
     /**
+     * The current AutoFill type returned for {@link View#getImportantForAutofill()} by
+     * {@link #getImportantForAutofill()}.
+     *
+     * The default is {@link #IMPORTANT_FOR_AUTOFILL_NO} so that view is not considered important
+     * for AutoFill. This value should be updated to required value, like
+     * {@link #IMPORTANT_FOR_AUTOFILL_YES} before calling {@link AutofillManager#requestAutofill(View)}
+     * so that Android and apps consider the view as important for AutoFill to process the request.
+     * The updated value set will automatically be restored to {@link #IMPORTANT_FOR_AUTOFILL_NO} in
+     * {@link #autofill(AutofillValue)} by calling {@link #resetAutoFill()}.
+     */
+    @RequiresApi(api = Build.VERSION_CODES.O)
+    private int mAutoFillImportance = IMPORTANT_FOR_AUTOFILL_NO;
+
+    /**
      * The current AutoFill hints returned for {@link View#getAutofillHints()} ()} by {@link #getAutofillHints()} ()}.
      *
      * The default is an empty `string[]`. This value should be updated to required value. The
@@ -1073,6 +1087,8 @@ public final class TerminalView extends View {
         } else if (event.getAction() == KeyEvent.ACTION_MULTIPLE && keyCode == KeyEvent.KEYCODE_UNKNOWN) {
             mTermSession.write(event.getCharacters());
             return true;
+        } else if (keyCode == KeyEvent.KEYCODE_LANGUAGE_SWITCH) {
+            return super.onKeyDown(keyCode, event);
         }
         final int metaState = event.getMetaState();
         final boolean controlDown = event.isCtrlPressed() || mClient.readControlKey();
@@ -1380,13 +1396,14 @@ public final class TerminalView extends View {
     @RequiresApi(api = Build.VERSION_CODES.O)
     @Override
     public int getImportantForAutofill() {
-        return IMPORTANT_FOR_AUTOFILL_NO;
+        return mAutoFillImportance;
     }
 
     @RequiresApi(api = Build.VERSION_CODES.O)
     private synchronized void resetAutoFill() {
         // Restore none type so that AutoFill UI isn't shown anymore.
         mAutoFillType = AUTOFILL_TYPE_NONE;
+        mAutoFillImportance = IMPORTANT_FOR_AUTOFILL_NO;
         mAutoFillHints = new String[0];
     }
 
@@ -1436,6 +1453,9 @@ public final class TerminalView extends View {
             if (autofillManager != null && autofillManager.isEnabled()) {
                 // Update type that will be returned by `getAutofillType()` so that AutoFill UI is shown.
                 mAutoFillType = AUTOFILL_TYPE_TEXT;
+                // Update importance that will be returned by `getImportantForAutofill()` so that
+                // AutoFill considers the view as important.
+                mAutoFillImportance = IMPORTANT_FOR_AUTOFILL_YES;
                 // Update hints that will be returned by `getAutofillHints()` for which to show AutoFill UI.
                 mAutoFillHints = autoFillHints;
                 autofillManager.requestAutofill(this);

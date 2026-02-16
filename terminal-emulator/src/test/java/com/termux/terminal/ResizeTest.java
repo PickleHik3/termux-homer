@@ -72,6 +72,7 @@ public class ResizeTest extends TerminalTestCase {
         assertLinesAre("998       ", "999       ", "          ");
     }
 
+<<<<<<< HEAD
     public void testVerticalResize() {
         final int rows = 5;
         final int cols = 3;
@@ -84,6 +85,101 @@ public class ResizeTest extends TerminalTestCase {
         enterString("\033[2J");
         for (int r = 0; r < rows; r++) {
             for (int c = 0; c < cols; c++) {
+=======
+		// Switch from alt buffer:
+		enterString("\033[?1049l").assertLinesAre("a  ", "def", "$  ").assertCursorAt(2, 1);
+	}
+
+	public void testShrinkingInAltBuffer() {
+		final int rows = 5;
+		final int cols = 3;
+		withTerminalSized(cols, rows).enterString("A\r\nB\r\nC\r\nD\r\nE").assertLinesAre("A  ", "B  ", "C  ", "D  ", "E  ");
+		enterString("\033[?1049h").assertLinesAre("   ", "   ", "   ", "   ", "   ");
+		resize(3, 3).enterString("\033[?1049lF").assertLinesAre("C  ", "D  ", "EF ");
+	}
+
+	public void testResizeAfterNewlineWhenInAltBuffer() {
+		final int rows = 3;
+		final int cols = 3;
+		withTerminalSized(cols, rows);
+		enterString("a\r\nb\r\nc\r\nd\r\ne\r\nf\r\n").assertLinesAre("e  ", "f  ", "   ").assertCursorAt(2, 0);
+		assertLineWraps(false, false, false);
+
+		// Switch to alt buffer:
+		enterString("\033[?1049h").assertLinesAre("   ", "   ", "   ").assertCursorAt(2, 0);
+		enterString("h").assertLinesAre("   ", "   ", "h  ").assertCursorAt(2, 1);
+
+		// Grow by two rows:
+		resize(cols, 5).assertLinesAre("   ", "   ", "h  ", "   ", "   ").assertCursorAt(2, 1);
+		resize(cols, rows).assertLinesAre("   ", "   ", "h  ").assertCursorAt(2, 1);
+
+		// Switch from alt buffer:
+		enterString("\033[?1049l").assertLinesAre("e  ", "f  ", "   ").assertCursorAt(2, 0);
+	}
+
+	public void testResizeAfterHistoryWraparound() {
+		final int rows = 3;
+		final int cols = 10;
+		withTerminalSized(cols, rows);
+		StringBuilder buffer = new StringBuilder();
+		for (int i = 0; i < 1000; i++) {
+			String s = Integer.toString(i);
+			enterString(s);
+			buffer.setLength(0);
+			buffer.append(s);
+			while (buffer.length() < cols)
+				buffer.append(' ');
+			if (i > rows) {
+				assertLineIs(rows - 1, buffer.toString());
+			}
+			enterString("\r\n");
+		}
+		assertLinesAre("998       ", "999       ", "          ");
+		resize(cols, 2);
+		assertLinesAre("999       ", "          ");
+		resize(cols, 5);
+		assertLinesAre("996       ", "997       ", "998       ", "999       ", "          ");
+		resize(cols, rows);
+		assertLinesAre("998       ", "999       ", "          ");
+	}
+
+	public void testVerticalResize() {
+		final int rows = 5;
+		final int cols = 3;
+
+		withTerminalSized(cols, rows);
+		// Foreground color to 119:
+		enterString("\033[38;5;119m");
+		// Background color to 129:
+		enterString("\033[48;5;129m");
+		// Clear with ED, Erase in Display:
+		enterString("\033[2J");
+		for (int r = 0; r < rows; r++) {
+			for (int c = 0; c < cols; c++) {
+				long style = getStyleAt(r, c);
+				assertEquals(119, TextStyle.decodeForeColor(style));
+				assertEquals(129, TextStyle.decodeBackColor(style));
+			}
+		}
+		enterString("11\r\n22");
+		assertLinesAre("11 ", "22 ", "   ", "   ", "   ").assertLineWraps(false, false, false, false, false);
+		resize(cols, rows - 2).assertLinesAre("11 ", "22 ", "   ");
+
+		// After resize, screen should still be same color:
+		for (int r = 0; r < rows - 2; r++) {
+			for (int c = 0; c < cols; c++) {
+				long style = getStyleAt(r, c);
+				assertEquals(119, TextStyle.decodeForeColor(style));
+				assertEquals(129, TextStyle.decodeBackColor(style));
+			}
+		}
+
+		// Background color to 200 and grow back size (which should be cleared to the new background color):
+		enterString("\033[48;5;200m");
+		resize(cols, rows);
+		for (int r = 0; r < rows; r++) {
+			for (int c = 0; c < cols; c++) {
+>>>>>>> upstream/master
                 long style = getStyleAt(r, c);
                 assertEquals(119, TextStyle.decodeForeColor(style));
                 assertEquals(129, TextStyle.decodeBackColor(style));

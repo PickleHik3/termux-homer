@@ -12,7 +12,19 @@ import java.util.Set;
 
 public abstract class TerminalTestCase extends TestCase {
 
+<<<<<<< HEAD
     public static class MockTerminalOutput extends TerminalOutput {
+=======
+    public static final int INITIAL_CELL_WIDTH_PIXELS = 13;
+    public static final int INITIAL_CELL_HEIGHT_PIXELS = 15;
+
+    public static class MockTerminalOutput extends TerminalOutput {
+		final ByteArrayOutputStream baos = new ByteArrayOutputStream();
+		public final List<ChangedTitle> titleChanges = new ArrayList<>();
+		public final List<String> clipboardPuts = new ArrayList<>();
+		public int bellsRung = 0;
+		public int colorsChanged = 0;
+>>>>>>> upstream/master
 
         final ByteArrayOutputStream baos = new ByteArrayOutputStream();
 
@@ -101,11 +113,19 @@ public abstract class TerminalTestCase extends TestCase {
         return this;
     }
 
+<<<<<<< HEAD
     public void assertEnteringStringGivesResponse(String input, String expectedResponse) {
         enterString(input);
         String response = mOutput.getOutputAndClear();
         assertEquals(expectedResponse, response);
     }
+=======
+	protected TerminalTestCase withTerminalSized(int columns, int rows) {
+	    // The tests aren't currently using the client, so a null client will suffice, a dummy client should be implemented if needed
+		mTerminal = new TerminalEmulator(mOutput, columns, rows, INITIAL_CELL_WIDTH_PIXELS, INITIAL_CELL_HEIGHT_PIXELS, rows * 2, null);
+		return this;
+	}
+>>>>>>> upstream/master
 
     @Override
     protected void setUp() throws Exception {
@@ -204,11 +224,19 @@ public abstract class TerminalTestCase extends TestCase {
         return this;
     }
 
+<<<<<<< HEAD
     public TerminalTestCase resize(int cols, int rows) {
         mTerminal.resize(cols, rows);
         assertInvariants();
         return this;
     }
+=======
+	public TerminalTestCase resize(int cols, int rows) {
+		mTerminal.resize(cols, rows, INITIAL_CELL_WIDTH_PIXELS, INITIAL_CELL_HEIGHT_PIXELS);
+		assertInvariants();
+		return this;
+	}
+>>>>>>> upstream/master
 
     public TerminalTestCase assertLineWraps(boolean... lines) {
         for (int i = 0; i < lines.length; i++) assertEquals("line=" + i, lines[i], mTerminal.getScreen().mLines[mTerminal.getScreen().externalToInternalRow(i)].mLineWrap);

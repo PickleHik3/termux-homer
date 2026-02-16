@@ -25,9 +25,13 @@ final class JNI {
      */
     public static native int createSubprocess(String cmd, String cwd, String[] args, String[] envVars, int[] processId, int rows, int columns, int cellWidth, int cellHeight);
 
+<<<<<<< HEAD
     /**
      * Set the window size for a given pty, which allows connected programs to learn how large their screen is.
      */
+=======
+    /** Set the window size for a given pty, which allows connected programs to learn how large their screen is. */
+>>>>>>> upstream/master
     public static native void setPtyWindowSize(int fd, int rows, int cols, int cellWidth, int cellHeight);
 
     /**

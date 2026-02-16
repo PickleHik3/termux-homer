@@ -43,6 +43,14 @@ android {
     testOptions {
         unitTests.returnDefaultValues = true
     }
+
+    publishing {
+        multipleVariants {
+            withSourcesJar()
+            withJavadocJar()
+            allVariants()
+        }
+    }
 }
 
 tasks.withType(Test) {
@@ -56,7 +64,11 @@ tasks.withType(JavaCompile) {
 }
 
 dependencies {
+<<<<<<< HEAD
     implementation "androidx.annotation:annotation:1.8.0"
+=======
+    implementation "androidx.annotation:annotation:1.9.0"
+>>>>>>> upstream/master
     testImplementation "junit:junit:4.13.2"
 }
 
@@ -70,7 +82,11 @@ afterEvaluate {
         publications {
             // Creates a Maven publication called "release".
             release(MavenPublication) {
+<<<<<<< HEAD
                 from components.findByName('release')
+=======
+                from components.default
+>>>>>>> upstream/master
                 groupId = 'com.termux'
                 artifactId = 'terminal-emulator'
                 version = '0.118.0'

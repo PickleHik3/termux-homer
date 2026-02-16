@@ -75,6 +75,7 @@ public class ScrollRegionTest extends TerminalTestCase {
         withTerminalSized(3, 3).enterString("\033[?69h\033[2sABC\033[?6h\033ED").assertLinesAre("ABC", " D ", "   ");
     }
 
+<<<<<<< HEAD
     public void testBackwardIndex() {
         // vttest "Menu 11.3.2: VT420 Cursor-Movement Test", test 7.
         // Without margins:
@@ -84,6 +85,27 @@ public class ScrollRegionTest extends TerminalTestCase {
         // With left margin:
         withTerminalSized(3, 3).enterString("\033[?69h\033[2sABCDEF\0336\0336").assertLinesAre("A B", "  D", "  F");
     }
+=======
+	public void testRiRespectsLeftMargin() {
+		// Reverse Index (RI), ${ESC}M, should respect horizontal margins:
+		withTerminalSized(4, 3).enterString("ABCD\033[?69h\033[2;3s\033[?6h\033M").assertLinesAre("A  D", " BC ", "    ");
+	}
+
+	public void testSdRespectsLeftMargin() {
+		// Scroll Down (SD), ${CSI}${N}T, should respect horizontal margins:
+		withTerminalSized(4, 3).enterString("ABCD\033[?69h\033[2;3s\033[?6h\033[2T").assertLinesAre("A  D", "    ", " BC ");
+	}
+
+	public void testBackwardIndex() {
+		// vttest "Menu 11.3.2: VT420 Cursor-Movement Test", test 7.
+		// Without margins:
+		withTerminalSized(3, 3).enterString("ABCDEF\0336H").assertLinesAre("ABC", "DHF", "   ");
+		enterString("\0336\0336I").assertLinesAre("ABC", "IHF", "   ");
+		enterString("\0336\0336").assertLinesAre(" AB", " IH", "   ");
+		// With left margin:
+		withTerminalSized(3, 3).enterString("\033[?69h\033[2sABCDEF\0336\0336").assertLinesAre("A B", "  D", "  F");
+	}
+>>>>>>> upstream/master
 
     public void testForwardIndex() {
         // vttest "Menu 11.3.2: VT420 Cursor-Movement Test", test 8.
