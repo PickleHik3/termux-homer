@@ -188,32 +188,23 @@ def downloadBootstrap(String arch, String expectedChecksum, String version) {
         }
     }
 
-    def remoteUrl = "https://github.com/termux/termux-packages/releases/download/bootstrap-" + version + "/bootstrap-" + arch + "-" + version + ".zip"
-    logger.quiet("Downloading " + remoteUrl + " to " + localUrl)
-    
+    def remoteUrl = "https://github.com/termux/termux-packages/releases/download/bootstrap-" + version + "/bootstrap-" + arch + ".zip"
+    logger.quiet("Downloading " + remoteUrl + " ...")
+
+    file.parentFile.mkdirs()
+    def out = new BufferedOutputStream(new FileOutputStream(file))
+
     def connection = new URL(remoteUrl).openConnection()
-    connection.connect()
-    
-    def output = new FileOutputStream(file)
-    def input = connection.inputStream
-    def buffer = new byte[8192]
-    while (true) {
-        def readBytes = input.read(buffer)
-        if (readBytes < 0) break
-        digest.update(buffer, 0, readBytes)
-        output.write(buffer, 0, readBytes)
-    }
+    connection.setInstanceFollowRedirects(true)
+    def digestStream = new java.security.DigestInputStream(connection.inputStream, digest)
+    out << digestStream
+    out.close()
     def checksum = new BigInteger(1, digest.digest()).toString(16)
     while (checksum.length() < 64) { checksum = "0" + checksum }
     if (checksum != expectedChecksum) {
         file.delete()
-        throw new GradleException("Downloaded file has wrong hash: " + localUrl + ": expected: " + expectedChecksum + ", actual: " + checksum)
+        throw new GradleException("Wrong checksum for " + remoteUrl + ": expected: " + expectedChecksum + ", actual: " + checksum)
     }
-}
-
-// https://stackoverflow.com/questions/75274720/a-failure-occurred-while-executing-appcheckdebugduplicateclasses/
-configurations.implementation {
-   exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jdk8'
 }
 
 clean {
@@ -222,6 +213,11 @@ clean {
         tree.include 'bootstrap-*.zip'
         tree.each { it.delete() }
     }
+}
+
+// https://stackoverflow.com/questions/75274720/a-failure-occurred-while-executing-appcheckdebugduplicateclasses/
+configurations.implementation {
+   exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jdk8'
 }
 
 task downloadBootstraps() {
