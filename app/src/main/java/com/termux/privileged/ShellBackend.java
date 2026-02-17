@@ -1,0 +1,352 @@
+package com.termux.privileged;
+
+import android.content.Context;
+import android.util.Log;
+
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
+import java.io.IOException;
+
+/**
+ * Shell-based backend for privileged operations
+ * 
+ * This implementation uses shell/rish commands as a fallback when Shizuku
+ * is not available. It provides basic privileged operations through shell
+ * command execution.
+ */
+public class ShellBackend implements PrivilegedBackend {
+    private static final String TAG = "ShellBackend";
+    private static final long COMMAND_TIMEOUT_SECONDS = 30;
+    
+    private Context context;
+    private boolean isAvailable = false;
+    private boolean hasPermission = false;
+    private RootMethod rootMethod = RootMethod.NONE;
+    
+    @Override
+    public CompletableFuture<Boolean> initialize(Context context) {
+        this.context = context.getApplicationContext();
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                Log.i(TAG, "Initializing shell backend...");
+                
+                // Check if su is available
+                String suCheck = executeRootCommand(RootMethod.SU, List.of("echo", "test"));
+                if (isCommandSuccessful(suCheck)) {
+                    hasPermission = true;
+                    rootMethod = RootMethod.SU;
+                    Log.i(TAG, "Root access available via su");
+                } else {
+                    // Try rish as alternative
+                    String rishCheck = executeRootCommand(RootMethod.RISH, List.of("echo", "test"));
+                    if (isCommandSuccessful(rishCheck)) {
+                        hasPermission = true;
+                        rootMethod = RootMethod.RISH;
+                        Log.i(TAG, "Root access available via rish");
+                    } else {
+                        Log.w(TAG, "Neither su nor rish available");
+                        hasPermission = false;
+                        rootMethod = RootMethod.NONE;
+                    }
+                }
+                
+                isAvailable = true;
+                return hasPermission;
+                
+            } catch (Exception e) {
+                Log.e(TAG, "Failed to initialize shell backend", e);
+                isAvailable = false;
+                hasPermission = false;
+                return false;
+            }
+        });
+    }
+    
+    @Override
+    public boolean isAvailable() {
+        return isAvailable;
+    }
+    
+    @Override
+    public Type getType() {
+        return Type.SHELL;
+    }
+    
+    @Override
+    public boolean hasPermission() {
+        return hasPermission;
+    }
+    
+    @Override
+    public boolean requestPermission(int requestCode) {
+        // Shell backend doesn't need explicit permission requests
+        // The user needs to have root access configured
+        Log.i(TAG, "Shell backend: Permission check not applicable");
+        return hasPermission && rootMethod != RootMethod.NONE;
+    }
+    
+    @Override
+    public CompletableFuture<List<String>> getInstalledPackages() {
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                List<String> packages = new ArrayList<>();
+                
+                // Get list of installed packages using pm list packages
+                String output = executePrivilegedCommand(List.of("pm", "list", "packages"));
+                
+                if (output != null) {
+                    String[] lines = output.split("\n");
+                    for (String line : lines) {
+                        if (line.startsWith("package:")) {
+                            packages.add(line.substring("package:".length()));
+                        }
+                    }
+                }
+                
+                return packages;
+                
+            } catch (Exception e) {
+                Log.e(TAG, "Failed to get installed packages", e);
+                return List.of();
+            }
+        });
+    }
+    
+    @Override
+    public CompletableFuture<Boolean> installPackage(String apkPath) {
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                if (apkPath == null || apkPath.trim().isEmpty()) {
+                    Log.e(TAG, "Invalid APK path");
+                    return false;
+                }
+                
+                // Install APK using pm install
+                String output = executePrivilegedCommand(List.of("pm", "install", "-r", apkPath));
+                
+                if (output != null) {
+                    boolean success = output.contains("Success") || output.contains("success");
+                    Log.i(TAG, "Install result: " + output);
+                    return success;
+                }
+                
+                return false;
+                
+            } catch (Exception e) {
+                Log.e(TAG, "Failed to install package: " + apkPath, e);
+                return false;
+            }
+        });
+    }
+    
+    @Override
+    public CompletableFuture<Boolean> uninstallPackage(String packageName) {
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                if (packageName == null || packageName.trim().isEmpty()) {
+                    Log.e(TAG, "Invalid package name");
+                    return false;
+                }
+                
+                // Uninstall package using pm uninstall
+                String output = executePrivilegedCommand(List.of("pm", "uninstall", packageName));
+                
+                if (output != null) {
+                    boolean success = output.contains("Success") || output.contains("success");
+                    Log.i(TAG, "Uninstall result: " + output);
+                    return success;
+                }
+                
+                return false;
+                
+            } catch (Exception e) {
+                Log.e(TAG, "Failed to uninstall package: " + packageName, e);
+                return false;
+            }
+        });
+    }
+    
+    @Override
+    public CompletableFuture<Boolean> setComponentEnabled(String packageName, String componentName, boolean enabled) {
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                if (packageName == null || componentName == null) {
+                    Log.e(TAG, "Invalid package or component name");
+                    return false;
+                }
+                
+                // Enable/disable component using pm enable/disable
+                String action = enabled ? "enable" : "disable";
+                String output = executePrivilegedCommand(List.of("pm", action, packageName + "/" + componentName));
+                
+                if (output != null) {
+                    boolean success = output.contains("Success") || output.contains("success");
+                    Log.i(TAG, "Component " + action + " result: " + output);
+                    return success;
+                }
+                
+                return false;
+                
+            } catch (Exception e) {
+                Log.e(TAG, "Failed to set component enabled: " + componentName, e);
+                return false;
+            }
+        });
+    }
+    
+    @Override
+    public CompletableFuture<String> executeCommand(String command) {
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                if (command == null || command.trim().isEmpty()) {
+                    return "Invalid command";
+                }
+                
+                List<String> args = List.of("sh", "-c", command);
+                if (hasPermission && rootMethod != RootMethod.NONE) {
+                    return executeRootCommand(rootMethod, args);
+                }
+                return executeDirectCommand(args);
+                
+            } catch (Exception e) {
+                Log.e(TAG, "Failed to execute command: " + command, e);
+                return "Error: " + e.getMessage();
+            }
+        });
+    }
+    
+    @Override
+    public boolean isOperationSupported(PrivilegedOperation operation) {
+        // Shell backend supports most operations but with text-based limitations
+        return operation != null;
+    }
+    
+    @Override
+    public String getStatusDescription() {
+        return String.format("Shell backend - Available: %s, HasPermission: %s", 
+            isAvailable, hasPermission);
+    }
+    
+    @Override
+    public void cleanup() {
+        // Shell backend doesn't need specific cleanup
+        Log.i(TAG, "Shell backend cleaned up");
+    }
+    
+    /**
+     * Execute a shell command and return the output
+     */
+    private String executePrivilegedCommand(List<String> args) {
+        if (hasPermission && rootMethod != RootMethod.NONE) {
+            return executeRootCommand(rootMethod, args);
+        }
+        return executeDirectCommand(args);
+    }
+
+    private String executeDirectCommand(List<String> command) {
+        String logCommand = String.join(" ", command);
+        return runProcess(command, logCommand);
+    }
+
+    private String executeRootCommand(RootMethod method, List<String> command) {
+        if (method == RootMethod.NONE) {
+            return "Error: No root method available";
+        }
+        String shellCommand = buildShellCommand(command);
+        List<String> fullCommand = new ArrayList<>();
+        if (method == RootMethod.SU) {
+            fullCommand.add("su");
+        } else {
+            fullCommand.add("rish");
+        }
+        fullCommand.add("-c");
+        fullCommand.add(shellCommand);
+        String logCommand = (method == RootMethod.SU ? "su -c " : "rish -c ") + shellCommand;
+        return runProcess(fullCommand, logCommand);
+    }
+
+    private String runProcess(List<String> command, String logCommand) {
+        try {
+            Process process = new ProcessBuilder(command).start();
+
+            // Wait for process with timeout
+            boolean finished = process.waitFor(COMMAND_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+            if (!finished) {
+                process.destroyForcibly();
+                Log.w(TAG, "Command timed out: " + maskSensitive(logCommand));
+                return "Error: Command timed out";
+            }
+
+            String output = readStream(process.getInputStream());
+            String errorOutput = readStream(process.getErrorStream());
+
+            int exitCode = process.exitValue();
+            if (exitCode != 0) {
+                Log.w(TAG, "Command failed (" + exitCode + "): " + maskSensitive(logCommand));
+                String errorMsg = errorOutput.length() > 0 ? errorOutput : "Exit code: " + exitCode;
+                return "Error (" + exitCode + "): " + errorMsg;
+            }
+
+            return output;
+
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to execute shell command: " + maskSensitive(logCommand), e);
+            return "Error: " + e.getMessage();
+        }
+    }
+
+    private String readStream(java.io.InputStream inputStream) throws IOException {
+        BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream));
+        StringBuilder output = new StringBuilder();
+        String line;
+        while ((line = reader.readLine()) != null) {
+            if (output.length() > 0) {
+                output.append("\n");
+            }
+            output.append(line);
+        }
+        return output.toString();
+    }
+
+    private String buildShellCommand(List<String> args) {
+        StringBuilder builder = new StringBuilder();
+        for (int i = 0; i < args.size(); i++) {
+            if (i > 0) {
+                builder.append(" ");
+            }
+            builder.append(shellEscape(args.get(i)));
+        }
+        return builder.toString();
+    }
+
+    private String shellEscape(String arg) {
+        if (arg == null) {
+            return "''";
+        }
+        return "'" + arg.replace("'", "'\"'\"'") + "'";
+    }
+
+    private boolean isCommandSuccessful(String output) {
+        return output != null && !output.startsWith("Error");
+    }
+
+    /**
+     * Mask sensitive values in command logging
+     */
+    private String maskSensitive(String command) {
+        if (command == null) return null;
+        // Mask file paths and package names for safe logging
+        return command.replaceAll("/[\\w/.-]+\\.apk", "<apk>")
+                      .replaceAll("[a-zA-Z_][a-zA-Z0-9_]*(\\.[a-zA-Z_][a-zA-Z0-9_]*)+", "<package>");
+    }
+
+    private enum RootMethod {
+        SU,
+        RISH,
+        NONE
+    }
+}
