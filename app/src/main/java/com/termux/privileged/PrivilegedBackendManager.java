@@ -48,15 +48,15 @@ public class PrivilegedBackendManager {
                 Log.i(TAG, "Initializing privileged backend system...");
                 
                 // Try to initialize Shizuku backend first
-                ShizukuBackend shizukuBackend = new ShizukuBackend();
-                if (shizukuBackend.initialize(context).join()) {
-                    currentBackend = shizukuBackend;
-                    Log.i(TAG, "Shizuku backend initialized successfully");
-                    return true;
-                }
+                // ShizukuBackend shizukuBackend = new ShizukuBackend();
+                // if (shizukuBackend.initialize(context).join()) {
+                //     currentBackend = shizukuBackend;
+                //     Log.i(TAG, "Shizuku backend initialized successfully");
+                //     return true;
+                // }
                 
                 // Fall back to shell backend
-                Log.i(TAG, "Shizuku not available, falling back to shell backend");
+                Log.i(TAG, "Shizuku disabled, using shell backend");
                 ShellBackend shellBackend = new ShellBackend();
                 if (shellBackend.initialize(context).join()) {
                     currentBackend = shellBackend;

@@ -47,11 +47,17 @@ Thumbs.db
 .qa/
 
 # Agent documentation
-AGENTS.md
 project-plan.md
 knowledge-base.md
 CLAUDE.md
 project-ledger.md
+
+# Agent workspace (keep config/scripts tracked, ignore runtime logs)
+/work-logs/build-error.log
+/work-logs/build-last.log
+/work-logs/build-debug.log
+/work-logs/agent-log.md
+/work-logs/*.tmp
 
 # Reference repos
 reference-repos/
