@@ -1,5 +1,6 @@
 package com.termux.app;
 
+import android.app.Application;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ActivityInfo;
@@ -11,6 +12,7 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.robolectric.RobolectricTestRunner;
 import org.robolectric.RuntimeEnvironment;
+import org.robolectric.annotation.ConscryptMode;
 import org.robolectric.annotation.Config;
 import org.robolectric.shadows.ShadowPackageManager;
 
@@ -18,7 +20,8 @@ import static org.junit.Assert.assertEquals;
 import static org.robolectric.Shadows.shadowOf;
 
 @RunWith(RobolectricTestRunner.class)
-@Config(sdk = {Build.VERSION_CODES.P})
+@Config(sdk = {Build.VERSION_CODES.P}, application = Application.class)
+@ConscryptMode(ConscryptMode.Mode.OFF)
 public class SuggestionBarAppDiscoveryTest {
 
     private Context context;
@@ -27,9 +30,10 @@ public class SuggestionBarAppDiscoveryTest {
 
     @Before
     public void setUp() {
-        context = RuntimeEnvironment.application;
+        context = RuntimeEnvironment.getApplication().getApplicationContext();
         shadowPackageManager = shadowOf(context.getPackageManager());
         suggestionBarView = new SuggestionBarView(context, null);
+        suggestionBarView.setMaxButtonCount(1);
     }
 
     @Test
@@ -47,19 +51,21 @@ public class SuggestionBarAppDiscoveryTest {
         shadowPackageManager.addResolveInfoForIntent(launcherIntent, resolveInfo);
 
         suggestionBarView.reloadAllApps();
+        suggestionBarView.reloadWithInput("", null);
 
         int childCount = suggestionBarView.getChildCount();
-        assertEquals("SuggestionBarView should render at least 1 suggestion when a launcher app is registered",
-                childCount > 0, true);
+        assertEquals("SuggestionBarView should render at least 1 suggestion when a launcher app is registered", true,
+                childCount > 0);
     }
 
     @Test
     public void testReloadAllApps_withNoRegisteredApps_rendersZeroChildrenAndDoesNotCrash() {
         suggestionBarView.reloadAllApps();
+        suggestionBarView.reloadWithInput("", null);
 
         int childCount = suggestionBarView.getChildCount();
 
-        assertEquals("SuggestionBarView should handle empty app list without crashing", childCount >= 0, true);
+        assertEquals("SuggestionBarView should handle empty app list without crashing", 0, childCount);
     }
 
     @Test
@@ -78,10 +84,11 @@ public class SuggestionBarAppDiscoveryTest {
         }
 
         suggestionBarView.reloadAllApps();
+        suggestionBarView.reloadWithInput("", null);
 
         int childCount = suggestionBarView.getChildCount();
-        assertEquals("SuggestionBarView should render multiple suggestions when multiple apps are registered",
-                childCount > 0, true);
+        assertEquals("SuggestionBarView should render multiple suggestions when multiple apps are registered", true,
+                childCount > 0);
     }
 
     @Test
@@ -99,9 +106,9 @@ public class SuggestionBarAppDiscoveryTest {
 
         suggestionBarView.setDefaultButtons(null);
         suggestionBarView.reloadAllApps();
+        suggestionBarView.reloadWithInput("", null);
 
         int childCount = suggestionBarView.getChildCount();
-        assertEquals("SuggestionBarView should render suggestions with default buttons set",
-                childCount > 0, true);
+        assertEquals("SuggestionBarView should render suggestions with default buttons set", true, childCount > 0);
     }
 }

@@ -1,5 +1,6 @@
 package com.termux.app;
 
+import android.app.Application;
 import android.os.Build;
 import android.view.View;
 import android.view.ViewGroup;
@@ -11,6 +12,7 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.robolectric.Robolectric;
 import org.robolectric.RobolectricTestRunner;
+import org.robolectric.annotation.ConscryptMode;
 import org.robolectric.annotation.Config;
 import org.robolectric.util.ReflectionHelpers;
 
@@ -20,7 +22,8 @@ import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 
 @RunWith(RobolectricTestRunner.class)
-@Config(sdk = {Build.VERSION_CODES.P})
+@Config(sdk = {Build.VERSION_CODES.P}, application = Application.class)
+@ConscryptMode(ConscryptMode.Mode.OFF)
 public class TermuxActivityExtraKeysLayoutParamsTest {
 
     @Test

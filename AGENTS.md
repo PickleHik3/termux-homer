@@ -1,173 +1,157 @@
 # AGENTS.md
 
-## Goal
-Run an autonomous fix loop for this Android project in Termux:
-1. Build
-2. Read error logs
-3. Apply minimal code/build fix
-4. Rebuild
-5. Repeat until green or blocked
+## Launcher Port Rebase Contract
 
-## Environment (Termux-specific)
-- Project root: `/data/data/com.termux/files/home/files/android-dev/termux-launcher`
-- Java and Gradle wrapper are available.
-- Use ARM `aapt2` override automatically through `work-logs/build-errors.sh`.
-- Use `COMPILE_SDK_OVERRIDE=34` for local Termux builds unless explicitly told otherwise.
+This file is the operating contract for a less-capable execution agent working on launcher feature parity.
 
-## Required Build Command
-Always run builds through:
+## Mission
+Port launcher-specific behavior from `main` into `rebase-upstream-termux` without contaminating architecture or silently degrading functionality.
 
-```sh
-COMPILE_SDK_OVERRIDE=34 ./work-logs/build-errors.sh :app:assembleDebug
-```
+## Scope Lock
+- In scope: Phase 2 from `project-roadmap.md` (launcher parity only).
+- Out of scope: Shizuku integration, backend redesign, unrelated refactors.
+- Branch lock: work only on `rebase-upstream-termux`.
 
-Notes:
-- This rewrites `work-logs/build-error.log` and `work-logs/build-last.log` every run.
-- `work-logs/build-error.log` contains filtered failure lines.
-- `work-logs/build-last.log` contains full stacktrace/details.
+## Decision Policy (Strict)
+When a decision is high-impact or ambiguous, do not decide autonomously.
 
-## Fast Loop (Default)
-Use this as the default inner loop for quicker iterations:
+Hard-stop and record a blocker in `work-logs/roadblocks.md` for:
+- API/architecture ambiguity across multiple valid approaches.
+- Any change that disables, removes, or bypasses launcher functionality.
+- Dependency swaps or version shifts not already used in this repo.
+- Manifest behavior changes that affect launcher/home semantics.
+- Risky conflict resolution where intent is unclear.
 
-```sh
-COMPILE_SDK_OVERRIDE=34 ./work-logs/build-errors.sh :app:compileDebugJavaWithJavac
-```
-
-When Java compile passes, run a resource check:
-
-```sh
-COMPILE_SDK_OVERRIDE=34 ./work-logs/build-errors.sh :app:processDebugResources
-```
-
-Only after both pass, ask user before full assemble.
-
-## Full Assemble Confirmation Rule
-Before running full APK build, agent must prompt user and wait for approval:
-
-```sh
-COMPILE_SDK_OVERRIDE=34 ./work-logs/build-errors.sh :app:assembleDebug
-```
-
-Do not run full assemble automatically.
-
-## Loop Protocol
-On each iteration:
-
-1. Run fast loop command first:
-   - `:app:compileDebugJavaWithJavac`
-2. If compile passes, run:
-   - `:app:processDebugResources`
-3. If exit code is `0`: stop and report success.
-4. If exit code is non-zero:
-   - Parse `work-logs/build-error.log` first.
-   - Cluster repeated errors by root cause.
-   - Fix the highest-leverage root cause first.
-   - Prefer one-shot fixes for repeated patterns.
-5. Re-run the same build command.
-6. When both fast checks pass, ask user if full assemble should run.
-7. Continue until success or hard blocker.
-
-## Error Triage Rules
-- Treat the first real compiler/resource failure as primary.
-- Ignore repeated downstream “Cause 2..N” noise once root cause is known.
-- Prioritize in this order:
-  1. Syntax/merge-conflict/parsing failures
-  2. Missing symbols/imports/dependencies
-  3. Resource/linking issues
-  4. Packaging/signing/lint issues
-
-## Edit Rules
-- Make the smallest valid change that resolves the current cluster.
+## Safety Rules
+- Do the smallest parity-preserving change possible.
 - Do not refactor unrelated code.
-- Keep existing project style and behavior.
-- Do not remove functionality to silence errors.
-- Never use destructive git commands (`reset --hard`, force checkout, etc.).
-- Do not replace production classes with stubs/mocks just to make compile pass unless user explicitly approves.
-- Do not comment out feature code paths (service calls, backend wiring, native config) unless user explicitly approves.
-- If a fix degrades behavior, stop and ask user before applying.
+- Do not use stubs/mocks to fake completion.
+- Do not comment out features to make builds pass.
+- Never run destructive git commands (`reset --hard`, force checkout, etc.).
+- If unsure, file blocker and stop.
 
-## Functional Safety Gate
-- A build is considered "fixed" only if compilation passes **without intentional feature disablement**.
-- Treat these as temporary workarounds requiring user approval:
-  - Disabling/removing privileged backend implementations.
-  - Commenting out app/runtime behavior calls.
-  - Removing native build blocks when module expects native sources.
-- Preferred order for fixes:
-  1. Correct dependency coordinates/versions/repositories.
-  2. Align method signatures and constructor calls with current APIs.
-  3. Fix source conflicts/syntax/import issues.
-  4. Apply guarded fallback only with explicit user confirmation.
+## Mandatory Preflight Per Session
+1. Confirm branch is `rebase-upstream-termux`.
+2. Scan for merge markers before editing:
+   - Launcher-critical paths (hard stop):
+     - `rg -n "<<<<<<<|=======|>>>>>>>" app/src/main termux-shared/src/main terminal-emulator/src/main terminal-view/src/main app/build.gradle build.gradle settings.gradle gradle.properties .github`
+   - Test/docs/non-critical paths (warn only):
+     - `rg -n "<<<<<<<|=======|>>>>>>>" app/src/test termux-shared/src/test terminal-emulator/src/test terminal-view/src/test README.md docs project-docs`
+3. If markers appear in launcher-critical paths, file blocker in `work-logs/roadblocks.md` and stop.
+4. If markers appear only in test/docs/non-critical paths, append a warning note to `work-logs/agent-log.md` and continue Phase 2 work.
 
-## Verification Rules
-- After each fix, re-run:
+## Single Approved Build Wrapper
+Use only:
+
+```sh
+COMPILE_SDK_OVERRIDE=34 ./work-logs/build-errors.sh <gradle-task>
+```
+
+Default loop tasks:
 
 ```sh
 COMPILE_SDK_OVERRIDE=34 ./work-logs/build-errors.sh :app:compileDebugJavaWithJavac
-```
-
-- If compile passes, then run:
-
-```sh
 COMPILE_SDK_OVERRIDE=34 ./work-logs/build-errors.sh :app:processDebugResources
 ```
 
-- If still failing, continue loop with new top error cluster.
-- If both pass, prompt user before:
+Full assemble is approval-gated:
 
 ```sh
 COMPILE_SDK_OVERRIDE=34 ./work-logs/build-errors.sh :app:assembleDebug
 ```
 
-## Tooling Strategy (Crush TUI)
-- Prefer `filesystem` tools (`glob/read/patch`) for code and logs.
-- Use `sequential-thinking` before risky or cross-file edits.
-- Use `context7` when framework/library API behavior is uncertain.
-- Use `github` tools only for repo/PR operations, not local-only debugging.
-- Keep tool outputs summarized; do not paste large logs verbatim.
+Do not run full assemble unless explicitly approved.
 
-## Rolling Agent Log
-- Maintain a rolling activity log at:
-  - `termux-launcher/work-logs/agent-log.md`
-- Update it after each fix+verify cycle.
-- After each update, run:
-  - `./work-logs/trim-agent-log.sh`
-- Keep entries concise and structured:
-  - `Cycle #`
-  - `Root cause`
-  - `Files changed`
-  - `Decision`
-  - `Build result`
-  - `Next step`
-- Hard size limits to control context usage:
-  - Max `120` lines total
-  - Max `12` recent cycles retained
-- If limit is exceeded:
-  - Preserve a short `Session Summary` at top (5-10 lines)
-  - Drop oldest cycle entries first
-  - Never paste raw stack traces into `work-logs/agent-log.md`
+## Launcher Parity Checklist (Execution Order)
+Complete in this order and mark progress in cycle reports.
 
-## MCP Debugging Policy
-- Use MCP tools when local errors involve external APIs/libraries or unclear behavior.
-- Prefer `context7` for authoritative API references before speculative code edits.
-- For this project, prioritize context pull for:
-  - Termux/termux-app related APIs and build patterns
-  - Shizuku APIs, package names, and integration changes
-- MCP usage rules:
-  - Query only what is needed for the current error cluster.
-  - Summarize findings in 2-5 lines inside the current cycle log entry.
-  - Convert findings into exact local edits; avoid broad refactors.
+1. Manifest launcher behavior parity
+   - File: `app/src/main/AndroidManifest.xml`
+   - Preserve HOME/DEFAULT launcher intent behavior and launcher entry semantics.
+   - Preserve launcher-related permissions and task behavior used by this fork.
 
-## Reporting Format (each cycle)
+2. Suggestion/search behavior parity
+   - Files:
+     - `app/src/main/java/com/termux/app/SuggestionBarView.java`
+     - `app/src/main/java/com/termux/app/TermuxActivity.java`
+     - `app/src/main/java/com/termux/app/terminal/TermuxTerminalViewClient.java`
+   - Preserve terminal-driven input extraction and deterministic fuzzy ranking behavior.
+   - Preserve app launch action from suggestions.
+
+3. Launcher UI + extra-keys integration parity
+   - Files:
+     - `app/src/main/res/layout/activity_termux.xml`
+     - `app/src/main/res/layout/suggestion_bar.xml`
+   - Preserve suggestion bar placement above extra keys and shared blur/background surface behavior.
+
+4. Wallpaper/background parity
+   - Files:
+     - `app/src/main/java/com/termux/app/style/TermuxBackgroundManager.java`
+     - `app/src/main/java/com/termux/app/style/TermuxSystemWallpaperManager.java`
+   - Preserve preferred path and fallback behavior for wallpaper setting without crashes.
+
+5. Theme and dynamic color parity
+   - Files:
+     - `app/src/main/res/values/themes.xml`
+     - `app/src/main/res/values-night/themes.xml`
+     - `app/src/main/res/values-v31/themes.xml`
+     - `app/src/main/res/values-night-v31/themes.xml`
+   - Preserve Material You dynamic color behavior on API 31+ and stable fallback themes.
+
+6. Dependency/config parity
+   - Files:
+     - `app/build.gradle`
+     - `gradle.properties`
+   - Keep launcher-required dependencies/config aligned with existing fork behavior.
+
+## Error Triage Order
+Prioritize root cause in this order:
+1. Syntax/merge conflicts/parsing
+2. Missing symbols/imports/dependencies
+3. Resource/linking
+4. Packaging/signing/lint
+
+Always read `work-logs/build-error.log` first, then `work-logs/build-last.log` for details.
+
+## Verification Gates
+After each meaningful fix:
+1. Run `:app:compileDebugJavaWithJavac`
+2. If pass, run `:app:processDebugResources`
+3. If both pass, report status and ask for assemble approval
+4. If any fail, continue on top root-cause cluster only
+
+A change is not accepted if it passes build by disabling launcher features.
+
+## Reporting Contract
+For each cycle, append concise notes to `work-logs/agent-log.md`:
+- `Cycle: <n>`
+- `Checklist item: <1..6>`
 - `Root cause: ...`
 - `Files changed: ...`
 - `Why this fix: ...`
 - `Build result: pass/fail`
-- `Next error (if any): ...`
+- `Next step: ...`
 
-## Blocker Handling
-If blocked by environment/tooling (not code), report clearly with exact command(s):
-- Missing SDK/NDK/package
-- Broken local binary/toolchain
-- Permission/storage/path issues
+Rules:
+- Keep entries short.
+- Do not paste raw stack traces.
+- Use `work-logs/build-last.log` as the detailed trace source.
 
-Then stop and wait for user action.
+## Blocker Recording (Mandatory)
+If blocked, append an entry to `work-logs/roadblocks.md` and stop. Do not continue with speculative fixes.
+
+Required entry fields:
+- `Timestamp:`
+- `Branch + Commit:`
+- `Task/Checklist Item:`
+- `Blocker Type:`
+- `Evidence (command + short output):`
+- `Why decision needed:`
+- `Requested human decision:`
+
+## Completion Criteria (Phase 2)
+Phase 2 launcher port is complete only when:
+- Checklist items 1-6 are complete.
+- Fast verification commands pass.
+- No intentional feature disablement exists.
+- Remaining issues are either resolved or explicitly logged as blockers for human decision.

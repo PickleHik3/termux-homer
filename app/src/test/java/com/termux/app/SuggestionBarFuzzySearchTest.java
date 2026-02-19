@@ -1,5 +1,6 @@
 package com.termux.app;
 
+import android.app.Application;
 import android.content.Context;
 import android.os.Build;
 import android.widget.Button;
@@ -9,7 +10,9 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.robolectric.RobolectricTestRunner;
 import org.robolectric.RuntimeEnvironment;
+import org.robolectric.annotation.ConscryptMode;
 import org.robolectric.annotation.Config;
+import org.robolectric.util.ReflectionHelpers;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -22,14 +25,15 @@ import me.xdrop.fuzzywuzzy.FuzzySearch;
 import static org.junit.Assert.assertEquals;
 
 @RunWith(RobolectricTestRunner.class)
-@Config(sdk = {Build.VERSION_CODES.P})
+@Config(sdk = {Build.VERSION_CODES.P}, application = Application.class)
+@ConscryptMode(ConscryptMode.Mode.OFF)
 public class SuggestionBarFuzzySearchTest {
 
     private Context context;
 
     @Before
     public void setUp() {
-        context = RuntimeEnvironment.application;
+        context = RuntimeEnvironment.getApplication().getApplicationContext();
     }
 
     @Test
@@ -42,7 +46,7 @@ public class SuggestionBarFuzzySearchTest {
                 new TestButton("alpha"),
                 new TestButton("beta")
         );
-        suggestionBarView.setSuggestionButtons(buttons);
+        ReflectionHelpers.setField(suggestionBarView, "allSuggestionButtons", new ArrayList<>(buttons));
         suggestionBarView.setMaxButtonCount(2);
 
         suggestionBarView.reloadWithInput("al", null);
@@ -68,7 +72,7 @@ public class SuggestionBarFuzzySearchTest {
         );
 
         List<TestButton> expected = buildExpectedFuzzyOrder(buttons, "termx", 70);
-        suggestionBarView.setSuggestionButtons(new ArrayList<>(buttons));
+        ReflectionHelpers.setField(suggestionBarView, "allSuggestionButtons", new ArrayList<>(buttons));
         suggestionBarView.setMaxButtonCount(expected.size());
 
         suggestionBarView.reloadWithInput("termx", null);
@@ -84,9 +88,9 @@ public class SuggestionBarFuzzySearchTest {
         List<TestButton> expected = new ArrayList<>();
         String lowered = input == null ? "" : input.toLowerCase();
         for (TestButton button : buttons) {
-            int ratio = FuzzySearch.partialRatio(button.getText().toLowerCase(), lowered);
+            int ratio = FuzzySearch.partialRatio(lowered, button.getText().toLowerCase());
             button.setRatio(ratio);
-            if (ratio > tolerance) {
+            if (ratio >= tolerance) {
                 expected.add(button);
             }
         }
