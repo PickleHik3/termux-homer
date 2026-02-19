@@ -6,7 +6,11 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.res.Configuration;
 import android.graphics.Bitmap;
+import android.graphics.BlendMode;
+import android.graphics.BlendModeColorFilter;
 import android.graphics.Point;
+import android.graphics.PorterDuff;
+import android.graphics.PorterDuffColorFilter;
 import android.graphics.drawable.Drawable;
 import android.os.Build;
 import android.os.Handler;
@@ -249,7 +253,7 @@ public class TermuxBackgroundManager {
             executor.execute(() -> {
                 if (isImageFilesExist(mActivity, true)) {
                     Drawable drawable = ImageUtils.getDrawable(imagePath);
-                    ImageUtils.addOverlay(drawable, mActivity.getProperties().getBackgroundOverlayColor());
+                    applyBackgroundOverlay(drawable, mActivity.getProperties().getBackgroundOverlayColor());
                     handler.post(() -> mActivity.getWindow().getDecorView().setBackground(drawable));
                 } else {
                     Logger.logErrorAndShowToast(mActivity, LOG_TAG, mActivity.getString(R.string.error_background_image_loading_failed));
@@ -275,6 +279,18 @@ public class TermuxBackgroundManager {
     public void notifyBackgroundUpdated(boolean isImage) {
         mPreferences.setBackgroundImageEnabled(isImage);
         TermuxActivity.updateTermuxActivityStyling(mActivity, true);
+    }
+
+    private void applyBackgroundOverlay(@NonNull Drawable drawable, int color) {
+        if (mPreferences != null && mPreferences.isMonetOverlayEnabled()) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                drawable.setColorFilter(new BlendModeColorFilter(color, BlendMode.SRC_OVER));
+            } else {
+                drawable.setColorFilter(new PorterDuffColorFilter(color, PorterDuff.Mode.SRC_OVER));
+            }
+        } else {
+            ImageUtils.addOverlay(drawable, color);
+        }
     }
 
     private void maybeSetSystemWallpaper(@NonNull Bitmap bitmap) {
