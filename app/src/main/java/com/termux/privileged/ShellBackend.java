@@ -300,7 +300,11 @@ public class ShellBackend implements PrivilegedBackend {
             return output;
 
         } catch (Exception e) {
-            Log.e(TAG, "Failed to execute shell command: " + maskSensitive(logCommand), e);
+            if (isExpectedRootProbeFailure(command, e)) {
+                Log.i(TAG, "Root probe denied by platform/policy: " + maskSensitive(logCommand));
+            } else {
+                Log.e(TAG, "Failed to execute shell command: " + maskSensitive(logCommand), e);
+            }
             return "Error: " + e.getMessage();
         }
     }
@@ -346,6 +350,14 @@ public class ShellBackend implements PrivilegedBackend {
         return lowerOutput.contains("permission denied") ||
             lowerOutput.contains("operation not permitted") ||
             lowerOutput.contains("not allowed");
+    }
+
+    private boolean isExpectedRootProbeFailure(List<String> command, Exception exception) {
+        if (command == null || command.isEmpty() || exception == null) return false;
+        String binary = command.get(0);
+        if (!"su".equals(binary) && !"rish".equals(binary)) return false;
+        String message = exception.getMessage();
+        return message != null && isPermissionDenied(message);
     }
 
     /**
