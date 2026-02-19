@@ -41,6 +41,9 @@ public class ShellBackend implements PrivilegedBackend {
                     rootMethod = RootMethod.SU;
                     Log.i(TAG, "Root access available via su");
                 } else {
+                    if (isPermissionDenied(suCheck)) {
+                        Log.i(TAG, "su root probe denied by platform/policy");
+                    }
                     // Try rish as alternative
                     String rishCheck = executeRootCommand(RootMethod.RISH, List.of("echo", "test"));
                     if (isCommandSuccessful(rishCheck)) {
@@ -48,6 +51,9 @@ public class ShellBackend implements PrivilegedBackend {
                         rootMethod = RootMethod.RISH;
                         Log.i(TAG, "Root access available via rish");
                     } else {
+                        if (isPermissionDenied(rishCheck)) {
+                            Log.i(TAG, "rish root probe denied by platform/policy");
+                        }
                         Log.w(TAG, "Neither su nor rish available");
                         hasPermission = false;
                         rootMethod = RootMethod.NONE;
@@ -332,6 +338,14 @@ public class ShellBackend implements PrivilegedBackend {
 
     private boolean isCommandSuccessful(String output) {
         return output != null && !output.startsWith("Error");
+    }
+
+    private boolean isPermissionDenied(String output) {
+        if (output == null) return false;
+        String lowerOutput = output.toLowerCase();
+        return lowerOutput.contains("permission denied") ||
+            lowerOutput.contains("operation not permitted") ||
+            lowerOutput.contains("not allowed");
     }
 
     /**

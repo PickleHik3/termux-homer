@@ -7,6 +7,7 @@ import androidx.annotation.Nullable;
 import com.termux.shared.logger.Logger;
 import com.termux.shared.reflection.ReflectionUtils;
 import java.lang.reflect.Method;
+import java.util.Collections;
 import java.util.Map;
 
 /**
@@ -88,18 +89,21 @@ public class FeatureFlagUtils {
      */
     @SuppressWarnings("unchecked")
     public static Map<String, String> getAllFeatureFlags() {
+        if (android.os.Build.VERSION.SDK_INT >= 35) {
+            Logger.logVerbose(LOG_TAG, "Skipping hidden FeatureFlagUtils.getAllFeatureFlags() reflection on Android 15+");
+            return Collections.emptyMap();
+        }
         ReflectionUtils.bypassHiddenAPIReflectionRestrictions();
         try {
             @SuppressLint("PrivateApi")
             Class<?> clazz = Class.forName(FEATURE_FLAGS_CLASS);
             Method getAllFeatureFlagsMethod = ReflectionUtils.getDeclaredMethod(clazz, "getAllFeatureFlags");
             if (getAllFeatureFlagsMethod == null)
-                return null;
+                return Collections.emptyMap();
             return (Map<String, String>) ReflectionUtils.invokeMethod(getAllFeatureFlagsMethod, null).value;
         } catch (Exception e) {
-            // ClassCastException may be thrown
-            Logger.logStackTraceWithMessage(LOG_TAG, "Failed to get all feature flags", e);
-            return null;
+            Logger.logVerbose(LOG_TAG, "Failed to get all feature flags via reflection: " + e.getMessage());
+            return Collections.emptyMap();
         }
     }
 

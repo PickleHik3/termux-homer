@@ -201,6 +201,10 @@ public class PackageUtils {
      */
     @Nullable
     public static String getApplicationInfoSeInfoForPackage(@NonNull final ApplicationInfo applicationInfo) {
+        if (Build.VERSION.SDK_INT >= 35) {
+            Logger.logVerbose(LOG_TAG, "Skipping ApplicationInfo.seInfo reflection on Android 15+");
+            return null;
+        }
         ReflectionUtils.bypassHiddenAPIReflectionRestrictions();
         try {
             return (String) ReflectionUtils.invokeField(ApplicationInfo.class, Build.VERSION.SDK_INT < Build.VERSION_CODES.O ? "seinfo" : "seInfo", applicationInfo).value;
@@ -223,6 +227,10 @@ public class PackageUtils {
     public static String getApplicationInfoSeInfoUserForPackage(@NonNull final ApplicationInfo applicationInfo) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O)
             return null;
+        if (Build.VERSION.SDK_INT >= 35) {
+            Logger.logVerbose(LOG_TAG, "Skipping ApplicationInfo.seInfoUser reflection on Android 15+");
+            return null;
+        }
         ReflectionUtils.bypassHiddenAPIReflectionRestrictions();
         try {
             return (String) ReflectionUtils.invokeField(ApplicationInfo.class, "seInfoUser", applicationInfo).value;

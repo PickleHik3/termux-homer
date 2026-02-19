@@ -4,7 +4,7 @@ import android.os.Build;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import com.termux.shared.logger.Logger;
-// import org.chickenhook.restrictionbypass.Unseal;
+import org.lsposed.hiddenapibypass.HiddenApiBypass;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -25,7 +25,7 @@ public class ReflectionUtils {
         if (!HIDDEN_API_REFLECTION_RESTRICTIONS_BYPASSED && Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             Logger.logDebug(LOG_TAG, "Bypassing android hidden api reflection restrictions");
             try {
-                // Unseal.unseal(); // Commented out - dependency not available
+                HiddenApiBypass.addHiddenApiExemptions("");
             } catch (Throwable t) {
                 Logger.logStackTraceWithMessage(LOG_TAG, "Failed to bypass hidden API reflection restrictions", t);
             }
@@ -69,7 +69,7 @@ public class ReflectionUtils {
         public Object value;
 
         FieldInvokeResult(boolean success, Object value) {
-            this.value = success;
+            this.success = success;
             this.value = value;
         }
     }
@@ -165,7 +165,7 @@ public class ReflectionUtils {
         public Object value;
 
         MethodInvokeResult(boolean success, Object value) {
-            this.value = success;
+            this.success = success;
             this.value = value;
         }
     }
