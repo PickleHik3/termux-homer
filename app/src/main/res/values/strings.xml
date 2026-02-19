@@ -255,10 +255,11 @@
                 <string name="termux_use_system_wallpaper_off">Only update the in-app background; the system wallpaper stays unchanged.</string>
                 
                 <!-- Monet Background -->
-                <string name="termux_monet_background_enabled_title">Monet Background (Unstable)</string>
-                <string name="termux_monet_background_enabled_off">Terminal Monet Background will be disabled.
-                    Turns the terminal background into monet (Default)</string>
-                <string name="termux_monet_background_enabled_on">Monet Background will be enabled.</string>
+                <string name="termux_monet_background_enabled_title">Use Monet background + overlay (Unstable)</string>
+                <string name="termux_monet_background_enabled_off">Use the regular background and overlay color from termux.properties. (Default)</string>
+                <string name="termux_monet_background_enabled_on">Use wallpaper-based Monet color for both terminal background and opacity overlay.</string>
+                <string name="termux_monet_background_guide_title">Guide</string>
+                <string name="termux_monet_background_guide_summary">Enable this toggle, then use Terminal background opacity below to control strength of the Monet overlay.</string>
                 <string name="termux_terminal_background_opacity_title">Terminal background opacity</string>
                 <string name="termux_terminal_background_opacity_summary">Adjusts the translucency (alpha) of the terminal background overlay.</string>
                 <string name="termux_monet_overlay_enabled_title">Use Monet overlay color</string>

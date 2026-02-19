@@ -106,25 +106,11 @@ class TermuxStylePreferencesDataStore extends PreferenceDataStore {
                 mPreferences.setSessionsBlurEnabled(value);
                 break;
             case "monet_background_enabled":
-                mPreferences.setMonetBackgroundEnabled(value);
+                setMonetBackgroundAndOverlayEnabled(value);
                 break;
             case "monet_overlay_enabled":
-                if (value) {
-                    String current = getCurrentOverlayColorString();
-                    if (current != null && !current.isEmpty()) {
-                        mPreferences.setManualOverlayColor(current);
-                    }
-                }
-                mPreferences.setMonetOverlayEnabled(value);
-                Integer manualOverride = null;
-                if (!value) {
-                    String manualColor = mPreferences.getManualOverlayColor();
-                    if (manualColor != null && !manualColor.isEmpty()) {
-                        manualOverride = TermuxSharedProperties.getBackgroundOverlayInternalPropertyValueFromValue(manualColor);
-                    }
-                }
-                syncBackgroundOverlayColor(mPreferences.getTerminalBackgroundOpacity(), manualOverride);
-                TermuxActivity.updateTermuxActivityStyling(mContext, true);
+                // Legacy compatibility: keep both toggles in sync even if old UI writes this key.
+                setMonetBackgroundAndOverlayEnabled(value);
                 break;
             case "app_launcher_show_icons":
                 mPreferences.setAppLauncherShowIconsEnabled(value);
@@ -153,7 +139,7 @@ class TermuxStylePreferencesDataStore extends PreferenceDataStore {
             case "monet_background_enabled":
                 return mPreferences.isMonetBackgroundEnabled();
             case "monet_overlay_enabled":
-                return mPreferences.isMonetOverlayEnabled();
+                return mPreferences.isMonetBackgroundEnabled();
             case "app_launcher_show_icons":
                 return mPreferences.isAppLauncherShowIconsEnabled();
             case "app_launcher_bw_icons":
@@ -278,6 +264,26 @@ class TermuxStylePreferencesDataStore extends PreferenceDataStore {
         }
         int newColor = (baseColor & 0x00FFFFFF) | (alpha << 24);
         writeOverlayColorToProperties(String.format("#%08X", newColor));
+    }
+
+    private void setMonetBackgroundAndOverlayEnabled(boolean enabled) {
+        if (enabled) {
+            String current = getCurrentOverlayColorString();
+            if (current != null && !current.isEmpty()) {
+                mPreferences.setManualOverlayColor(current);
+            }
+        }
+        mPreferences.setMonetBackgroundEnabled(enabled);
+        mPreferences.setMonetOverlayEnabled(enabled);
+        Integer manualOverride = null;
+        if (!enabled) {
+            String manualColor = mPreferences.getManualOverlayColor();
+            if (manualColor != null && !manualColor.isEmpty()) {
+                manualOverride = TermuxSharedProperties.getBackgroundOverlayInternalPropertyValueFromValue(manualColor);
+            }
+        }
+        syncBackgroundOverlayColor(mPreferences.getTerminalBackgroundOpacity(), manualOverride);
+        TermuxActivity.updateTermuxActivityStyling(mContext, true);
     }
 
     private String getCurrentOverlayColorString() {
