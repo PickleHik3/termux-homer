@@ -1,6 +1,7 @@
 package com.termux.app.fragments.settings.termux;
 
 import android.content.Context;
+import android.os.Build;
 import android.os.Bundle;
 import androidx.annotation.ColorInt;
 import androidx.annotation.Keep;
@@ -334,7 +335,10 @@ class TermuxStylePreferencesDataStore extends PreferenceDataStore {
     @ColorInt
     private int getMonetSurfaceColor(@ColorInt int fallbackColor) {
         try {
-            // Use the app monet accent resource so overlay tracks wallpaper-derived dynamic color.
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                // Use a mid-tone dynamic accent directly from Android Monet palette.
+                return ContextCompat.getColor(mContext, android.R.color.system_accent1_500);
+            }
             return ContextCompat.getColor(mContext, R.color.main_accent);
         } catch (Exception e) {
             Logger.logStackTraceWithMessage(LOG_TAG, "Failed to resolve Monet surface color", e);
