@@ -28,6 +28,11 @@
             app:summaryOn="@string/termux_crash_report_notifications_enabled_on"
             app:title="@string/termux_crash_report_notifications_enabled_title" />
 
+        <Preference
+            app:key="privileged_backend_smoke_test"
+            app:title="@string/termux_privileged_backend_smoke_test_title"
+            app:summary="@string/termux_privileged_backend_smoke_test_summary" />
+
     </PreferenceCategory>
 
 </PreferenceScreen>

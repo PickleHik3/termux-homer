@@ -10,10 +10,9 @@ import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.TimeUnit;
 
 import rikka.shizuku.Shizuku;
-import rikka.shizuku.Sui;
+import rikka.sui.Sui;
 
 /**
  * Shizuku-based backend for privileged operations
@@ -24,32 +23,51 @@ import rikka.shizuku.Sui;
 public class ShizukuBackend implements PrivilegedBackend {
     private static final String TAG = "ShizukuBackend";
     
-    private static final int REQUEST_CODE = 1001;
-    private static final long COMMAND_TIMEOUT_SECONDS = 30;
+    public static final int PERMISSION_REQUEST_CODE = 1001;
     
+    private final Callback callback;
     private Context context;
     private boolean isAvailable = false;
     private boolean hasPermission = false;
     private boolean binderReceived = false;
     private boolean suiInitialized = false;
-    
+    private boolean listenersRegistered = false;
+
+    public ShizukuBackend() {
+        this(null);
+    }
+
+    public ShizukuBackend(Callback callback) {
+        this.callback = callback;
+    }
+
+    public interface Callback {
+        void onPermissionResult(boolean granted);
+        void onBinderDead();
+        default void onBinderReceived() {
+        }
+    }
+
     // Listeners for Shizuku events
-    private final Shizuku.BinderReceivedListener binderReceivedListener = () -> {
+    private final Shizuku.OnBinderReceivedListener binderReceivedListener = () -> {
         Log.i(TAG, "Shizuku binder received");
         binderReceived = true;
         checkPermission();
+        notifyBinderReceived();
     };
     
-    private final Shizuku.BinderDeadListener binderDeadListener = () -> {
+    private final Shizuku.OnBinderDeadListener binderDeadListener = () -> {
         Log.i(TAG, "Shizuku binder dead");
         binderReceived = false;
         hasPermission = false;
+        notifyBinderDead();
     };
     
     private final Shizuku.OnRequestPermissionResultListener permissionResultListener = (requestCode, grantResult) -> {
-        if (requestCode == REQUEST_CODE) {
+        if (requestCode == PERMISSION_REQUEST_CODE) {
             hasPermission = (grantResult == PackageManager.PERMISSION_GRANTED);
             Log.i(TAG, "Permission request result: " + hasPermission);
+            notifyPermissionResult(hasPermission);
         }
     };
     
@@ -60,39 +78,29 @@ public class ShizukuBackend implements PrivilegedBackend {
             try {
                 Log.i(TAG, "Initializing Shizuku backend...");
                 
-                // Check if we can initialize Sui (Magisk module)
                 suiInitialized = Sui.init(context.getPackageName());
                 Log.i(TAG, "Sui initialization result: " + suiInitialized);
-                
-                // Add listeners for binder events
-                Shizuku.addBinderReceivedListener(binderReceivedListener);
-                Shizuku.addBinderDeadListener(binderDeadListener);
-                Shizuku.addRequestPermissionResultListener(permissionResultListener);
-                
-                // Check if we already have a binder
+
+                registerListeners();
+
                 if (Shizuku.isPreV11()) {
                     Log.w(TAG, "Shizuku pre-v11 not supported");
                     isAvailable = false;
                     return false;
                 }
-                
-                if (Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED) {
-                    binderReceived = true;
-                    hasPermission = true;
-                    Log.i(TAG, "Shizuku permission already granted");
-                } else if (Shizuku.shouldShowRequestPermissionRationale()) {
-                    Log.i(TAG, "Shizuku permission previously denied");
-                    binderReceived = true; // We have a binder but no permission
-                    hasPermission = false;
+
+                binderReceived = Shizuku.pingBinder();
+                if (binderReceived) {
+                    checkPermission();
+                    notifyBinderReceived();
                 } else {
-                    Log.i(TAG, "Shizuku binder received, permission not yet requested");
-                    binderReceived = true; // Binder is received, just need permission
+                    hasPermission = false;
                 }
-                
-                isAvailable = true;
-                Log.i(TAG, "Shizuku backend initialized successfully");
-                return true;
-                
+
+                isAvailable = binderReceived;
+                Log.i(TAG, "Shizuku backend initialized, binder: " + binderReceived);
+                return isAvailable;
+
             } catch (Exception e) {
                 Log.e(TAG, "Failed to initialize Shizuku backend", e);
                 isAvailable = false;
@@ -119,6 +127,10 @@ public class ShizukuBackend implements PrivilegedBackend {
     
     @Override
     public boolean requestPermission(int requestCode) {
+        if (callback == null) {
+            Log.w(TAG, "Cannot request permission: no callback");
+            return false;
+        }
         if (!isAvailable() || Shizuku.isPreV11()) {
             Log.w(TAG, "Cannot request permission: backend not available");
             return false;
@@ -134,12 +146,12 @@ public class ShizukuBackend implements PrivilegedBackend {
             return false;
         }
         
-        if (requestCode != REQUEST_CODE) {
-            Log.w(TAG, "Ignoring non-standard request code: " + requestCode + ", using " + REQUEST_CODE);
+        if (requestCode != PERMISSION_REQUEST_CODE) {
+            Log.w(TAG, "Ignoring non-standard request code: " + requestCode + ", using " + PERMISSION_REQUEST_CODE);
         }
 
         Log.i(TAG, "Requesting Shizuku permission...");
-        Shizuku.requestPermission(REQUEST_CODE);
+        Shizuku.requestPermission(PERMISSION_REQUEST_CODE);
         return true;
     }
     
@@ -326,14 +338,43 @@ public class ShizukuBackend implements PrivilegedBackend {
     @Override
     public void cleanup() {
         try {
-            // Remove listeners
-            Shizuku.removeBinderReceivedListener(binderReceivedListener);
-            Shizuku.removeBinderDeadListener(binderDeadListener);
-            Shizuku.removeRequestPermissionResultListener(permissionResultListener);
-            
+            if (listenersRegistered) {
+                Shizuku.removeBinderReceivedListener(binderReceivedListener);
+                Shizuku.removeBinderDeadListener(binderDeadListener);
+                Shizuku.removeRequestPermissionResultListener(permissionResultListener);
+                listenersRegistered = false;
+            }
             Log.i(TAG, "Shizuku backend cleaned up");
         } catch (Exception e) {
             Log.e(TAG, "Error during cleanup", e);
+        }
+    }
+    
+    private void registerListeners() {
+        if (listenersRegistered) {
+            return;
+        }
+        Shizuku.addBinderReceivedListener(binderReceivedListener);
+        Shizuku.addBinderDeadListener(binderDeadListener);
+        Shizuku.addRequestPermissionResultListener(permissionResultListener);
+        listenersRegistered = true;
+    }
+
+    private void notifyBinderReceived() {
+        if (callback != null) {
+            callback.onBinderReceived();
+        }
+    }
+
+    private void notifyBinderDead() {
+        if (callback != null) {
+            callback.onBinderDead();
+        }
+    }
+
+    private void notifyPermissionResult(boolean granted) {
+        if (callback != null) {
+            callback.onPermissionResult(granted);
         }
     }
     
@@ -364,28 +405,9 @@ public class ShizukuBackend implements PrivilegedBackend {
                 return "Invalid command";
             }
 
-            // Use Shizuku.newProcess() for proper privileged execution
-            Process process = Shizuku.newProcess(args.toArray(new String[0]), null, null);
-
-            // Wait for process with timeout
-            boolean finished = process.waitFor(COMMAND_TIMEOUT_SECONDS, TimeUnit.SECONDS);
-            if (!finished) {
-                process.destroyForcibly();
-                Log.w(TAG, "Shizuku command timed out");
-                return "Error: Command timed out";
-            }
-
-            String output = readStream(process.getInputStream());
-            String errorOutput = readStream(process.getErrorStream());
-
-            int exitCode = process.exitValue();
-            if (exitCode != 0) {
-                String errorMsg = errorOutput.length() > 0 ? errorOutput : "Exit code: " + exitCode;
-                Log.w(TAG, "Shizuku command failed (" + exitCode + ")");
-                return "Error (" + exitCode + "): " + errorMsg;
-            }
-
-            return output;
+            // Shizuku API 13 no longer exposes direct process creation as a public API.
+            // Command execution should be implemented via binder calls or a bound user service.
+            return "Error: command execution requires UserService-based implementation on this Shizuku API version";
 
         } catch (Exception e) {
             Log.e(TAG, "Failed to execute Shizuku command", e);

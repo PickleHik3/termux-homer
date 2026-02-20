@@ -1,9 +1,9 @@
 package com.termux.privileged;
 
 import android.content.Context;
-import android.content.pm.PackageManager;
 import android.util.Log;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
@@ -11,213 +11,351 @@ import java.util.concurrent.Executors;
 
 /**
  * Manager class for privileged backend operations
- * 
+ *
  * This class handles the initialization and management of the appropriate
- * privileged backend (Shizuku or shell fallback) and provides a unified
- * interface for the rest of the application.
+ * privileged backend (Shizuku or shell fallback) and orchestrates the required
+ * state/reason reporting.
  */
 public class PrivilegedBackendManager {
     private static final String TAG = "PrivilegedBackendManager";
-    
     private static PrivilegedBackendManager instance;
-    private PrivilegedBackend currentBackend;
-    private final ExecutorService executorService = Executors.newCachedThreadPool();
-    
+
+    public enum BackendState {
+        UNINITIALIZED,
+        INITIALIZING,
+        READY,
+        PERMISSION_DENIED,
+        SERVICE_NOT_RUNNING,
+        FALLBACK_SHELL,
+        UNAVAILABLE
+    }
+
+    public enum StatusReason {
+        GRANTED,
+        DENIED,
+        SERVICE_NOT_RUNNING,
+        BINDER_DEAD,
+        FALLBACK_SHELL,
+        UNAVAILABLE
+    }
+
+    private final ExecutorService executorService = Executors.newSingleThreadExecutor();
+    private final Object stateLock = new Object();
+    private BackendState backendState = BackendState.UNINITIALIZED;
+    private StatusReason statusReason = StatusReason.UNAVAILABLE;
+    private String statusMessage = "Not initialized";
+
+    private Context applicationContext;
+    private PrivilegedBackend currentBackend = new NoOpBackend();
+    private ShizukuBackend shizukuBackend;
+    private ShellBackend shellBackend;
+
+    private final ShizukuBackend.Callback shizukuCallback = new ShizukuBackend.Callback() {
+        @Override
+        public void onPermissionResult(boolean granted) {
+            executorService.submit(() -> handleShizukuPermissionResult(granted));
+        }
+
+        @Override
+        public void onBinderDead() {
+            executorService.submit(PrivilegedBackendManager.this::handleShizukuBinderDeath);
+        }
+    };
+
     private PrivilegedBackendManager() {
         // Private constructor for singleton
     }
-    
-    /**
-     * Get the singleton instance
-     */
+
     public static synchronized PrivilegedBackendManager getInstance() {
         if (instance == null) {
             instance = new PrivilegedBackendManager();
         }
         return instance;
     }
-    
-    /**
-     * Initialize the privileged backend system
-     * @param context Application context
-     * @return CompletableFuture that completes when initialization is done
-     */
+
     public CompletableFuture<Boolean> initialize(Context context) {
+        this.applicationContext = context.getApplicationContext();
+        updateState(BackendState.INITIALIZING, StatusReason.UNAVAILABLE, "Choosing backend");
+
         return CompletableFuture.supplyAsync(() -> {
             try {
-                Log.i(TAG, "Initializing privileged backend system...");
-                
-                // Try to initialize Shizuku backend first
-                ShizukuBackend shizukuBackend = new ShizukuBackend();
-                if (shizukuBackend.initialize(context).join()) {
-                    currentBackend = shizukuBackend;
-                    Log.i(TAG, "Shizuku backend initialized successfully");
-                    return true;
+                boolean hasShizuku = attemptShizukuInitialization(this.applicationContext);
+                if (!hasShizuku) {
+                    boolean shellReady = fallbackToShell("Shizuku unavailable at startup");
+                    return shellReady;
                 }
-                
-                // Fall back to shell backend
-                Log.i(TAG, "Shizuku not available, falling back to shell backend");
-                ShellBackend shellBackend = new ShellBackend();
-                if (shellBackend.initialize(context).join()) {
-                    currentBackend = shellBackend;
-                    Log.i(TAG, "Shell backend initialized successfully");
-                    return true;
-                }
-                
-                // No backend available
-                Log.w(TAG, "No privileged backend available");
-                currentBackend = new NoOpBackend();
-                return false;
-                
+                return currentBackend.isAvailable();
             } catch (Exception e) {
                 Log.e(TAG, "Failed to initialize privileged backend", e);
-                currentBackend = new NoOpBackend();
+                fallbackToNoOp("Initialization exception: " + e.getMessage());
                 return false;
             }
         }, executorService);
     }
-    
-    /**
-     * Get the current backend
-     */
+
+    private boolean attemptShizukuInitialization(Context context) {
+        shizukuBackend = new ShizukuBackend(shizukuCallback);
+        boolean initialized = shizukuBackend.initialize(context).join();
+        if (!initialized || !shizukuBackend.isAvailable()) {
+            updateState(BackendState.SERVICE_NOT_RUNNING, StatusReason.SERVICE_NOT_RUNNING,
+                "Shizuku service not running");
+            return false;
+        }
+
+        if (shizukuBackend.hasPermission()) {
+            applyBackend(shizukuBackend, BackendState.READY, StatusReason.GRANTED,
+                "Shizuku backend ready");
+        } else {
+            applyBackend(shizukuBackend, BackendState.PERMISSION_DENIED, StatusReason.UNAVAILABLE,
+                "Shizuku backend bound but permission missing");
+        }
+
+        return true;
+    }
+
+    private boolean fallbackToShell(String reason) {
+        if (applicationContext == null) {
+            fallbackToNoOp("Missing context for shell fallback");
+            return false;
+        }
+
+        shellBackend = new ShellBackend();
+        boolean shellReady = shellBackend.initialize(applicationContext).join();
+        if (shellReady && shellBackend.hasPermission()) {
+            applyBackend(shellBackend, BackendState.FALLBACK_SHELL, StatusReason.FALLBACK_SHELL, reason);
+            return true;
+        }
+
+        fallbackToNoOp("Shell fallback failed: " + reason);
+        return false;
+    }
+
+    private void fallbackToNoOp(String reason) {
+        applyBackend(new NoOpBackend(), BackendState.UNAVAILABLE, StatusReason.UNAVAILABLE, reason);
+    }
+
+    private void handleShizukuPermissionResult(boolean granted) {
+        if (!(currentBackend instanceof ShizukuBackend)) {
+            return;
+        }
+
+        if (granted) {
+            applyBackend(currentBackend, BackendState.READY, StatusReason.GRANTED,
+                "Shizuku permission granted");
+        } else {
+            applyBackend(currentBackend, BackendState.PERMISSION_DENIED, StatusReason.DENIED,
+                "Shizuku permission denied");
+            fallbackToShell("Shizuku permission denied");
+        }
+    }
+
+    private void handleShizukuBinderDeath() {
+        if (!(currentBackend instanceof ShizukuBackend)) {
+            return;
+        }
+
+        updateState(BackendState.SERVICE_NOT_RUNNING, StatusReason.BINDER_DEAD,
+            "Shizuku binder died");
+        fallbackToShell("Shizuku binder dead");
+    }
+
+    private void applyBackend(PrivilegedBackend backend, BackendState state, StatusReason reason, String message) {
+        if (currentBackend != null && currentBackend != backend) {
+            currentBackend.cleanup();
+        }
+        currentBackend = backend;
+        updateState(state, reason, message);
+    }
+
+    private void updateState(BackendState state, StatusReason reason, String message) {
+        synchronized (stateLock) {
+            this.backendState = state;
+            this.statusReason = reason;
+            this.statusMessage = message;
+        }
+        Log.i(TAG, "Backend state -> " + state + ", reason -> " + reason + ", message -> " + message);
+    }
+
+    private boolean ensureShizukuPermissionBeforeOperation(String operation) {
+        if (currentBackend instanceof ShizukuBackend) {
+            ShizukuBackend shizukuBackend = (ShizukuBackend) currentBackend;
+            if (!shizukuBackend.isAvailable()) {
+                handleShizukuBinderDeath();
+                return false;
+            }
+
+            if (!shizukuBackend.hasPermission()) {
+                Log.i(TAG, "Shizuku permission required before " + operation);
+                requestPrivilegedPermission(ShizukuBackend.PERMISSION_REQUEST_CODE);
+                return false;
+            }
+        }
+        return true;
+    }
+
     public PrivilegedBackend getBackend() {
         return currentBackend;
     }
-    
-    /**
-     * Check if privileged operations are available
-     */
-    public boolean isPrivilegedAvailable() {
-        return currentBackend != null && currentBackend.isAvailable() && currentBackend.hasPermission();
+
+    public BackendState getBackendState() {
+        synchronized (stateLock) {
+            return backendState;
+        }
     }
-    
-    /**
-     * Get the current backend type
-     */
+
+    public StatusReason getStatusReason() {
+        synchronized (stateLock) {
+            return statusReason;
+        }
+    }
+
+    public String getStatusMessage() {
+        synchronized (stateLock) {
+            return statusMessage;
+        }
+    }
+
+    public boolean isPrivilegedAvailable() {
+        BackendState state = getBackendState();
+        return (state == BackendState.READY || state == BackendState.FALLBACK_SHELL)
+            && currentBackend != null && currentBackend.hasPermission();
+    }
+
     public PrivilegedBackend.Type getBackendType() {
         return currentBackend != null ? currentBackend.getType() : PrivilegedBackend.Type.NONE;
     }
-    
-    /**
-     * Request privileged permissions
-     */
+
     public boolean requestPrivilegedPermission(int requestCode) {
-        return currentBackend != null && currentBackend.requestPermission(requestCode);
+        if (currentBackend instanceof ShizukuBackend) {
+            ShizukuBackend shizukuBackend = (ShizukuBackend) currentBackend;
+            if (!shizukuBackend.isAvailable()) {
+                return false;
+            }
+            boolean initiated = shizukuBackend.requestPermission(requestCode);
+            if (initiated) {
+                updateState(BackendState.PERMISSION_DENIED, StatusReason.UNAVAILABLE,
+                    "Requested Shizuku permission");
+            }
+            return initiated;
+        }
+        return false;
     }
-    
-    /**
-     * Get installed packages with privileged access
-     */
+
     public CompletableFuture<List<String>> getInstalledPackages() {
-        return currentBackend != null ? currentBackend.getInstalledPackages() : 
-            CompletableFuture.completedFuture(List.of());
+        if (!ensureShizukuPermissionBeforeOperation("getInstalledPackages")) {
+            return CompletableFuture.completedFuture(Collections.emptyList());
+        }
+        return currentBackend.getInstalledPackages();
     }
-    
-    /**
-     * Install a package
-     */
+
     public CompletableFuture<Boolean> installPackage(String apkPath) {
-        return currentBackend != null ? currentBackend.installPackage(apkPath) :
-            CompletableFuture.completedFuture(false);
+        if (!ensureShizukuPermissionBeforeOperation("installPackage")) {
+            return CompletableFuture.completedFuture(false);
+        }
+        return currentBackend.installPackage(apkPath);
     }
-    
-    /**
-     * Uninstall a package
-     */
+
     public CompletableFuture<Boolean> uninstallPackage(String packageName) {
-        return currentBackend != null ? currentBackend.uninstallPackage(packageName) :
-            CompletableFuture.completedFuture(false);
+        if (!ensureShizukuPermissionBeforeOperation("uninstallPackage")) {
+            return CompletableFuture.completedFuture(false);
+        }
+        return currentBackend.uninstallPackage(packageName);
     }
-    
-    /**
-     * Execute a privileged command
-     */
+
+    public CompletableFuture<Boolean> setComponentEnabled(String packageName, String componentName, boolean enabled) {
+        if (!ensureShizukuPermissionBeforeOperation("setComponentEnabled")) {
+            return CompletableFuture.completedFuture(false);
+        }
+        return currentBackend.setComponentEnabled(packageName, componentName, enabled);
+    }
+
     public CompletableFuture<String> executeCommand(String command) {
-        return currentBackend != null ? currentBackend.executeCommand(command) :
-            CompletableFuture.completedFuture("Backend not available");
+        if (!ensureShizukuPermissionBeforeOperation("executeCommand")) {
+            return CompletableFuture.completedFuture("Shizuku permission required");
+        }
+        return currentBackend.executeCommand(command);
     }
-    
-    /**
-     * Get status description for debugging
-     */
+
     public String getStatusDescription() {
-        return currentBackend != null ? currentBackend.getStatusDescription() : "No backend initialized";
+        StringBuilder builder = new StringBuilder();
+        builder.append("Backend: ").append(getBackendType());
+        builder.append(" | State: ").append(getBackendState());
+        builder.append(" | Reason: ").append(getStatusReason());
+        builder.append(" | Message: ").append(getStatusMessage());
+        builder.append(" | Permission: ").append(currentBackend != null && currentBackend.hasPermission());
+        return builder.toString();
     }
-    
-    /**
-     * Cleanup resources
-     */
+
     public void cleanup() {
         if (currentBackend != null) {
             currentBackend.cleanup();
         }
         executorService.shutdown();
+        applyBackend(new NoOpBackend(), BackendState.UNAVAILABLE, StatusReason.UNAVAILABLE,
+            "Resources cleaned up");
     }
-    
-    /**
-     * No-operation backend for when no privileged backend is available
-     */
+
     private static class NoOpBackend implements PrivilegedBackend {
         @Override
         public CompletableFuture<Boolean> initialize(Context context) {
             return CompletableFuture.completedFuture(false);
         }
-        
+
         @Override
         public boolean isAvailable() {
             return false;
         }
-        
+
         @Override
         public Type getType() {
             return Type.NONE;
         }
-        
+
         @Override
         public boolean hasPermission() {
             return false;
         }
-        
+
         @Override
         public boolean requestPermission(int requestCode) {
             return false;
         }
-        
+
         @Override
         public CompletableFuture<List<String>> getInstalledPackages() {
-            return CompletableFuture.completedFuture(List.of());
+            return CompletableFuture.completedFuture(Collections.emptyList());
         }
-        
+
         @Override
         public CompletableFuture<Boolean> installPackage(String apkPath) {
             return CompletableFuture.completedFuture(false);
         }
-        
+
         @Override
         public CompletableFuture<Boolean> uninstallPackage(String packageName) {
             return CompletableFuture.completedFuture(false);
         }
-        
+
         @Override
         public CompletableFuture<Boolean> setComponentEnabled(String packageName, String componentName, boolean enabled) {
             return CompletableFuture.completedFuture(false);
         }
-        
+
         @Override
         public CompletableFuture<String> executeCommand(String command) {
             return CompletableFuture.completedFuture("No privileged backend available");
         }
-        
+
         @Override
         public boolean isOperationSupported(PrivilegedOperation operation) {
             return false;
         }
-        
+
         @Override
         public String getStatusDescription() {
             return "No privileged backend available";
         }
-        
+
         @Override
         public void cleanup() {
             // No-op

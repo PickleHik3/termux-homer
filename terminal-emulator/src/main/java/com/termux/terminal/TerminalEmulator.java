@@ -1046,8 +1046,8 @@ public final class TerminalEmulator {
                     case ESC_APC:
                         doApc(b);
                         break;
-                    case ESC_APC_ESC:
-                        doApcEsc(b);
+                    case ESC_APC_ESCAPE:
+                        doApcEscape(b);
                         break;
                     case ESC_OSC:
                         doOsc(b);
@@ -1389,10 +1389,6 @@ public final class TerminalEmulator {
     }
 
     /**
-<<<<<<< HEAD
-     * Process byte while in the {@link #ESC_CSI_QUESTIONMARK} escape state.
-     */
-=======
      * Process byte while in the {@link #ESC_CSI_UNSUPPORTED_PARAMETER_BYTE} or
      * {@link #ESC_CSI_UNSUPPORTED_INTERMEDIATE_BYTE} escape state.
      *
@@ -1856,17 +1852,8 @@ public final class TerminalEmulator {
                 continueSequence(ESC_OSC);
                 ESC_OSC_colon = -1;
                 break;
-            case // DECKPNM
-            '>':
-                setDecsetinternalBit(DECSET_BIT_APPLICATION_KEYPAD, false);
-                break;
-<<<<<<< HEAD
-            case // APC
-            '_':
-                mOSCOrDeviceControlArgs.setLength(0);
-=======
             case '_': // APC - Application Program Command.
->>>>>>> upstream/master
+                mOSCOrDeviceControlArgs.setLength(0);
                 continueSequence(ESC_APC);
                 break;
             default:
@@ -2105,15 +2092,6 @@ public final class TerminalEmulator {
                 }
                 mCursorCol = newCol;
                 break;
-<<<<<<< HEAD
-            case // Esc [ ? -- start of a private mode set
-            '?':
-                continueSequence(ESC_CSI_QUESTIONMARK);
-                break;
-            case // "Esc [ >" --
-            '>':
-                continueSequence(ESC_CSI_BIGGERTHAN);
-                break;
             case '?': // Esc [ ? -- start of a private parameter byte
                 continueSequence(ESC_CSI_QUESTIONMARK);
                 break;
@@ -2238,21 +2216,11 @@ public final class TerminalEmulator {
                     13:
                         mSession.write("\033[3;0;0t");
                         break;
-<<<<<<< HEAD
-                    case // Report xterm window in pixels. Result is CSI 4 ; height ; width t
-                    14:
-                        mSession.write(String.format(Locale.US, "\033[4;%d;%dt", mRows * cellH, mColumns * cellW));
-=======
                     case 14: // Report xterm window in pixels. Result is CSI 4 ; height ; width t
                         mSession.write(String.format(Locale.US, "\033[4;%d;%dt", mRows * mCellHeightPixels, mColumns * mCellWidthPixels));
                         break;
                     case 16: // Report xterm character cell size in pixels. Result is CSI 6 ; height ; width t
                         mSession.write(String.format(Locale.US, "\033[6;%d;%dt", mCellHeightPixels, mCellWidthPixels));
->>>>>>> upstream/master
-                        break;
-                    case // Report xterm window in pixels. Result is CSI 4 ; height ; width t
-                    16:
-                        mSession.write(String.format(Locale.US, "\033[6;%d;%dt", cellH, cellW));
                         break;
                     case // Report the size of the text area in characters. Result is CSI 8 ; height ; width t
                     18:
@@ -2435,14 +2403,9 @@ public final class TerminalEmulator {
             } else if (code == 49) {
                 // Set default background color.
                 mBackColor = TextStyle.COLOR_INDEX_BACKGROUND;
-<<<<<<< HEAD
-            } else if (code >= 90 && code <= 97) {
-                // Bright foreground colors (aixterm codes).
-=======
             } else if (code == 59) { // Set default underline color.
                 mUnderlineColor = TextStyle.COLOR_INDEX_FOREGROUND;
             } else if (code >= 90 && code <= 97) { // Bright foreground colors (aixterm codes).
->>>>>>> upstream/master
                 mForeColor = code - 90 + 8;
             } else if (code >= 100 && code <= 107) {
                 // Bright background color (aixterm codes).
@@ -2451,35 +2414,6 @@ public final class TerminalEmulator {
                 if (LOG_ESCAPE_SEQUENCES)
                     Logger.logWarn(mClient, LOG_TAG, String.format("SGR unknown code %d", code));
             }
-        }
-    }
-
-    private void doApc(int b) {
-        switch(b) {
-            case // Bell.
-            7:
-                break;
-            case // Escape.
-            27:
-                continueSequence(ESC_APC_ESC);
-                break;
-            default:
-                collectOSCArgs(b);
-                continueSequence(ESC_OSC);
-        }
-    }
-
-    private void doApcEsc(int b) {
-        switch(b) {
-            case '\\':
-                break;
-            default:
-                // The ESC character was not followed by a \, so insert the ESC and
-                // the current character in arg buffer.
-                collectOSCArgs(27);
-                collectOSCArgs(b);
-                continueSequence(ESC_APC);
-                break;
         }
     }
 

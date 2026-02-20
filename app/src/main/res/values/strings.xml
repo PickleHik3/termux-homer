@@ -193,6 +193,8 @@
                 <string name="termux_crash_report_notifications_enabled_title">Crash Report Notifications</string>
                 <string name="termux_crash_report_notifications_enabled_off">Disable notifications for crash reports.</string>
                 <string name="termux_crash_report_notifications_enabled_on">Show notifications for crash reports. (Default)</string>
+                <string name="termux_privileged_backend_smoke_test_title">Run Privileged Backend Smoke Test</string>
+                <string name="termux_privileged_backend_smoke_test_summary">Logs backend state/reason/type and runs a minimal privileged command test.</string>
 
 
         <!-- Terminal IO Preferences -->
