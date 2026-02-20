@@ -237,6 +237,15 @@
             </intent-filter>
         </service>
 
+        <service
+            android:name=".tooie.TooieNotificationListener"
+            android:exported="false"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+
         <!-- Shizuku Provider for privileged operations -->
         <provider
             android:name="rikka.shizuku.ShizukuProvider"
