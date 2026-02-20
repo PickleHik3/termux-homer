@@ -1,6 +1,6 @@
 # Termux Launcher
 
-Vibe coded proof of concept Android launcher and terminal app fork based on Termux-Monet, highly inspired by TEL (Termux Expert Launcher). 
+Vibe coded proof of concept Android launcher and terminal app fork based on Termux-Monet, heavily inspired by TEL (Termux Expert Launcher). 
 
 ## Primary Difference from TEL;
 - Sixel support in terminal.
