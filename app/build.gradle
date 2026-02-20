@@ -84,12 +84,6 @@ android {
         targetCompatibility JavaVersion.VERSION_11
     }
 
-    externalNativeBuild {
-        ndkBuild {
-            path "src/main/cpp/Android.mk"
-        }
-    }
-
     lint {
         disable 'ProtectedPermissions'
         disable 'HardcodedDebugMode'
