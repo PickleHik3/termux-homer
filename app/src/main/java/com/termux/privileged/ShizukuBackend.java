@@ -419,7 +419,7 @@ public class ShizukuBackend implements PrivilegedBackend {
             }
 
             Process process = (Process) processObject;
-            boolean finished = process.waitFor(COMMAND_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+            boolean finished = waitForProcessExit(process, COMMAND_TIMEOUT_SECONDS, TimeUnit.SECONDS);
             if (!finished) {
                 process.destroyForcibly();
                 return "Error: command timed out";
@@ -442,6 +442,21 @@ public class ShizukuBackend implements PrivilegedBackend {
             Log.e(TAG, "Failed to execute Shizuku command", e);
             return "Error: " + e.getMessage();
         }
+    }
+
+    private boolean waitForProcessExit(Process process, long timeout, TimeUnit unit) throws InterruptedException {
+        long deadlineNanos = System.nanoTime() + unit.toNanos(timeout);
+        while (System.nanoTime() < deadlineNanos) {
+            try {
+                if (!process.isAlive()) {
+                    return true;
+                }
+            } catch (IllegalArgumentException ignored) {
+                // ShizukuRemoteProcess may throw IllegalArgumentException while still running.
+            }
+            Thread.sleep(100);
+        }
+        return false;
     }
 
     private String readStream(java.io.InputStream inputStream) throws IOException {
