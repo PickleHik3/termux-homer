@@ -1,214 +1,63 @@
-# Termux: Launcher, Tooie
+# Termux Launcher
 
-This is a personal proof-of-concept I vibecoded for myself.
+Android launcher and terminal app fork based on Termux, focused on launcher UX and privileged integrations.
 
-It combines ideas from Termux Monet and TEL to make a modern Android launcher workflow that is basically just Termux.
-
-I do not claim credit for upstream work. If a real Android developer wants to take this further, please do.
-
-<p align="center">
-  <img src="resources/assets/tooie.png" width="220" alt="Tooie mascot"/>
-</p>
-
-## Credits
-
-- Termux app: https://github.com/termux/termux-app
-- Termux Monet: https://github.com/Termux-Monet/termux-monet
-- TEL project: https://github.com/t-e-l/tel
-
-## Included Files
-
-Everything below is bundled in this repo under `resources/`:
-
-| Type | Path |
-| --- | --- |
-| Fish config | `resources/config/fish/config.fish` |
-| Tmux config | `resources/config/tmux/.tmux.conf` |
-| Termux properties | `resources/config/termux/termux.properties` |
-| Unexpected Keyboard layout | `resources/config/termux/unexp-keyb-layout.txt` |
-| Tooie mascot image | `resources/assets/tooie.png` |
-| btop restore script | `resources/scripts/restore_btop.sh` |
-| tmux status script (kew ticker) | `resources/scripts/statusbar/kew-now-playing` |
-| tmux status script (weather ticker) | `resources/scripts/statusbar/weather-cache` |
-| `termux-restart` helper | `resources/bin/termux-restart` |
-| Pacman bootstrap reference | `resources/optional/termux-init/bootstrap.md` |
-| Neovim Termux LSP config | `resources/optional/termux-init/nvim/termux.lua` |
-| Crush LSP + MCP config example | `resources/optional/termux-init/crush/crush.example.json` |
-| Shell package module reference | `resources/optional/termux-init/modules/packages.sh` |
-| Fish shell module reference | `resources/optional/termux-init/modules/shell.sh` |
-| Fish plugins list reference | `resources/optional/termux-init/fish/fish_plugins` |
-
-## User Guide
-
-### 1) Install baseline dependencies
-
-```sh
-pkg update && pkg upgrade -y
-pkg install -y fish tmux termux-api git curl zoxide
-```
-
-For the fuller dependency set, see:
-- `resources/optional/termux-init/modules/packages.sh`
-- `resources/optional/termux-init/modules/shell.sh`
-- `resources/optional/termux-init/fish/fish_plugins`
-
-### 2) Copy configs and helpers
-
-```sh
-mkdir -p ~/.config/fish ~/.termux ~/files/btop ~/.local/bin
-cp resources/config/fish/config.fish ~/.config/fish/config.fish
-cp resources/config/tmux/.tmux.conf ~/.tmux.conf
-cp resources/config/termux/termux.properties ~/.termux/termux.properties
-cp resources/scripts/restore_btop.sh ~/files/btop/restore_btop.sh
-cp resources/scripts/statusbar/kew-now-playing ~/.local/bin/kew-now-playing
-cp resources/scripts/statusbar/weather-cache ~/.local/bin/weather-cache
-cp resources/bin/termux-restart $PREFIX/bin/termux-restart
-chmod +x ~/files/btop/restore_btop.sh ~/.local/bin/kew-now-playing ~/.local/bin/weather-cache $PREFIX/bin/termux-restart
-termux-reload-settings
-```
-
-### 3) Optional keyboard layout (Unexpected Keyboard)
-
-- Install Unexpected Keyboard:
-  https://play.google.com/store/apps/details?id=juloo.keyboard2
-- Import/use the included layout file:
-  `resources/config/termux/unexp-keyb-layout.txt`
-
-### 4) App settings to configure
-
-- Enable wallpaper sync so system wallpaper and in-app wallpaper stay aligned (Monet works better).
-- Set an uncommon input split character, for example `@` or `#`, to trigger Android app search via suggestions bar.
-- Set default apps as comma-separated values, for example:
-  `phone,whatsapp,chrome`
-- Set wallpaper from inside the app:
-  long-press terminal -> Style -> Background.
-- For more styling and behavior details (this app is roughly 90% Termux-Monet, with app suggestion bar and blur-view additions), see:
-  https://github.com/Termux-Monet/termux-monet
-
-### 5) Optional references (manual, not automated)
-
-The `termux-init` flow is currently not functioning end-to-end here.
-Use these files as reference only:
-- `resources/optional/termux-init/bootstrap.md`
-- `resources/optional/termux-init/nvim/termux.lua`
-- `resources/optional/termux-init/crush/crush.example.json`
-- https://github.com/PickleHik3/termux-init
-
-## Keybinds
-
-### Fish keybinds (`resources/config/fish/config.fish`)
-
-| Key | Action |
-| --- | --- |
-| `Alt+e` | Send current command to `aichat` (`_aichat_fish`) |
-
-### Tmux keybinds (`resources/config/tmux/.tmux.conf`)
-
-| Key | Action |
-| --- | --- |
-| `Prefix` = `Ctrl+b` | Main tmux prefix |
-| `Alt+1..9` | Jump to window 1..9 |
-| `Alt+c` | New window |
-| `Alt+x` | Kill current window |
-| `Alt+z` | Last active window |
-| `Alt+r` | Replace current window (new + kill previous) |
-| `Alt+Arrow` | Move between panes |
-| `Prefix + |` | Split pane horizontally |
-| `Prefix + -` | Split pane vertically |
-| `Prefix + R` | Reload tmux config |
-| `Ctrl+Space` | Launch BlueLineConsole (Omnisearch) |
-| `Alt+w` | Launch WhatsApp |
-| `Alt+y` | Launch YouTube |
-| `Alt+b` | Launch Brave |
-| `Alt+t` | Launch Mihon |
-| `Alt+f` | Launch Solid Explorer |
-| `Alt+s` | Launch Android Settings |
-| `Alt+Space` | Launch BlueLineConsole |
-
-### Termux extra-keys (`resources/config/termux/termux.properties`)
-
-| Extra key | Sends | Result |
-| --- | --- | --- |
-| `🔥` | `Ctrl+b` `Backspace` | Open btop mini window |
-| `🕞` | `Ctrl+b` `Tab` | Open peaclock |
-| `🎧` | `Ctrl+b` `Esc` | Open kew |
-| `📂` | `Ctrl+b` `Enter` | Open yazi |
-| `🌠` | `Ctrl+b` `Del` | Open crush |
-| `📒` | `Ctrl+b` `PgUp` | Open nvim |
-| `🗓️` | `Ctrl+b` `PgDn` | Open calcure |
-| `🔍` | `Ctrl+b` `End` | Launch BlueLineConsole |
-| `⇄` | `Alt+z` | Switch to last tmux window |
-| `𝍣` | `Ctrl+b` `-` | Split pane vertically |
-| `𝍬` (popup) | `Ctrl+b` `|` | Split pane horizontally |
-| `⓵` `⓶` `⓷` | `Ctrl+b` `1/2/3` | Switch tmux window |
-| `✎` | `Ctrl+b` `[` | Enter copy mode |
-| `㋡` | `Ctrl+b` | Prefix helper key |
-
-## Quirks And Limitations
-
-- `tooie-shelf` is experimental and not fully functional in this setup:
-  https://github.com/PickleHik3/tooie-shelf
-- Install `termux-api` for wallpaper sync-to-system features.
-- In settings, keep terminal margin adjustment OFF:
-  `Termux:Launcher -> Terminal View -> Terminal Margin Adjustment`.
-  If enabled, extra-keys bar and app suggestions may flicker while interacting.
-- `btop` needs Shizuku + `rish`, plus generic Linux btop from:
-  https://github.com/aristocratos/btop/releases
-  Then use `resources/scripts/restore_btop.sh`.
-- tmux status-right expects:
-  - `~/.local/bin/kew-now-playing`
-  - `~/.local/bin/weather-cache`
-- `weather-cache` uses `Kuwait` by default; edit the script to change city.
-- If shell exit causes stutter, force close app or run `termux-restart`.
-- Termux:X11 currently does not work well with this setup.
-- Battery usage is untested; on my Nothing Phone 2 it has been mostly fine.
-- Pacman/TUR guide:
-  https://wiki.termux.com/wiki/Switching_package_manager
-- Users are encouraged to build APKs themselves or use nightly workflow artifacts.
-
-## TUI Apps (from `tui.txt`)
-
-- https://github.com/charmbracelet/crush
-- https://github.com/am2rican5/sigye
-- https://github.com/octobanana/peaclock
-- https://github.com/sxyazi/yazi
-- https://github.com/ravachol/kew
-- https://github.com/anufrievroman/calcure
-- https://github.com/antonmedv/walk
-- More TUIs: https://terminaltrove.com/
+This repository now contains only Android app source and related app assets.
+Shell dotfiles/config bundles (tmux, fish, nvim) are intentionally not part of this repo.
 
 ## Screenshots
 
-<table>
-  <tr>
-    <td><img src="screenshots/home-screen.png" width="360" alt="Home screen"/></td>
-    <td><img src="screenshots/home-screen-blur.png" width="360" alt="Home screen blur"/></td>
-  </tr>
-  <tr>
-    <td><img src="screenshots/app-search.png" width="360" alt="App search"/></td>
-    <td><img src="screenshots/shell-env.png" width="360" alt="Shell environment"/></td>
-  </tr>
-  <tr>
-    <td><img src="screenshots/pacman-termux.png" width="360" alt="Pacman in Termux"/></td>
-    <td><img src="screenshots/lazyvim.png" width="360" alt="LazyVim"/></td>
-  </tr>
-  <tr>
-    <td><img src="screenshots/btop-android.png" width="360" alt="btop on Android"/></td>
-    <td><img src="screenshots/TUI-crush-ai.png" width="360" alt="Crush AI"/></td>
-  </tr>
-  <tr>
-    <td><img src="screenshots/TUI-sigye-clock.png" width="360" alt="Sigye clock"/></td>
-    <td><img src="screenshots/TUI-yazi.png" width="360" alt="Yazi"/></td>
-  </tr>
-  <tr>
-    <td><img src="screenshots/TUI-kew-music.png" width="360" alt="Kew music"/></td>
-    <td><img src="screenshots/TUI-calcure.png" width="360" alt="Calcure"/></td>
-  </tr>
-  <tr>
-    <td><img src="screenshots/TUI-tooie-shelf.png" width="360" alt="Tooie shelf"/></td>
-    <td></td>
-  </tr>
-  <tr>
-    <td colspan="2" align="center"><img src="screenshots/app-settings.png" width="360" alt="App settings"/></td>
-  </tr>
-</table>
+<p align="center">
+  <img src="resources/assets/tooie.png" width="180" alt="Tooie mascot"/>
+</p>
+
+| Home | Search | Settings |
+| --- | --- | --- |
+| ![Home](screenshots/home-screen.png) | ![Search](screenshots/app-search.png) | ![Settings](screenshots/app-settings.png) |
+
+| Blur Home | Shelf | Terminal Environment |
+| --- | --- | --- |
+| ![Blur Home](screenshots/home-screen-blur.png) | ![Tooie Shelf](screenshots/TUI-tooie-shelf.png) | ![Shell Env](screenshots/shell-env.png) |
+
+## Download APK
+
+Use GitHub Actions artifacts.
+
+1. Non-Shizuku build (default)
+- Download artifact from the latest successful run on `main`.
+- Workflow: `Build nightly` (`.github/workflows/debug_build.yml`).
+
+2. Shizuku integration build
+- Download artifact from the latest successful run on `shizuku-integration`.
+- Workflow: `Build nightly` (`.github/workflows/debug_build.yml`).
+
+Note: action artifacts require a logged-in GitHub account.
+
+## Shizuku Integration
+
+`shizuku-integration` branch includes privileged backend support and Tooie local API endpoints.
+
+Current Tooie endpoints include:
+- `/v1/status`
+- `/v1/apps`
+- `/v1/media/now-playing`
+- `/v1/notifications`
+- `/v1/exec` (policy-gated)
+- `/v1/screen/lock`
+
+Developer/security notes:
+- `docs/en/Tooie_API.md`
+
+## Build (local)
+
+```sh
+COMPILE_SDK_OVERRIDE=34 ./gradlew \
+  -PcompileSdkVersion=34 \
+  -Pandroid.aapt2FromMavenOverride=/data/data/com.termux/files/usr/bin/aapt2 \
+  :app:compileDebugJavaWithJavac
+```
+
+## Upstream Base
+
+- Upstream Termux app: https://github.com/termux/termux-app
+
