@@ -38,7 +38,7 @@ Use GitHub Actions artifacts.
 - Download artifact from the latest successful run on `shizuku-integration`.
 - Workflow: `Build nightly` (`.github/workflows/debug_build.yml`).
 
-3. Companion Apps
+3. Companion Apps (Termux API, Termux Styling etc)
 - Download from https://github.com/Termux-Monet/ 
 
 Note: action artifacts require a logged-in GitHub account.
