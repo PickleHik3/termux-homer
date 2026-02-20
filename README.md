@@ -1,9 +1,16 @@
 # Termux Launcher
 
-Android launcher and terminal app fork based on Termux, focused on launcher UX and privileged integrations.
+Vibe coded proof of concept Android launcher and terminal app fork based on Termux-Monet, highly inspired by TEL (Termux Expert Launcher). 
 
-This repository now contains only Android app source and related app assets.
-Shell dotfiles/config bundles (tmux, fish, nvim) are intentionally not part of this repo.
+## Primary Difference from TEL;
+- Sixel support in terminal.
+- Wallpaper implimentation is different due to how it was implimented in Termux-Monet (TEL can make terminal fully transparent, so you can set android live wallpapers and have it show as terminal background if required) but my version sets an in-app wallpaper (same as termux-monet) + uses termux api to sync with system wallpaper so that the monet color themes properly propagates accross the app and the system.
+
+## Credits
+- https://github.com/t-e-l/tel
+- https://github.com/Termux-Monet/termux-monet
+- https://github.com/termux/termux-app
+
 
 ## Screenshots
 
@@ -30,6 +37,9 @@ Use GitHub Actions artifacts.
 2. Shizuku integration build
 - Download artifact from the latest successful run on `shizuku-integration`.
 - Workflow: `Build nightly` (`.github/workflows/debug_build.yml`).
+
+3. Companion Apps
+- Download from https://github.com/Termux-Monet/ 
 
 Note: action artifacts require a logged-in GitHub account.
 
