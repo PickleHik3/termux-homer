@@ -45,6 +45,10 @@ Requires notification listener access.
 Runs a privileged command through `PrivilegedBackendManager`.
 Subject to strict policy in `~/.tooie/config.json`.
 
+### `POST /v1/privileged/request-permission`
+Requests privileged permission when Shizuku is available but not yet granted.
+Returns backend status fields to help diagnose permission state.
+
 ### `POST /v1/screen/lock`
 Attempts screen lock key event (`223`, fallback `26`) via privileged backend.
 
@@ -60,6 +64,7 @@ tooie media
 tooie notifications
 tooie lock
 tooie exec id
+tooie permission
 tooie token rotate
 ```
 
@@ -125,6 +130,8 @@ Rules:
 - Command must exactly match a prefix or start with `"<prefix> "`.
 - Commands with unsupported control chars are rejected.
 - Overlong commands are rejected.
+- If Shizuku permission is missing, `/v1/exec` returns `permission_required`
+  and attempts to trigger a permission request.
 
 ## Notification and Media Data
 
@@ -152,4 +159,3 @@ If not granted, responses include:
 - Tooie is event-driven for notifications/media and avoids constant polling loops.
 - `/v1/apps` can be heavier than status queries; avoid frequent tight loops.
 - `/v1/exec` cost depends on spawned privileged command frequency.
-

@@ -5,7 +5,9 @@ import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 
+import com.termux.privileged.PrivilegedBackend;
 import com.termux.privileged.PrivilegedBackendManager;
+import com.termux.privileged.ShizukuBackend;
 import com.termux.shared.logger.Logger;
 import com.termux.shared.termux.TermuxConstants;
 
@@ -179,6 +181,8 @@ public class TooieApiServer {
                 return buildNotifications();
             } else if ("POST".equals(request.method) && "/v1/exec".equals(request.path)) {
                 return runExec(request.body);
+            } else if ("POST".equals(request.method) && "/v1/privileged/request-permission".equals(request.path)) {
+                return requestPrivilegedPermission();
             } else if ("POST".equals(request.method) && "/v1/screen/lock".equals(request.path)) {
                 return runLockScreen();
             } else if ("POST".equals(request.method) && "/v1/auth/rotate".equals(request.path)) {
@@ -277,9 +281,22 @@ public class TooieApiServer {
             return error;
         }
 
+        PrivilegedBackendManager manager = PrivilegedBackendManager.getInstance();
+        if (manager.getBackendType() == PrivilegedBackend.Type.SHIZUKU && !manager.getBackend().hasPermission()) {
+            boolean requested = manager.requestPrivilegedPermission(ShizukuBackend.PERMISSION_REQUEST_CODE);
+            JSONObject error = jsonError("permission_required",
+                "Shizuku permission is required. Grant it, then retry command.");
+            error.put("_statusCode", 403);
+            error.put("permissionRequested", requested);
+            error.put("backendState", String.valueOf(manager.getBackendState()));
+            error.put("statusReason", String.valueOf(manager.getStatusReason()));
+            error.put("statusMessage", manager.getStatusMessage());
+            return error;
+        }
+
         String output;
         try {
-            output = PrivilegedBackendManager.getInstance().executeCommand(command).get(20, TimeUnit.SECONDS);
+            output = manager.executeCommand(command).get(20, TimeUnit.SECONDS);
         } catch (Exception e) {
             JSONObject error = jsonError("exec_failed", e.getMessage());
             error.put("_statusCode", 500);
@@ -290,6 +307,21 @@ public class TooieApiServer {
         data.put("ok", isSuccessfulCommandOutput(output));
         data.put("command", command);
         data.put("output", output == null ? "" : output);
+        return data;
+    }
+
+    private JSONObject requestPrivilegedPermission() throws JSONException {
+        PrivilegedBackendManager manager = PrivilegedBackendManager.getInstance();
+        boolean requested = manager.requestPrivilegedPermission(ShizukuBackend.PERMISSION_REQUEST_CODE);
+
+        JSONObject data = new JSONObject();
+        data.put("ok", requested || manager.getBackend().hasPermission());
+        data.put("requested", requested);
+        data.put("backendType", String.valueOf(manager.getBackendType()));
+        data.put("backendState", String.valueOf(manager.getBackendState()));
+        data.put("statusReason", String.valueOf(manager.getStatusReason()));
+        data.put("statusMessage", manager.getStatusMessage());
+        data.put("hasPermission", manager.getBackend().hasPermission());
         return data;
     }
 
@@ -542,6 +574,9 @@ public class TooieApiServer {
             "    curl $CURL_COMMON -X POST -H \"Authorization: Bearer $TOKEN\" -H \"Content-Type: application/json\" \\\n" +
             "      --data \"{\\\"command\\\":\\\"$CMD_ESCAPED\\\"}\" \"$BASE/v1/exec\"\n" +
             "    ;;\n" +
+            "  permission)\n" +
+            "    curl $CURL_COMMON -X POST -H \"Authorization: Bearer $TOKEN\" \"$BASE/v1/privileged/request-permission\"\n" +
+            "    ;;\n" +
             "  lock)\n" +
             "    curl $CURL_COMMON -X POST -H \"Authorization: Bearer $TOKEN\" \"$BASE/v1/screen/lock\"\n" +
             "    ;;\n" +
@@ -551,7 +586,7 @@ public class TooieApiServer {
             "    curl $CURL_COMMON -X POST -H \"Authorization: Bearer $TOKEN\" \"$BASE/v1/auth/rotate\"\n" +
             "    ;;\n" +
             "  *)\n" +
-            "    echo \"usage: tooie {status|apps|media|notifications|exec|lock|token rotate}\" >&2\n" +
+            "    echo \"usage: tooie {status|apps|media|notifications|exec|permission|lock|token rotate}\" >&2\n" +
             "    exit 2\n" +
             "    ;;\n" +
             "esac\n";
