@@ -4,6 +4,7 @@ import android.content.Context;
 import android.util.Log;
 
 import java.io.BufferedReader;
+import java.io.FileNotFoundException;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.List;
@@ -293,6 +294,13 @@ public class ShellBackend implements PrivilegedBackend {
 
             return output;
 
+        } catch (IOException e) {
+            if (isExpectedMissingRish(command, e)) {
+                Log.w(TAG, "rish not found; skipping rish root path");
+            } else {
+                Log.e(TAG, "Failed to execute shell command: " + maskSensitive(logCommand), e);
+            }
+            return "Error: " + e.getMessage();
         } catch (Exception e) {
             Log.e(TAG, "Failed to execute shell command: " + maskSensitive(logCommand), e);
             return "Error: " + e.getMessage();
@@ -332,6 +340,23 @@ public class ShellBackend implements PrivilegedBackend {
 
     private boolean isCommandSuccessful(String output) {
         return output != null && !output.startsWith("Error");
+    }
+
+    private boolean isExpectedMissingRish(List<String> command, IOException exception) {
+        if (command == null || command.isEmpty() || !"rish".equals(command.get(0))) {
+            return false;
+        }
+        if (exception instanceof FileNotFoundException) {
+            return true;
+        }
+        String message = exception.getMessage();
+        if (message == null) {
+            return false;
+        }
+        String lower = message.toLowerCase();
+        return lower.contains("cannot run program \"rish\"")
+            || lower.contains("no such file")
+            || lower.contains("error=2");
     }
 
     /**

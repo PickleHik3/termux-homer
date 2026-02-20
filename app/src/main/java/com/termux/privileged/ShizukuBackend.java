@@ -7,9 +7,11 @@ import android.util.Log;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 
 import rikka.shizuku.Shizuku;
 import rikka.sui.Sui;
@@ -22,6 +24,7 @@ import rikka.sui.Sui;
  */
 public class ShizukuBackend implements PrivilegedBackend {
     private static final String TAG = "ShizukuBackend";
+    private static final long COMMAND_TIMEOUT_SECONDS = 30;
     
     public static final int PERMISSION_REQUEST_CODE = 1001;
     
@@ -405,10 +408,36 @@ public class ShizukuBackend implements PrivilegedBackend {
                 return "Invalid command";
             }
 
-            // Shizuku API 13 no longer exposes direct process creation as a public API.
-            // Command execution should be implemented via binder calls or a bound user service.
-            return "Error: command execution requires UserService-based implementation on this Shizuku API version";
+            // Use reflective lookup for Shizuku remote process creation.
+            Method newProcessMethod = Shizuku.class.getDeclaredMethod(
+                "newProcess", String[].class, String[].class, String.class);
+            newProcessMethod.setAccessible(true);
+            Object processObject = newProcessMethod.invoke(
+                null, args.toArray(new String[0]), null, null);
+            if (!(processObject instanceof Process)) {
+                return "Error: Shizuku process API unavailable";
+            }
 
+            Process process = (Process) processObject;
+            boolean finished = process.waitFor(COMMAND_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+            if (!finished) {
+                process.destroyForcibly();
+                return "Error: command timed out";
+            }
+
+            String output = readStream(process.getInputStream());
+            String errorOutput = readStream(process.getErrorStream());
+            int exitCode = process.exitValue();
+            if (exitCode != 0) {
+                String errorMessage = errorOutput.isEmpty() ? ("Exit code: " + exitCode) : errorOutput;
+                return "Error (" + exitCode + "): " + errorMessage;
+            }
+
+            return output;
+
+        } catch (NoSuchMethodException e) {
+            Log.e(TAG, "Shizuku newProcess API is not available on this runtime", e);
+            return "Error: Shizuku command execution API unavailable";
         } catch (Exception e) {
             Log.e(TAG, "Failed to execute Shizuku command", e);
             return "Error: " + e.getMessage();

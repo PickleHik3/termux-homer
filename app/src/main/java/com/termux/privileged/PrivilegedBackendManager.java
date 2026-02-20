@@ -24,6 +24,7 @@ public class PrivilegedBackendManager {
         UNINITIALIZED,
         INITIALIZING,
         READY,
+        PERMISSION_REQUESTING,
         PERMISSION_DENIED,
         SERVICE_NOT_RUNNING,
         FALLBACK_SHELL,
@@ -32,6 +33,7 @@ public class PrivilegedBackendManager {
 
     public enum StatusReason {
         GRANTED,
+        PERMISSION_REQUESTING,
         DENIED,
         SERVICE_NOT_RUNNING,
         BINDER_DEAD,
@@ -185,6 +187,10 @@ public class PrivilegedBackendManager {
             }
 
             if (!shizukuBackend.hasPermission()) {
+                if (getBackendState() == BackendState.PERMISSION_REQUESTING) {
+                    Log.i(TAG, "Shizuku permission request already in progress before " + operation);
+                    return false;
+                }
                 Log.i(TAG, "Shizuku permission required before " + operation);
                 requestPrivilegedPermission(ShizukuBackend.PERMISSION_REQUEST_CODE);
                 return false;
@@ -231,9 +237,18 @@ public class PrivilegedBackendManager {
             if (!shizukuBackend.isAvailable()) {
                 return false;
             }
+            if (shizukuBackend.hasPermission()) {
+                updateState(BackendState.READY, StatusReason.GRANTED,
+                    "Shizuku permission already granted");
+                return true;
+            }
+            if (getBackendState() == BackendState.PERMISSION_REQUESTING) {
+                Log.i(TAG, "Ignoring duplicate Shizuku permission request");
+                return true;
+            }
             boolean initiated = shizukuBackend.requestPermission(requestCode);
             if (initiated) {
-                updateState(BackendState.PERMISSION_DENIED, StatusReason.UNAVAILABLE,
+                updateState(BackendState.PERMISSION_REQUESTING, StatusReason.PERMISSION_REQUESTING,
                     "Requested Shizuku permission");
             }
             return initiated;
