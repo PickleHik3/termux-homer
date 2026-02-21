@@ -40,6 +40,7 @@ Note: action artifacts require a logged-in GitHub account.
 Current Tooie endpoints include:
 - `/v1/status`
 - `/v1/apps`
+- `/v1/system/resources`
 - `/v1/media/now-playing`
 - `/v1/notifications`
 - `/v1/exec` (policy-gated)
@@ -60,4 +61,3 @@ COMPILE_SDK_OVERRIDE=34 ./gradlew \
 ## Upstream Base
 
 - Upstream Termux app: https://github.com/termux/termux-app
-

@@ -33,6 +33,13 @@ Returns backend + Tooie runtime status.
 ### `GET /v1/apps`
 Returns installed apps (package, label, system flag).
 
+### `GET /v1/system/resources`
+Returns a system resource snapshot:
+- CPU core count and load average (`1m`, `5m`, `15m`)
+- Memory stats from `/proc/meminfo` (`total`, `available`, `free`, `used`)
+- App heap and low-memory indicators
+- Current privileged backend status fields (`backendType`, `backendState`, `statusReason`)
+
 ### `GET /v1/media/now-playing`
 Returns cached now-playing media session data.
 Requires notification listener access.
@@ -60,6 +67,7 @@ Rotates API token and rewrites `~/.tooie/token` and `~/.tooie/endpoint`.
 ```sh
 tooie status
 tooie apps
+tooie resources
 tooie media
 tooie notifications
 tooie lock
@@ -158,4 +166,5 @@ If not granted, responses include:
 
 - Tooie is event-driven for notifications/media and avoids constant polling loops.
 - `/v1/apps` can be heavier than status queries; avoid frequent tight loops.
+- `/v1/system/resources` is designed for periodic dashboard polling.
 - `/v1/exec` cost depends on spawned privileged command frequency.

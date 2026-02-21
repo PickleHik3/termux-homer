@@ -1,5 +1,6 @@
 package com.termux.tooie;
 
+import android.app.ActivityManager;
 import android.content.Context;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageInfo;
@@ -175,6 +176,8 @@ public class TooieApiServer {
                 return buildStatus();
             } else if ("GET".equals(request.method) && "/v1/apps".equals(request.path)) {
                 return buildApps(context);
+            } else if ("GET".equals(request.method) && "/v1/system/resources".equals(request.path)) {
+                return buildSystemResources(context);
             } else if ("GET".equals(request.method) && "/v1/media/now-playing".equals(request.path)) {
                 return buildNowPlaying();
             } else if ("GET".equals(request.method) && "/v1/notifications".equals(request.path)) {
@@ -235,6 +238,53 @@ public class TooieApiServer {
         data.put("ok", true);
         data.put("count", apps.length());
         data.put("apps", apps);
+        return data;
+    }
+
+    private JSONObject buildSystemResources(Context context) throws JSONException {
+        JSONObject data = new JSONObject();
+        data.put("ok", true);
+        data.put("timestampMs", System.currentTimeMillis());
+        data.put("cpuCores", Runtime.getRuntime().availableProcessors());
+
+        double[] loadAverage = readLoadAverage();
+        if (loadAverage != null) {
+            data.put("loadAvg1m", loadAverage[0]);
+            data.put("loadAvg5m", loadAverage[1]);
+            data.put("loadAvg15m", loadAverage[2]);
+        }
+
+        Map<String, Long> memInfoKb = readMemInfoKb();
+        if (!memInfoKb.isEmpty()) {
+            long memTotalKb = memInfoKb.get("MemTotal") != null ? memInfoKb.get("MemTotal") : 0L;
+            long memAvailableKb = memInfoKb.get("MemAvailable") != null ? memInfoKb.get("MemAvailable") : 0L;
+            long memFreeKb = memInfoKb.get("MemFree") != null ? memInfoKb.get("MemFree") : 0L;
+            long memUsedKb = memTotalKb > 0 && memAvailableKb > 0 ? (memTotalKb - memAvailableKb) : 0L;
+            data.put("memTotalBytes", memTotalKb * 1024L);
+            data.put("memAvailableBytes", memAvailableKb * 1024L);
+            data.put("memFreeBytes", memFreeKb * 1024L);
+            data.put("memUsedBytes", memUsedKb * 1024L);
+        }
+
+        Runtime runtime = Runtime.getRuntime();
+        long javaHeapUsedBytes = runtime.totalMemory() - runtime.freeMemory();
+        data.put("javaHeapUsedBytes", javaHeapUsedBytes);
+        data.put("javaHeapMaxBytes", runtime.maxMemory());
+
+        ActivityManager activityManager = (ActivityManager) context.getSystemService(Context.ACTIVITY_SERVICE);
+        if (activityManager != null) {
+            ActivityManager.MemoryInfo memoryInfo = new ActivityManager.MemoryInfo();
+            activityManager.getMemoryInfo(memoryInfo);
+            data.put("lowMemory", memoryInfo.lowMemory);
+            data.put("memoryThresholdBytes", memoryInfo.threshold);
+            data.put("memoryClassMb", activityManager.getMemoryClass());
+            data.put("largeMemoryClassMb", activityManager.getLargeMemoryClass());
+        }
+
+        PrivilegedBackendManager manager = PrivilegedBackendManager.getInstance();
+        data.put("backendType", String.valueOf(manager.getBackendType()));
+        data.put("backendState", String.valueOf(manager.getBackendState()));
+        data.put("statusReason", String.valueOf(manager.getStatusReason()));
         return data;
     }
 
@@ -521,6 +571,7 @@ public class TooieApiServer {
         rateLimiters.clear();
         rateLimiters.put("GET:/v1/status", new SimpleRateLimiter(120, 60_000));
         rateLimiters.put("GET:/v1/apps", new SimpleRateLimiter(60, 60_000));
+        rateLimiters.put("GET:/v1/system/resources", new SimpleRateLimiter(120, 60_000));
         rateLimiters.put("GET:/v1/media/now-playing", new SimpleRateLimiter(120, 60_000));
         rateLimiters.put("GET:/v1/notifications", new SimpleRateLimiter(120, 60_000));
         rateLimiters.put("POST:/v1/exec", new SimpleRateLimiter(30, 60_000));
@@ -562,6 +613,9 @@ public class TooieApiServer {
             "  apps)\n" +
             "    curl $CURL_COMMON -H \"Authorization: Bearer $TOKEN\" \"$BASE/v1/apps\"\n" +
             "    ;;\n" +
+            "  resources)\n" +
+            "    curl $CURL_COMMON -H \"Authorization: Bearer $TOKEN\" \"$BASE/v1/system/resources\"\n" +
+            "    ;;\n" +
             "  media)\n" +
             "    curl $CURL_COMMON -H \"Authorization: Bearer $TOKEN\" \"$BASE/v1/media/now-playing\"\n" +
             "    ;;\n" +
@@ -586,7 +640,7 @@ public class TooieApiServer {
             "    curl $CURL_COMMON -X POST -H \"Authorization: Bearer $TOKEN\" \"$BASE/v1/auth/rotate\"\n" +
             "    ;;\n" +
             "  *)\n" +
-            "    echo \"usage: tooie {status|apps|media|notifications|exec|permission|lock|token rotate}\" >&2\n" +
+            "    echo \"usage: tooie {status|apps|resources|media|notifications|exec|permission|lock|token rotate}\" >&2\n" +
             "    exit 2\n" +
             "    ;;\n" +
             "esac\n";
@@ -694,6 +748,45 @@ public class TooieApiServer {
                 output.write(buffer, 0, read);
             }
             return output.toByteArray();
+        }
+    }
+
+    private Map<String, Long> readMemInfoKb() {
+        Map<String, Long> values = new HashMap<>();
+        try {
+            String content = new String(readAllBytes(new File("/proc/meminfo")), StandardCharsets.UTF_8);
+            String[] lines = content.split("\n");
+            for (String line : lines) {
+                int colon = line.indexOf(':');
+                if (colon <= 0) continue;
+                String key = line.substring(0, colon).trim();
+                String valuePart = line.substring(colon + 1).trim();
+                if (valuePart.isEmpty()) continue;
+                String[] parts = valuePart.split("\\s+");
+                if (parts.length == 0) continue;
+                try {
+                    values.put(key, Long.parseLong(parts[0]));
+                } catch (NumberFormatException ignored) {
+                }
+            }
+        } catch (IOException ignored) {
+        }
+        return values;
+    }
+
+    private double[] readLoadAverage() {
+        try {
+            String content = new String(readAllBytes(new File("/proc/loadavg")), StandardCharsets.UTF_8).trim();
+            if (content.isEmpty()) return null;
+            String[] parts = content.split("\\s+");
+            if (parts.length < 3) return null;
+            return new double[] {
+                Double.parseDouble(parts[0]),
+                Double.parseDouble(parts[1]),
+                Double.parseDouble(parts[2]),
+            };
+        } catch (Exception ignored) {
+            return null;
         }
     }
 
