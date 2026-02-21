@@ -880,6 +880,28 @@ public class TooieApiServer {
                 lastCpuIdleTicks = idle;
                 lastCpuSampleMs = now;
             }
+
+            // First sample has no delta yet. Take a short second sample to compute cpuPercent.
+            try {
+                Thread.sleep(120);
+            } catch (InterruptedException ignored) {
+            }
+            long[] second = readProcStatCpuTicks();
+            if (second != null) {
+                long total2 = second[0];
+                long idle2 = second[1];
+                long totalDelta = total2 - total;
+                long idleDelta = idle2 - idle;
+                if (totalDelta > 0) {
+                    synchronized (this) {
+                        lastCpuTotalTicks = total2;
+                        lastCpuIdleTicks = idle2;
+                        lastCpuSampleMs = System.currentTimeMillis();
+                    }
+                    double percent = 100.0 * (1.0 - ((double) idleDelta / (double) totalDelta));
+                    return clampPercent(percent);
+                }
+            }
         }
 
         // Fallback to load average based approximation.
@@ -890,8 +912,19 @@ public class TooieApiServer {
     }
 
     private long[] readProcStatCpuTicks() {
+        long[] direct = readProcStatCpuTicksFromContent(readFileAsString("/proc/stat"));
+        if (direct != null) {
+            return direct;
+        }
+
+        // Fallback through privileged backend if direct procfs read is unavailable.
+        String privileged = executePrivileged("cat /proc/stat");
+        return readProcStatCpuTicksFromContent(privileged);
+    }
+
+    private long[] readProcStatCpuTicksFromContent(String content) {
+        if (content == null || content.isEmpty()) return null;
         try {
-            String content = new String(readAllBytes(new File("/proc/stat")), StandardCharsets.UTF_8);
             String[] lines = content.split("\n");
             for (String line : lines) {
                 if (!line.startsWith("cpu ")) continue;
@@ -916,6 +949,14 @@ public class TooieApiServer {
         } catch (Exception ignored) {
         }
         return null;
+    }
+
+    private String readFileAsString(String path) {
+        try {
+            return new String(readAllBytes(new File(path)), StandardCharsets.UTF_8);
+        } catch (Exception ignored) {
+            return null;
+        }
     }
 
     private JSONObject readUptimeInfo() {

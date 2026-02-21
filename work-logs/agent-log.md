@@ -86,3 +86,13 @@ Status reason: Exposed as `statusReason` and `statusMessage` in resource respons
 Build result: pass (:app:compileDebugJavaWithJavac)
 Manual validation case(s): compile-validated; runtime endpoint check pending on device (`tooie resources`).
 Next step: Optional follow-up to add per-process top-N CPU/memory snapshot behind opt-in query flag.
+
+Cycle: 6
+Task: Fix missing cpuPercent in /v1/system/resources response
+Root cause: cpuPercent logic depended on prior /proc/stat sample; first-sample path often returned no cpuPercent and loadavg fallback was unavailable on device.
+Files changed: app/src/main/java/com/termux/tooie/TooieApiServer.java, work-logs/agent-log.md
+Backend selected: Added direct procfs sampling plus privileged `cat /proc/stat` fallback to improve reliability under app-context restrictions.
+Status reason: Unchanged (`statusReason` from backend manager).
+Build result: pass (:app:compileDebugJavaWithJavac)
+Manual validation case(s): compile-validated; runtime verify with repeated `tooie resources` calls expecting `cpuPercent` present.
+Next step: Push fix and trigger nightly APK build for install verification.
