@@ -76,3 +76,13 @@ Status reason: Included in `/v1/system/resources` response as `statusReason` fro
 Build result: pass (:app:compileDebugJavaWithJavac)
 Manual validation case(s): compile-validated; endpoint runtime check pending device invocation (`tooie resources`).
 Next step: Commit to shizuku-integration and trigger GitHub Actions Build nightly workflow.
+
+Cycle: 5
+Task: Expand Tooie /v1/system/resources payload breadth
+Root cause: Endpoint lacked CPU percent and broader system diagnostics needed for downstream dashboards/projects.
+Files changed: app/src/main/java/com/termux/tooie/TooieApiServer.java, docs/en/Tooie_API.md
+Backend selected: Shizuku backend status is embedded in payload; metrics collected primarily from procfs/system APIs for low-latency polling.
+Status reason: Exposed as `statusReason` and `statusMessage` in resource response.
+Build result: pass (:app:compileDebugJavaWithJavac)
+Manual validation case(s): compile-validated; runtime endpoint check pending on device (`tooie resources`).
+Next step: Optional follow-up to add per-process top-N CPU/memory snapshot behind opt-in query flag.

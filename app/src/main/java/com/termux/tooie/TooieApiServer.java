@@ -2,9 +2,14 @@ package com.termux.tooie;
 
 import android.app.ActivityManager;
 import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
+import android.os.BatteryManager;
+import android.os.StatFs;
+import android.os.SystemClock;
 
 import com.termux.privileged.PrivilegedBackend;
 import com.termux.privileged.PrivilegedBackendManager;
@@ -32,6 +37,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.List;
@@ -72,6 +78,9 @@ public class TooieApiServer {
     private volatile int port;
     private ServerSocket serverSocket;
     private Thread acceptThread;
+    private long lastCpuTotalTicks = -1L;
+    private long lastCpuIdleTicks = -1L;
+    private long lastCpuSampleMs = 0L;
 
     private TooieApiServer() {
     }
@@ -244,6 +253,7 @@ public class TooieApiServer {
     private JSONObject buildSystemResources(Context context) throws JSONException {
         JSONObject data = new JSONObject();
         data.put("ok", true);
+        data.put("apiVersion", API_VERSION);
         data.put("timestampMs", System.currentTimeMillis());
         data.put("cpuCores", Runtime.getRuntime().availableProcessors());
 
@@ -252,6 +262,10 @@ public class TooieApiServer {
             data.put("loadAvg1m", loadAverage[0]);
             data.put("loadAvg5m", loadAverage[1]);
             data.put("loadAvg15m", loadAverage[2]);
+        }
+        double cpuPercent = readCPUPercent(loadAverage, Runtime.getRuntime().availableProcessors());
+        if (cpuPercent >= 0) {
+            data.put("cpuPercent", cpuPercent);
         }
 
         Map<String, Long> memInfoKb = readMemInfoKb();
@@ -264,12 +278,38 @@ public class TooieApiServer {
             data.put("memAvailableBytes", memAvailableKb * 1024L);
             data.put("memFreeBytes", memFreeKb * 1024L);
             data.put("memUsedBytes", memUsedKb * 1024L);
+
+            JSONObject memory = new JSONObject();
+            memory.put("totalBytes", memTotalKb * 1024L);
+            memory.put("availableBytes", memAvailableKb * 1024L);
+            memory.put("freeBytes", memFreeKb * 1024L);
+            memory.put("usedBytes", memUsedKb * 1024L);
+            putMemInfoBytes(memory, "buffersBytes", memInfoKb, "Buffers");
+            putMemInfoBytes(memory, "cachedBytes", memInfoKb, "Cached");
+            putMemInfoBytes(memory, "swapCachedBytes", memInfoKb, "SwapCached");
+            putMemInfoBytes(memory, "activeBytes", memInfoKb, "Active");
+            putMemInfoBytes(memory, "inactiveBytes", memInfoKb, "Inactive");
+            putMemInfoBytes(memory, "shmemBytes", memInfoKb, "Shmem");
+            putMemInfoBytes(memory, "slabBytes", memInfoKb, "Slab");
+            putMemInfoBytes(memory, "swapTotalBytes", memInfoKb, "SwapTotal");
+            putMemInfoBytes(memory, "swapFreeBytes", memInfoKb, "SwapFree");
+            data.put("memory", memory);
         }
 
         Runtime runtime = Runtime.getRuntime();
         long javaHeapUsedBytes = runtime.totalMemory() - runtime.freeMemory();
         data.put("javaHeapUsedBytes", javaHeapUsedBytes);
         data.put("javaHeapMaxBytes", runtime.maxMemory());
+        data.put("javaHeapFreeBytes", runtime.freeMemory());
+        data.put("javaHeapTotalBytes", runtime.totalMemory());
+
+        JSONObject runtimeInfo = new JSONObject();
+        runtimeInfo.put("availableProcessors", runtime.availableProcessors());
+        runtimeInfo.put("javaHeapUsedBytes", javaHeapUsedBytes);
+        runtimeInfo.put("javaHeapFreeBytes", runtime.freeMemory());
+        runtimeInfo.put("javaHeapTotalBytes", runtime.totalMemory());
+        runtimeInfo.put("javaHeapMaxBytes", runtime.maxMemory());
+        data.put("runtime", runtimeInfo);
 
         ActivityManager activityManager = (ActivityManager) context.getSystemService(Context.ACTIVITY_SERVICE);
         if (activityManager != null) {
@@ -281,10 +321,38 @@ public class TooieApiServer {
             data.put("largeMemoryClassMb", activityManager.getLargeMemoryClass());
         }
 
+        JSONObject uptime = readUptimeInfo();
+        if (uptime.length() > 0) {
+            data.put("uptime", uptime);
+        }
+
+        JSONArray storage = readStorageStats(context);
+        if (storage.length() > 0) {
+            data.put("storage", storage);
+        }
+
+        JSONObject battery = readBatteryInfo(context);
+        if (battery.length() > 0) {
+            data.put("battery", battery);
+        }
+
+        JSONArray network = readNetworkStats();
+        if (network.length() > 0) {
+            data.put("network", network);
+        }
+
+        JSONArray thermal = readThermalZones();
+        if (thermal.length() > 0) {
+            data.put("thermal", thermal);
+        }
+
         PrivilegedBackendManager manager = PrivilegedBackendManager.getInstance();
         data.put("backendType", String.valueOf(manager.getBackendType()));
         data.put("backendState", String.valueOf(manager.getBackendState()));
         data.put("statusReason", String.valueOf(manager.getStatusReason()));
+        data.put("statusMessage", manager.getStatusMessage());
+        data.put("isPrivilegedAvailable", manager.isPrivilegedAvailable());
+        data.put("execPolicy", describeExecPolicy());
         return data;
     }
 
@@ -787,6 +855,299 @@ public class TooieApiServer {
             };
         } catch (Exception ignored) {
             return null;
+        }
+    }
+
+    private double readCPUPercent(double[] loadAverage, int cpuCores) {
+        long[] sample = readProcStatCpuTicks();
+        if (sample != null) {
+            long total = sample[0];
+            long idle = sample[1];
+            long now = System.currentTimeMillis();
+            synchronized (this) {
+                if (lastCpuTotalTicks > 0 && total > lastCpuTotalTicks && now > lastCpuSampleMs) {
+                    long totalDelta = total - lastCpuTotalTicks;
+                    long idleDelta = idle - lastCpuIdleTicks;
+                    if (totalDelta > 0) {
+                        double percent = 100.0 * (1.0 - ((double) idleDelta / (double) totalDelta));
+                        lastCpuTotalTicks = total;
+                        lastCpuIdleTicks = idle;
+                        lastCpuSampleMs = now;
+                        return clampPercent(percent);
+                    }
+                }
+                lastCpuTotalTicks = total;
+                lastCpuIdleTicks = idle;
+                lastCpuSampleMs = now;
+            }
+        }
+
+        // Fallback to load average based approximation.
+        if (loadAverage != null && loadAverage.length >= 1 && cpuCores > 0) {
+            return clampPercent((loadAverage[0] / cpuCores) * 100.0);
+        }
+        return -1;
+    }
+
+    private long[] readProcStatCpuTicks() {
+        try {
+            String content = new String(readAllBytes(new File("/proc/stat")), StandardCharsets.UTF_8);
+            String[] lines = content.split("\n");
+            for (String line : lines) {
+                if (!line.startsWith("cpu ")) continue;
+                String[] fields = line.trim().split("\\s+");
+                if (fields.length < 5) return null;
+                long total = 0L;
+                for (int i = 1; i < fields.length; i++) {
+                    try {
+                        total += Long.parseLong(fields[i]);
+                    } catch (NumberFormatException ignored) {
+                    }
+                }
+                long idle = Long.parseLong(fields[4]);
+                if (fields.length > 5) {
+                    try {
+                        idle += Long.parseLong(fields[5]); // iowait as idle-like time
+                    } catch (NumberFormatException ignored) {
+                    }
+                }
+                return new long[] {total, idle};
+            }
+        } catch (Exception ignored) {
+        }
+        return null;
+    }
+
+    private JSONObject readUptimeInfo() {
+        JSONObject uptime = new JSONObject();
+        try {
+            uptime.put("processUptimeMs", SystemClock.elapsedRealtime());
+            uptime.put("processUptimeSec", SystemClock.elapsedRealtime() / 1000.0);
+            String content = new String(readAllBytes(new File("/proc/uptime")), StandardCharsets.UTF_8).trim();
+            String[] parts = content.split("\\s+");
+            if (parts.length >= 1) {
+                double uptimeSec = Double.parseDouble(parts[0]);
+                uptime.put("systemUptimeSec", uptimeSec);
+                uptime.put("systemUptimeMs", (long) (uptimeSec * 1000.0));
+            }
+        } catch (Exception ignored) {
+        }
+        return uptime;
+    }
+
+    private JSONArray readStorageStats(Context context) {
+        JSONArray storage = new JSONArray();
+        addStoragePath(storage, "root", "/");
+        addStoragePath(storage, "data", "/data");
+
+        File filesDir = context.getFilesDir();
+        if (filesDir != null) {
+            addStoragePath(storage, "appFiles", filesDir.getAbsolutePath());
+        }
+        File cacheDir = context.getCacheDir();
+        if (cacheDir != null) {
+            addStoragePath(storage, "appCache", cacheDir.getAbsolutePath());
+        }
+        File extDir = context.getExternalFilesDir(null);
+        if (extDir != null) {
+            addStoragePath(storage, "externalFiles", extDir.getAbsolutePath());
+        }
+        addStoragePath(storage, "shared", "/storage/emulated/0");
+        return storage;
+    }
+
+    private void addStoragePath(JSONArray storage, String label, String path) {
+        try {
+            File file = new File(path);
+            if (!file.exists()) return;
+            StatFs statFs = new StatFs(path);
+            long total = statFs.getTotalBytes();
+            long free = statFs.getFreeBytes();
+            long available = statFs.getAvailableBytes();
+            long used = total > free ? (total - free) : 0L;
+            JSONObject item = new JSONObject();
+            item.put("label", label);
+            item.put("path", path);
+            item.put("totalBytes", total);
+            item.put("freeBytes", free);
+            item.put("availableBytes", available);
+            item.put("usedBytes", used);
+            storage.put(item);
+        } catch (Exception ignored) {
+        }
+    }
+
+    private JSONObject readBatteryInfo(Context context) {
+        JSONObject battery = new JSONObject();
+        try {
+            Intent intent = context.registerReceiver(null, new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
+            if (intent == null) return battery;
+            int level = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1);
+            int scale = intent.getIntExtra(BatteryManager.EXTRA_SCALE, -1);
+            int status = intent.getIntExtra(BatteryManager.EXTRA_STATUS, -1);
+            int health = intent.getIntExtra(BatteryManager.EXTRA_HEALTH, -1);
+            int plugged = intent.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0);
+            int tempTenthsC = intent.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, Integer.MIN_VALUE);
+            int voltageMv = intent.getIntExtra(BatteryManager.EXTRA_VOLTAGE, -1);
+
+            if (level >= 0 && scale > 0) {
+                battery.put("levelPercent", (level * 100.0) / scale);
+                battery.put("level", level);
+                battery.put("scale", scale);
+            }
+            battery.put("status", batteryStatusToString(status));
+            battery.put("health", batteryHealthToString(health));
+            battery.put("charging", status == BatteryManager.BATTERY_STATUS_CHARGING || status == BatteryManager.BATTERY_STATUS_FULL);
+            battery.put("plugged", plugged != 0);
+            battery.put("plugType", batteryPlugToString(plugged));
+            if (tempTenthsC != Integer.MIN_VALUE) {
+                battery.put("temperatureC", tempTenthsC / 10.0);
+            }
+            if (voltageMv >= 0) {
+                battery.put("voltageMv", voltageMv);
+            }
+        } catch (Exception ignored) {
+        }
+        return battery;
+    }
+
+    private JSONArray readNetworkStats() {
+        JSONArray network = new JSONArray();
+        try {
+            String content = new String(readAllBytes(new File("/proc/net/dev")), StandardCharsets.UTF_8);
+            String[] lines = content.split("\n");
+            for (String line : lines) {
+                if (!line.contains(":")) continue;
+                String[] split = line.split(":");
+                if (split.length != 2) continue;
+                String iface = split[0].trim();
+                if (iface.isEmpty()) continue;
+                String[] fields = split[1].trim().split("\\s+");
+                if (fields.length < 16) continue;
+                JSONObject item = new JSONObject();
+                item.put("interface", iface);
+                item.put("rxBytes", parseLongSafe(fields[0]));
+                item.put("rxPackets", parseLongSafe(fields[1]));
+                item.put("rxErrors", parseLongSafe(fields[2]));
+                item.put("rxDropped", parseLongSafe(fields[3]));
+                item.put("txBytes", parseLongSafe(fields[8]));
+                item.put("txPackets", parseLongSafe(fields[9]));
+                item.put("txErrors", parseLongSafe(fields[10]));
+                item.put("txDropped", parseLongSafe(fields[11]));
+                network.put(item);
+            }
+        } catch (Exception ignored) {
+        }
+        return network;
+    }
+
+    private JSONArray readThermalZones() {
+        JSONArray thermal = new JSONArray();
+        try {
+            File root = new File("/sys/class/thermal");
+            File[] zones = root.listFiles((dir, name) -> name != null && name.startsWith("thermal_zone"));
+            if (zones == null || zones.length == 0) return thermal;
+            Arrays.sort(zones, (a, b) -> a.getName().compareTo(b.getName()));
+            int limit = Math.min(zones.length, 24);
+            for (int i = 0; i < limit; i++) {
+                File zone = zones[i];
+                String type = readSingleLine(new File(zone, "type"));
+                String tempRaw = readSingleLine(new File(zone, "temp"));
+                if (tempRaw == null || tempRaw.isEmpty()) continue;
+                long temp = parseLongSafe(tempRaw);
+                // Most Android kernels expose millidegree C.
+                double tempC = temp > 1000 ? (temp / 1000.0) : (double) temp;
+                JSONObject item = new JSONObject();
+                item.put("zone", zone.getName());
+                item.put("type", type == null ? "" : type);
+                item.put("tempC", tempC);
+                thermal.put(item);
+            }
+        } catch (Exception ignored) {
+        }
+        return thermal;
+    }
+
+    private void putMemInfoBytes(JSONObject json, String fieldName, Map<String, Long> memInfoKb, String key) throws JSONException {
+        Long valueKb = memInfoKb.get(key);
+        if (valueKb != null && valueKb >= 0) {
+            json.put(fieldName, valueKb * 1024L);
+        }
+    }
+
+    private String readSingleLine(File file) {
+        try {
+            String text = new String(readAllBytes(file), StandardCharsets.UTF_8);
+            int newline = text.indexOf('\n');
+            if (newline >= 0) {
+                text = text.substring(0, newline);
+            }
+            return text.trim();
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    private long parseLongSafe(String value) {
+        try {
+            return Long.parseLong(value.trim());
+        } catch (Exception ignored) {
+            return 0L;
+        }
+    }
+
+    private double clampPercent(double value) {
+        if (value < 0) return 0;
+        if (value > 100) return 100;
+        return value;
+    }
+
+    private String batteryStatusToString(int status) {
+        switch (status) {
+            case BatteryManager.BATTERY_STATUS_CHARGING:
+                return "charging";
+            case BatteryManager.BATTERY_STATUS_DISCHARGING:
+                return "discharging";
+            case BatteryManager.BATTERY_STATUS_FULL:
+                return "full";
+            case BatteryManager.BATTERY_STATUS_NOT_CHARGING:
+                return "not_charging";
+            case BatteryManager.BATTERY_STATUS_UNKNOWN:
+            default:
+                return "unknown";
+        }
+    }
+
+    private String batteryHealthToString(int health) {
+        switch (health) {
+            case BatteryManager.BATTERY_HEALTH_GOOD:
+                return "good";
+            case BatteryManager.BATTERY_HEALTH_OVERHEAT:
+                return "overheat";
+            case BatteryManager.BATTERY_HEALTH_DEAD:
+                return "dead";
+            case BatteryManager.BATTERY_HEALTH_OVER_VOLTAGE:
+                return "over_voltage";
+            case BatteryManager.BATTERY_HEALTH_UNSPECIFIED_FAILURE:
+                return "unspecified_failure";
+            case BatteryManager.BATTERY_HEALTH_COLD:
+                return "cold";
+            case BatteryManager.BATTERY_HEALTH_UNKNOWN:
+            default:
+                return "unknown";
+        }
+    }
+
+    private String batteryPlugToString(int plugged) {
+        switch (plugged) {
+            case BatteryManager.BATTERY_PLUGGED_AC:
+                return "ac";
+            case BatteryManager.BATTERY_PLUGGED_USB:
+                return "usb";
+            case BatteryManager.BATTERY_PLUGGED_WIRELESS:
+                return "wireless";
+            default:
+                return "none";
         }
     }
 

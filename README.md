@@ -40,7 +40,7 @@ Note: action artifacts require a logged-in GitHub account.
 Current Tooie endpoints include:
 - `/v1/status`
 - `/v1/apps`
-- `/v1/system/resources`
+- `/v1/system/resources` (CPU, memory, storage, battery, network, thermal, backend diagnostics)
 - `/v1/media/now-playing`
 - `/v1/notifications`
 - `/v1/exec` (policy-gated)

@@ -35,10 +35,32 @@ Returns installed apps (package, label, system flag).
 
 ### `GET /v1/system/resources`
 Returns a system resource snapshot:
-- CPU core count and load average (`1m`, `5m`, `15m`)
-- Memory stats from `/proc/meminfo` (`total`, `available`, `free`, `used`)
-- App heap and low-memory indicators
-- Current privileged backend status fields (`backendType`, `backendState`, `statusReason`)
+- CPU metrics:
+  - `cpuPercent` (from `/proc/stat` delta, with load-average fallback)
+  - `cpuCores`
+  - `loadAvg1m`, `loadAvg5m`, `loadAvg15m`
+- Memory metrics:
+  - top-level compatibility fields:
+    - `memTotalBytes`, `memAvailableBytes`, `memFreeBytes`, `memUsedBytes`
+  - nested `memory` object with additional meminfo-derived fields:
+    - `buffersBytes`, `cachedBytes`, `swapCachedBytes`, `activeBytes`, `inactiveBytes`,
+      `shmemBytes`, `slabBytes`, `swapTotalBytes`, `swapFreeBytes`
+- Runtime/heap metrics:
+  - `javaHeapUsedBytes`, `javaHeapMaxBytes`, `javaHeapFreeBytes`, `javaHeapTotalBytes`
+  - nested `runtime` object
+- Uptime metrics:
+  - nested `uptime` object (`systemUptimeSec`, `systemUptimeMs`, `processUptimeMs`, `processUptimeSec`)
+- Storage metrics:
+  - nested `storage` array with per-path totals/used/free/available bytes
+- Battery metrics:
+  - nested `battery` object (`levelPercent`, charging state, plug type, temperature, voltage, health)
+- Network metrics:
+  - nested `network` array with per-interface `rx/tx` bytes, packets, errors, drops
+- Thermal metrics:
+  - nested `thermal` array from `/sys/class/thermal/thermal_zone*`
+- Backend diagnostics:
+  - `backendType`, `backendState`, `statusReason`, `statusMessage`, `isPrivilegedAvailable`
+  - `execPolicy`
 
 ### `GET /v1/media/now-playing`
 Returns cached now-playing media session data.
