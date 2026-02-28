@@ -1,6 +1,7 @@
 package com.termux.tooie;
 
 import android.content.ComponentName;
+import android.graphics.Bitmap;
 import android.media.MediaMetadata;
 import android.media.session.MediaController;
 import android.media.session.MediaSessionManager;
@@ -8,6 +9,7 @@ import android.media.session.PlaybackState;
 import android.os.Bundle;
 import android.service.notification.NotificationListenerService;
 import android.service.notification.StatusBarNotification;
+import android.util.Base64;
 
 import com.termux.shared.logger.Logger;
 
@@ -15,6 +17,7 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.io.ByteArrayOutputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
@@ -25,9 +28,11 @@ import java.util.concurrent.ConcurrentHashMap;
 public class TooieNotificationListener extends NotificationListenerService {
     private static final String LOG_TAG = "TooieNotifListener";
     private static final ConcurrentHashMap<String, JSONObject> NOTIFICATIONS = new ConcurrentHashMap<>();
+    private static final int MAX_ART_BYTES = 512 * 1024;
 
     private static volatile boolean listenerConnected;
     private static volatile JSONObject nowPlaying;
+    private static volatile JSONObject nowPlayingArt;
 
     @Override
     public void onListenerConnected() {
@@ -98,6 +103,23 @@ public class TooieNotificationListener extends NotificationListenerService {
         return data;
     }
 
+    public static JSONObject getNowPlayingArtSnapshot() {
+        JSONObject data = new JSONObject();
+        try {
+            data.put("listenerConnected", listenerConnected);
+            if (nowPlayingArt != null) {
+                data.put("art", new JSONObject(nowPlayingArt.toString()));
+            } else {
+                data.put("art", JSONObject.NULL);
+            }
+            if (!listenerConnected) {
+                data.put("hint", "Enable notification access for Termux:Monet to populate notifications and media endpoints.");
+            }
+        } catch (JSONException ignored) {
+        }
+        return data;
+    }
+
     private void rebuildNotificationsSnapshot() {
         try {
             StatusBarNotification[] active = getActiveNotifications();
@@ -150,6 +172,7 @@ public class TooieNotificationListener extends NotificationListenerService {
 
     private void refreshNowPlaying() {
         JSONObject current = null;
+        JSONObject currentArt = null;
         try {
             MediaSessionManager mediaSessionManager = (MediaSessionManager) getSystemService(MEDIA_SESSION_SERVICE);
             if (mediaSessionManager != null) {
@@ -158,6 +181,7 @@ public class TooieNotificationListener extends NotificationListenerService {
                 MediaController selected = selectController(sessions);
                 if (selected != null) {
                     current = toNowPlayingJson(selected);
+                    currentArt = toNowPlayingArtJson(selected);
                 }
             }
         } catch (SecurityException e) {
@@ -166,6 +190,7 @@ public class TooieNotificationListener extends NotificationListenerService {
             Logger.logErrorExtended(LOG_TAG, "Failed to refresh media sessions: " + e.getMessage());
         }
         nowPlaying = current;
+        nowPlayingArt = currentArt;
     }
 
     private MediaController selectController(List<MediaController> sessions) {
@@ -210,6 +235,58 @@ public class TooieNotificationListener extends NotificationListenerService {
     private Object safeMeta(MediaMetadata metadata, String key) {
         CharSequence value = metadata.getText(key);
         return value == null ? JSONObject.NULL : value.toString();
+    }
+
+    private JSONObject toNowPlayingArtJson(MediaController controller) throws JSONException {
+        MediaMetadata metadata = controller.getMetadata();
+        if (metadata == null) {
+            return null;
+        }
+        Bitmap bitmap = extractAlbumArt(metadata);
+        if (bitmap == null) {
+            return null;
+        }
+
+        byte[] jpeg = compressArt(bitmap);
+        if (jpeg == null || jpeg.length == 0) {
+            return null;
+        }
+
+        JSONObject data = new JSONObject();
+        data.put("packageName", controller.getPackageName());
+        data.put("mimeType", "image/jpeg");
+        data.put("width", bitmap.getWidth());
+        data.put("height", bitmap.getHeight());
+        data.put("sizeBytes", jpeg.length);
+        data.put("base64", Base64.encodeToString(jpeg, Base64.NO_WRAP));
+        data.put("title", safeMeta(metadata, MediaMetadata.METADATA_KEY_TITLE));
+        data.put("artist", safeMeta(metadata, MediaMetadata.METADATA_KEY_ARTIST));
+        data.put("album", safeMeta(metadata, MediaMetadata.METADATA_KEY_ALBUM));
+        return data;
+    }
+
+    private Bitmap extractAlbumArt(MediaMetadata metadata) {
+        Bitmap art = metadata.getBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART);
+        if (art != null) return art;
+        art = metadata.getBitmap(MediaMetadata.METADATA_KEY_ART);
+        if (art != null) return art;
+        return metadata.getBitmap(MediaMetadata.METADATA_KEY_DISPLAY_ICON);
+    }
+
+    private byte[] compressArt(Bitmap bitmap) {
+        int quality = 90;
+        while (quality >= 50) {
+            ByteArrayOutputStream output = new ByteArrayOutputStream();
+            if (!bitmap.compress(Bitmap.CompressFormat.JPEG, quality, output)) {
+                return null;
+            }
+            byte[] bytes = output.toByteArray();
+            if (bytes.length <= MAX_ART_BYTES || quality == 50) {
+                return bytes;
+            }
+            quality -= 10;
+        }
+        return null;
     }
 
     private String playbackStateName(int state) {

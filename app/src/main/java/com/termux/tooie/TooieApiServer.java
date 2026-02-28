@@ -7,9 +7,11 @@ import android.content.IntentFilter;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
+import android.media.AudioManager;
 import android.os.BatteryManager;
 import android.os.StatFs;
 import android.os.SystemClock;
+import android.provider.Settings;
 
 import com.termux.privileged.PrivilegedBackend;
 import com.termux.privileged.PrivilegedBackendManager;
@@ -46,6 +48,8 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Local Tooie API server exposed on localhost for shell integrations.
@@ -65,6 +69,9 @@ public class TooieApiServer {
     private static final int MAX_BODY_BYTES = 16 * 1024;
     private static final int MAX_EXEC_COMMAND_LENGTH = 512;
     private static final int CLIENT_SOCKET_TIMEOUT_MS = 10_000;
+    private static final int MIN_BRIGHTNESS = 0;
+    private static final int MAX_BRIGHTNESS = 255;
+    private static final int DEFAULT_VOLUME_STREAM = AudioManager.STREAM_MUSIC;
 
     private static TooieApiServer instance;
 
@@ -189,10 +196,16 @@ public class TooieApiServer {
                 return buildSystemResources(context);
             } else if ("GET".equals(request.method) && "/v1/media/now-playing".equals(request.path)) {
                 return buildNowPlaying();
+            } else if ("GET".equals(request.method) && "/v1/media/art".equals(request.path)) {
+                return buildNowPlayingArt();
             } else if ("GET".equals(request.method) && "/v1/notifications".equals(request.path)) {
                 return buildNotifications();
             } else if ("POST".equals(request.method) && "/v1/exec".equals(request.path)) {
                 return runExec(request.body);
+            } else if ("POST".equals(request.method) && "/v1/system/brightness".equals(request.path)) {
+                return runBrightness(context, request.body);
+            } else if ("POST".equals(request.method) && "/v1/system/volume".equals(request.path)) {
+                return runVolume(context, request.body);
             } else if ("POST".equals(request.method) && "/v1/privileged/request-permission".equals(request.path)) {
                 return requestPrivilegedPermission();
             } else if ("POST".equals(request.method) && "/v1/screen/lock".equals(request.path)) {
@@ -362,6 +375,12 @@ public class TooieApiServer {
         return snapshot;
     }
 
+    private JSONObject buildNowPlayingArt() throws JSONException {
+        JSONObject snapshot = TooieNotificationListener.getNowPlayingArtSnapshot();
+        snapshot.put("ok", true);
+        return snapshot;
+    }
+
     private JSONObject buildNotifications() throws JSONException {
         JSONObject snapshot = TooieNotificationListener.getNotificationsSnapshot();
         snapshot.put("ok", true);
@@ -472,6 +491,100 @@ public class TooieApiServer {
         data.put("ok", true);
         data.put("rotated", true);
         return data;
+    }
+
+    private JSONObject runBrightness(Context context, String body) throws JSONException {
+        JSONObject request = body != null && !body.isEmpty() ? new JSONObject(body) : new JSONObject();
+        Integer targetBrightness = readOptionalInteger(request, "brightness", "value");
+        if (targetBrightness != null && (targetBrightness < MIN_BRIGHTNESS || targetBrightness > MAX_BRIGHTNESS)) {
+            JSONObject error = jsonError("bad_request", "brightness must be between 0 and 255");
+            error.put("_statusCode", 400);
+            return error;
+        }
+
+        String setOutput = "";
+        if (targetBrightness != null) {
+            setOutput = executePrivileged("settings put system screen_brightness " + targetBrightness);
+            if (!isSuccessfulCommandOutput(setOutput)) {
+                JSONObject error = jsonError("set_failed", setOutput);
+                error.put("_statusCode", 500);
+                return error;
+            }
+        }
+
+        String readOutput = executePrivileged("settings get system screen_brightness");
+        Integer currentBrightness = parseFirstInteger(readOutput);
+
+        JSONObject data = new JSONObject();
+        data.put("ok", currentBrightness != null);
+        data.put("setRequested", targetBrightness != null);
+        data.put("targetBrightness", targetBrightness != null ? targetBrightness : JSONObject.NULL);
+        data.put("currentBrightness", currentBrightness != null ? currentBrightness : JSONObject.NULL);
+        data.put("rangeMin", MIN_BRIGHTNESS);
+        data.put("rangeMax", MAX_BRIGHTNESS);
+        data.put("rawReadOutput", readOutput == null ? "" : readOutput.trim());
+        if (targetBrightness != null) {
+            data.put("rawSetOutput", setOutput == null ? "" : setOutput.trim());
+        }
+        try {
+            data.put("canWriteSystemSettings", Settings.System.canWrite(context));
+        } catch (Exception ignored) {
+        }
+        return data;
+    }
+
+    private JSONObject runVolume(Context context, String body) throws JSONException {
+        JSONObject request = body != null && !body.isEmpty() ? new JSONObject(body) : new JSONObject();
+        int stream = request.optInt("stream", DEFAULT_VOLUME_STREAM);
+        Integer targetVolume = readOptionalInteger(request, "volume", "value");
+
+        AudioManager audioManager = (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
+        if (audioManager == null) {
+            JSONObject error = jsonError("unavailable", "AudioManager unavailable");
+            error.put("_statusCode", 500);
+            return error;
+        }
+
+        int minVolume = 0;
+        int maxVolume;
+        try {
+            maxVolume = audioManager.getStreamMaxVolume(stream);
+        } catch (Exception e) {
+            JSONObject error = jsonError("bad_request", "Invalid stream type");
+            error.put("_statusCode", 400);
+            return error;
+        }
+
+        if (targetVolume != null && (targetVolume < minVolume || targetVolume > maxVolume)) {
+            JSONObject error = jsonError("bad_request",
+                "volume must be between " + minVolume + " and " + maxVolume + " for stream " + stream);
+            error.put("_statusCode", 400);
+            return error;
+        }
+
+        try {
+            if (targetVolume != null) {
+                audioManager.setStreamVolume(stream, targetVolume, 0);
+            }
+            int currentVolume = audioManager.getStreamVolume(stream);
+            JSONObject data = new JSONObject();
+            data.put("ok", true);
+            data.put("setRequested", targetVolume != null);
+            data.put("stream", stream);
+            data.put("targetVolume", targetVolume != null ? targetVolume : JSONObject.NULL);
+            data.put("currentVolume", currentVolume);
+            data.put("rangeMin", minVolume);
+            data.put("rangeMax", maxVolume);
+            return data;
+        } catch (SecurityException securityException) {
+            JSONObject error = jsonError("forbidden", "Volume control requires MODIFY_AUDIO_SETTINGS permission");
+            error.put("_statusCode", 403);
+            return error;
+        } catch (Exception e) {
+            JSONObject error = jsonError("volume_failed", e.getMessage());
+            error.put("_statusCode", 500);
+            return error;
+        }
     }
 
     private String executePrivileged(String command) {
@@ -641,8 +754,11 @@ public class TooieApiServer {
         rateLimiters.put("GET:/v1/apps", new SimpleRateLimiter(60, 60_000));
         rateLimiters.put("GET:/v1/system/resources", new SimpleRateLimiter(120, 60_000));
         rateLimiters.put("GET:/v1/media/now-playing", new SimpleRateLimiter(120, 60_000));
+        rateLimiters.put("GET:/v1/media/art", new SimpleRateLimiter(60, 60_000));
         rateLimiters.put("GET:/v1/notifications", new SimpleRateLimiter(120, 60_000));
         rateLimiters.put("POST:/v1/exec", new SimpleRateLimiter(30, 60_000));
+        rateLimiters.put("POST:/v1/system/brightness", new SimpleRateLimiter(30, 60_000));
+        rateLimiters.put("POST:/v1/system/volume", new SimpleRateLimiter(30, 60_000));
         rateLimiters.put("POST:/v1/screen/lock", new SimpleRateLimiter(20, 60_000));
         rateLimiters.put("POST:/v1/auth/rotate", new SimpleRateLimiter(5, 60_000));
     }
@@ -687,8 +803,30 @@ public class TooieApiServer {
             "  media)\n" +
             "    curl $CURL_COMMON -H \"Authorization: Bearer $TOKEN\" \"$BASE/v1/media/now-playing\"\n" +
             "    ;;\n" +
+            "  art)\n" +
+            "    curl $CURL_COMMON -H \"Authorization: Bearer $TOKEN\" \"$BASE/v1/media/art\"\n" +
+            "    ;;\n" +
             "  notifications)\n" +
             "    curl $CURL_COMMON -H \"Authorization: Bearer $TOKEN\" \"$BASE/v1/notifications\"\n" +
+            "    ;;\n" +
+            "  brightness)\n" +
+            "    if [ \"$#\" -gt 0 ]; then\n" +
+            "      curl $CURL_COMMON -X POST -H \"Authorization: Bearer $TOKEN\" -H \"Content-Type: application/json\" \\\n" +
+            "        --data \"{\\\"brightness\\\":$1}\" \"$BASE/v1/system/brightness\"\n" +
+            "    else\n" +
+            "      curl $CURL_COMMON -X POST -H \"Authorization: Bearer $TOKEN\" \"$BASE/v1/system/brightness\"\n" +
+            "    fi\n" +
+            "    ;;\n" +
+            "  volume)\n" +
+            "    if [ \"$#\" -gt 1 ]; then\n" +
+            "      curl $CURL_COMMON -X POST -H \"Authorization: Bearer $TOKEN\" -H \"Content-Type: application/json\" \\\n" +
+            "        --data \"{\\\"volume\\\":$1,\\\"stream\\\":$2}\" \"$BASE/v1/system/volume\"\n" +
+            "    elif [ \"$#\" -gt 0 ]; then\n" +
+            "      curl $CURL_COMMON -X POST -H \"Authorization: Bearer $TOKEN\" -H \"Content-Type: application/json\" \\\n" +
+            "        --data \"{\\\"volume\\\":$1}\" \"$BASE/v1/system/volume\"\n" +
+            "    else\n" +
+            "      curl $CURL_COMMON -X POST -H \"Authorization: Bearer $TOKEN\" \"$BASE/v1/system/volume\"\n" +
+            "    fi\n" +
             "    ;;\n" +
             "  exec)\n" +
             "    [ \"$#\" -gt 0 ] || { echo \"usage: tooie exec <command>\" >&2; exit 2; }\n" +
@@ -708,7 +846,7 @@ public class TooieApiServer {
             "    curl $CURL_COMMON -X POST -H \"Authorization: Bearer $TOKEN\" \"$BASE/v1/auth/rotate\"\n" +
             "    ;;\n" +
             "  *)\n" +
-            "    echo \"usage: tooie {status|apps|resources|media|notifications|exec|permission|lock|token rotate}\" >&2\n" +
+            "    echo \"usage: tooie {status|apps|resources|media|art|notifications|brightness [value]|volume [value] [stream]|exec|permission|lock|token rotate}\" >&2\n" +
             "    exit 2\n" +
             "    ;;\n" +
             "esac\n";
@@ -1232,6 +1370,40 @@ public class TooieApiServer {
         if (lower.contains("permission required")) return false;
         if (lower.contains("no privileged backend")) return false;
         return true;
+    }
+
+    private Integer readOptionalInteger(JSONObject json, String... keys) {
+        if (json == null || keys == null) return null;
+        for (String key : keys) {
+            if (key == null || key.isEmpty() || !json.has(key) || json.isNull(key)) {
+                continue;
+            }
+            Object value = json.opt(key);
+            if (value instanceof Number) {
+                return ((Number) value).intValue();
+            }
+            String text = String.valueOf(value).trim();
+            if (text.isEmpty()) return null;
+            try {
+                return Integer.parseInt(text);
+            } catch (NumberFormatException ignored) {
+                return null;
+            }
+        }
+        return null;
+    }
+
+    private Integer parseFirstInteger(String text) {
+        if (text == null) return null;
+        Matcher matcher = Pattern.compile("-?\\d+").matcher(text);
+        if (matcher.find()) {
+            try {
+                return Integer.parseInt(matcher.group());
+            } catch (NumberFormatException ignored) {
+                return null;
+            }
+        }
+        return null;
     }
 
     private void cleanupSocket() {

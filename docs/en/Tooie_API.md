@@ -66,9 +66,23 @@ Returns a system resource snapshot:
 Returns cached now-playing media session data.
 Requires notification listener access.
 
+### `GET /v1/media/art`
+Returns cached now-playing album art snapshot as base64-encoded JPEG payload.
+Requires notification listener access.
+
 ### `GET /v1/notifications`
 Returns cached notification list.
 Requires notification listener access.
+
+### `POST /v1/system/brightness`
+Reads current brightness and optionally sets a new value.
+- Request body (optional): `{"brightness": <0..255>}` or `{"value": <0..255>}`
+- Empty body performs read-only snapshot.
+
+### `POST /v1/system/volume`
+Reads current volume and optionally sets a new value.
+- Request body (optional): `{"volume": <int>, "stream": <int>}` or `{"value": <int>}`
+- Empty body performs read-only snapshot for music stream.
 
 ### `POST /v1/exec`
 Runs a privileged command through `PrivilegedBackendManager`.
@@ -91,7 +105,13 @@ tooie status
 tooie apps
 tooie resources
 tooie media
+tooie art
 tooie notifications
+tooie brightness
+tooie brightness 128
+tooie volume
+tooie volume 8
+tooie volume 6 3
 tooie lock
 tooie exec id
 tooie permission
@@ -166,6 +186,7 @@ Rules:
 ## Notification and Media Data
 
 `tooie media` and `tooie notifications` require notification listener permission for the app.
+`tooie art` also requires notification listener permission.
 
 If not granted, responses include:
 - `listenerConnected: false`
