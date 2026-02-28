@@ -126,7 +126,7 @@ class TermuxStylePreferencesDataStore extends PreferenceDataStore {
     @Override
     public boolean getBoolean(String key, boolean defValue) {
         if (mPreferences == null)
-            return false;
+            return defValue;
         switch(key) {
             case "background_image_enabled":
                 return mPreferences.isBackgroundImageEnabled();
@@ -145,7 +145,7 @@ class TermuxStylePreferencesDataStore extends PreferenceDataStore {
             case "app_launcher_bw_icons":
                 return mPreferences.isAppLauncherBwIconsEnabled();
             default:
-                return false;
+                return defValue;
         }
     }
 

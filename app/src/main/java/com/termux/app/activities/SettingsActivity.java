@@ -53,19 +53,13 @@ public class SettingsActivity extends AppCompatActivity {
             if (context == null)
                 return;
             setPreferencesFromResource(R.xml.root_preferences, rootKey);
-            new Thread() {
-
-                @Override
-                public void run() {
-                    configureTermuxAPIPreference(context);
-                    configureTermuxGUIPreference(context);
-                    configureTermuxFloatPreference(context);
-                    configureTermuxTaskerPreference(context);
-                    configureTermuxWidgetPreference(context);
-                    configureAboutPreference(context);
-                    configureDonatePreference(context);
-                }
-            }.start();
+            configureTermuxAPIPreference(context);
+            configureTermuxGUIPreference(context);
+            configureTermuxFloatPreference(context);
+            configureTermuxTaskerPreference(context);
+            configureTermuxWidgetPreference(context);
+            configureAboutPreference(context);
+            configureDonatePreference(context);
         }
 
         private void configureTermuxAPIPreference(@NonNull Context context) {
@@ -130,7 +124,9 @@ public class SettingsActivity extends AppCompatActivity {
                             ReportInfo reportInfo = new ReportInfo(userActionName, TermuxConstants.TERMUX_APP.TERMUX_SETTINGS_ACTIVITY_NAME, title);
                             reportInfo.setReportString(aboutString.toString());
                             reportInfo.setReportSaveFileLabelAndPath(userActionName, Environment.getExternalStorageDirectory() + "/" + FileUtils.sanitizeFileName(TermuxConstants.TERMUX_APP_NAME + "-" + userActionName + ".log", true, true));
-                            ReportActivity.startReportActivity(context, reportInfo);
+                            if (isAdded() && getActivity() != null) {
+                                getActivity().runOnUiThread(() -> ReportActivity.startReportActivity(context, reportInfo));
+                            }
                         }
                     }.start();
                     return true;

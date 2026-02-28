@@ -82,13 +82,6 @@
             app:summaryOn="@string/termux_monet_background_enabled_on"
             app:title="@string/termux_monet_background_enabled_title" />
 
-        <Preference
-            app:key="monet_background_guide"
-            app:title="@string/termux_monet_background_guide_title"
-            app:summary="@string/termux_monet_background_guide_summary"
-            app:selectable="false"
-            app:iconSpaceReserved="false" />
-
         <androidx.preference.SeekBarPreference
             app:key="terminal_background_opacity"
             app:title="@string/termux_terminal_background_opacity_title"

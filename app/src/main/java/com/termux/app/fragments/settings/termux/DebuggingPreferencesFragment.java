@@ -133,14 +133,14 @@ class DebuggingPreferencesDataStore extends PreferenceDataStore {
     @Nullable
     public String getString(String key, @Nullable String defValue) {
         if (mPreferences == null)
-            return null;
+            return defValue;
         if (key == null)
-            return null;
+            return defValue;
         switch(key) {
             case "log_level":
                 return String.valueOf(mPreferences.getLogLevel());
             default:
-                return null;
+                return defValue;
         }
     }
 
@@ -185,7 +185,7 @@ class DebuggingPreferencesDataStore extends PreferenceDataStore {
     @Override
     public boolean getBoolean(String key, boolean defValue) {
         if (mPreferences == null)
-            return false;
+            return defValue;
         switch(key) {
             case "terminal_view_key_logging_enabled":
                 return mPreferences.isTerminalViewKeyLoggingEnabled();
@@ -194,7 +194,7 @@ class DebuggingPreferencesDataStore extends PreferenceDataStore {
             case "crash_report_notifications_enabled":
                 return mPreferences.areCrashReportNotificationsEnabled(false);
             default:
-                return false;
+                return defValue;
         }
     }
 }
