@@ -1,0 +1,25 @@
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <EditTextPreference
+        app:key="app_launcher_button_count"
+        app:title="@string/termux_app_launcher_button_count_title"
+        app:summary="@string/termux_app_launcher_button_count_summary"
+        android:defaultValue="5"
+        android:inputType="number" />
+
+    <EditTextPreference
+        app:key="app_launcher_bar_height"
+        app:title="@string/termux_app_launcher_bar_height_title"
+        app:summary="@string/termux_app_launcher_bar_height_summary"
+        android:defaultValue="1.2"
+        android:inputType="numberDecimal" />
+
+    <EditTextPreference
+        app:key="app_launcher_icon_scale"
+        app:title="@string/termux_app_launcher_icon_scale_title"
+        app:summary="@string/termux_app_launcher_icon_scale_summary"
+        android:defaultValue="1.0"
+        android:inputType="numberDecimal" />
+
+</PreferenceScreen>

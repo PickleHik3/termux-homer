@@ -1,0 +1,18 @@
+<PreferenceScreen xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <Preference
+        app:title="@string/termux_app_launcher_search_header"
+        app:summary="@string/termux_launcher_search_preferences_summary"
+        app:fragment="com.termux.app.fragments.settings.termux.LauncherSearchPreferencesFragment"/>
+
+    <Preference
+        app:title="@string/termux_app_launcher_layout_header"
+        app:summary="@string/termux_launcher_layout_preferences_summary"
+        app:fragment="com.termux.app.fragments.settings.termux.LauncherLayoutPreferencesFragment"/>
+
+    <Preference
+        app:title="@string/termux_launcher_icons_header"
+        app:summary="@string/termux_launcher_icons_preferences_summary"
+        app:fragment="com.termux.app.fragments.settings.termux.LauncherIconsPreferencesFragment"/>
+
+</PreferenceScreen>

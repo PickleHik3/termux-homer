@@ -1,0 +1,82 @@
+<PreferenceScreen xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <PreferenceCategory
+        app:key="privileged_access_overview"
+        app:title="@string/termux_privileged_access_overview_title">
+
+        <Preference
+            app:key="privileged_backend_status"
+            app:title="@string/termux_privileged_backend_status_title"
+            app:summary="@string/termux_privileged_backend_status_summary" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        app:key="privileged_access_backend"
+        app:title="@string/termux_privileged_access_backend_title">
+
+        <SwitchPreferenceCompat
+            app:key="priv_master_enabled"
+            app:title="@string/termux_privileged_master_enabled_title"
+            app:summaryOn="@string/termux_privileged_master_enabled_on"
+            app:summaryOff="@string/termux_privileged_master_enabled_off"
+            app:defaultValue="true" />
+
+        <SwitchPreferenceCompat
+            app:key="priv_prefer_shizuku"
+            app:title="@string/termux_privileged_prefer_shizuku_title"
+            app:summaryOn="@string/termux_privileged_prefer_shizuku_on"
+            app:summaryOff="@string/termux_privileged_prefer_shizuku_off"
+            app:defaultValue="true" />
+
+        <SwitchPreferenceCompat
+            app:key="priv_allow_shell_fallback"
+            app:title="@string/termux_privileged_allow_shell_fallback_title"
+            app:summaryOn="@string/termux_privileged_allow_shell_fallback_on"
+            app:summaryOff="@string/termux_privileged_allow_shell_fallback_off"
+            app:defaultValue="true" />
+
+        <Preference
+            app:key="priv_request_shizuku_permission"
+            app:title="@string/termux_privileged_request_permission_title"
+            app:summary="@string/termux_privileged_request_permission_summary" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        app:key="privileged_access_endpoints"
+        app:title="@string/termux_privileged_endpoints_title">
+
+        <SwitchPreferenceCompat
+            app:key="priv_endpoint_request_permission"
+            app:title="@string/termux_privileged_endpoint_request_permission_title"
+            app:summary="@string/termux_privileged_endpoint_request_permission_summary"
+            app:defaultValue="true" />
+
+        <SwitchPreferenceCompat
+            app:key="priv_endpoint_exec"
+            app:title="@string/termux_privileged_endpoint_exec_title"
+            app:summary="@string/termux_privileged_endpoint_exec_summary"
+            app:defaultValue="true" />
+
+        <SwitchPreferenceCompat
+            app:key="priv_endpoint_brightness"
+            app:title="@string/termux_privileged_endpoint_brightness_title"
+            app:summary="@string/termux_privileged_endpoint_brightness_summary"
+            app:defaultValue="true" />
+
+        <SwitchPreferenceCompat
+            app:key="priv_endpoint_volume"
+            app:title="@string/termux_privileged_endpoint_volume_title"
+            app:summary="@string/termux_privileged_endpoint_volume_summary"
+            app:defaultValue="true" />
+
+        <SwitchPreferenceCompat
+            app:key="priv_endpoint_lock_screen"
+            app:title="@string/termux_privileged_endpoint_lock_screen_title"
+            app:summary="@string/termux_privileged_endpoint_lock_screen_summary"
+            app:defaultValue="true" />
+
+    </PreferenceCategory>
+
+</PreferenceScreen>

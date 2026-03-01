@@ -15,6 +15,7 @@ import android.provider.Settings;
 
 import com.termux.privileged.PrivilegedBackend;
 import com.termux.privileged.PrivilegedBackendManager;
+import com.termux.privileged.PrivilegedPolicyStore;
 import com.termux.privileged.ShizukuBackend;
 import com.termux.shared.logger.Logger;
 import com.termux.shared.termux.TermuxConstants;
@@ -88,6 +89,7 @@ public class TooieApiServer {
     private long lastCpuTotalTicks = -1L;
     private long lastCpuIdleTicks = -1L;
     private long lastCpuSampleMs = 0L;
+    private Context appContext;
 
     private TooieApiServer() {
     }
@@ -106,6 +108,7 @@ public class TooieApiServer {
 
         try {
             initializeRateLimiters();
+            appContext = context.getApplicationContext();
             token = generateToken();
             serverSocket = new ServerSocket(0, 16, InetAddress.getByName("127.0.0.1"));
             port = serverSocket.getLocalPort();
@@ -201,15 +204,15 @@ public class TooieApiServer {
             } else if ("GET".equals(request.method) && "/v1/notifications".equals(request.path)) {
                 return buildNotifications();
             } else if ("POST".equals(request.method) && "/v1/exec".equals(request.path)) {
-                return runExec(request.body);
+                return runExec(context, request.body);
             } else if ("POST".equals(request.method) && "/v1/system/brightness".equals(request.path)) {
                 return runBrightness(context, request.body);
             } else if ("POST".equals(request.method) && "/v1/system/volume".equals(request.path)) {
                 return runVolume(context, request.body);
             } else if ("POST".equals(request.method) && "/v1/privileged/request-permission".equals(request.path)) {
-                return requestPrivilegedPermission();
+                return requestPrivilegedPermission(context);
             } else if ("POST".equals(request.method) && "/v1/screen/lock".equals(request.path)) {
-                return runLockScreen();
+                return runLockScreen(context);
             } else if ("POST".equals(request.method) && "/v1/auth/rotate".equals(request.path)) {
                 return rotateAuthToken();
             }
@@ -239,6 +242,7 @@ public class TooieApiServer {
         data.put("isPrivilegedAvailable", manager.isPrivilegedAvailable());
         data.put("notificationListenerConnected", TooieNotificationListener.isListenerConnected());
         data.put("execPolicy", describeExecPolicy());
+        data.put("privilegedPolicy", describePrivilegedPolicy());
         return data;
     }
 
@@ -366,6 +370,7 @@ public class TooieApiServer {
         data.put("statusMessage", manager.getStatusMessage());
         data.put("isPrivilegedAvailable", manager.isPrivilegedAvailable());
         data.put("execPolicy", describeExecPolicy());
+        data.put("privilegedPolicy", describePrivilegedPolicy());
         return data;
     }
 
@@ -387,7 +392,9 @@ public class TooieApiServer {
         return snapshot;
     }
 
-    private JSONObject runExec(String body) throws JSONException {
+    private JSONObject runExec(Context context, String body) throws JSONException {
+        JSONObject endpointGuard = ensurePrivilegedEndpointEnabled(context, PrivilegedPolicyStore.Endpoint.EXEC, "/v1/exec");
+        if (endpointGuard != null) return endpointGuard;
         JSONObject request = body != null && !body.isEmpty() ? new JSONObject(body) : new JSONObject();
         String command = request.optString("command", "").trim();
         if (command.isEmpty()) {
@@ -447,7 +454,9 @@ public class TooieApiServer {
         return data;
     }
 
-    private JSONObject requestPrivilegedPermission() throws JSONException {
+    private JSONObject requestPrivilegedPermission(Context context) throws JSONException {
+        JSONObject endpointGuard = ensurePrivilegedEndpointEnabled(context, PrivilegedPolicyStore.Endpoint.REQUEST_PERMISSION, "/v1/privileged/request-permission");
+        if (endpointGuard != null) return endpointGuard;
         PrivilegedBackendManager manager = PrivilegedBackendManager.getInstance();
         boolean requested = manager.requestPrivilegedPermission(ShizukuBackend.PERMISSION_REQUEST_CODE);
 
@@ -462,7 +471,9 @@ public class TooieApiServer {
         return data;
     }
 
-    private JSONObject runLockScreen() throws JSONException {
+    private JSONObject runLockScreen(Context context) throws JSONException {
+        JSONObject endpointGuard = ensurePrivilegedEndpointEnabled(context, PrivilegedPolicyStore.Endpoint.LOCK_SCREEN, "/v1/screen/lock");
+        if (endpointGuard != null) return endpointGuard;
         String first = executePrivileged("input keyevent 223");
         String used = "input keyevent 223";
         String output = first;
@@ -494,6 +505,8 @@ public class TooieApiServer {
     }
 
     private JSONObject runBrightness(Context context, String body) throws JSONException {
+        JSONObject endpointGuard = ensurePrivilegedEndpointEnabled(context, PrivilegedPolicyStore.Endpoint.BRIGHTNESS, "/v1/system/brightness");
+        if (endpointGuard != null) return endpointGuard;
         JSONObject request = body != null && !body.isEmpty() ? new JSONObject(body) : new JSONObject();
         Integer targetBrightness = readOptionalInteger(request, "brightness", "value");
         if (targetBrightness != null && (targetBrightness < MIN_BRIGHTNESS || targetBrightness > MAX_BRIGHTNESS)) {
@@ -534,6 +547,8 @@ public class TooieApiServer {
     }
 
     private JSONObject runVolume(Context context, String body) throws JSONException {
+        JSONObject endpointGuard = ensurePrivilegedEndpointEnabled(context, PrivilegedPolicyStore.Endpoint.VOLUME, "/v1/system/volume");
+        if (endpointGuard != null) return endpointGuard;
         JSONObject request = body != null && !body.isEmpty() ? new JSONObject(body) : new JSONObject();
         int stream = request.optInt("stream", DEFAULT_VOLUME_STREAM);
         Integer targetVolume = readOptionalInteger(request, "volume", "value");
@@ -586,7 +601,50 @@ public class TooieApiServer {
             return error;
         }
     }
+    private JSONObject ensurePrivilegedEndpointEnabled(Context context, PrivilegedPolicyStore.Endpoint endpoint, String endpointPath) throws JSONException {
+        if (context == null) {
+            JSONObject error = jsonError("unavailable", "Context unavailable for privileged policy check");
+            error.put("_statusCode", 500);
+            return error;
+        }
+        if (!PrivilegedPolicyStore.isMasterEnabled(context)) {
+            JSONObject error = jsonError("forbidden", "Privileged features disabled by settings");
+            error.put("_statusCode", 403);
+            error.put("endpoint", endpointPath);
+            return error;
+        }
+        if (!PrivilegedPolicyStore.isEndpointEnabled(context, endpoint)) {
+            JSONObject error = jsonError("forbidden", "Endpoint disabled by privileged policy");
+            error.put("_statusCode", 403);
+            error.put("endpoint", endpointPath);
+            return error;
+        }
+        return null;
+    }
 
+    private JSONObject describePrivilegedPolicy() throws JSONException {
+        Context context = appContext;
+        JSONObject info = new JSONObject();
+        if (context == null) {
+            info.put("available", false);
+            return info;
+        }
+
+        info.put("available", true);
+        info.put("masterEnabled", PrivilegedPolicyStore.isMasterEnabled(context));
+        info.put("preferShizuku", PrivilegedPolicyStore.isPreferShizuku(context));
+        info.put("allowShellFallback", PrivilegedPolicyStore.isShellFallbackEnabled(context));
+
+        JSONObject endpoints = new JSONObject();
+        endpoints.put("requestPermission", PrivilegedPolicyStore.isEndpointEnabled(context, PrivilegedPolicyStore.Endpoint.REQUEST_PERMISSION));
+        endpoints.put("exec", PrivilegedPolicyStore.isEndpointEnabled(context, PrivilegedPolicyStore.Endpoint.EXEC));
+        endpoints.put("brightness", PrivilegedPolicyStore.isEndpointEnabled(context, PrivilegedPolicyStore.Endpoint.BRIGHTNESS));
+        endpoints.put("volume", PrivilegedPolicyStore.isEndpointEnabled(context, PrivilegedPolicyStore.Endpoint.VOLUME));
+        endpoints.put("lockScreen", PrivilegedPolicyStore.isEndpointEnabled(context, PrivilegedPolicyStore.Endpoint.LOCK_SCREEN));
+        info.put("endpoints", endpoints);
+
+        return info;
+    }
     private String executePrivileged(String command) {
         try {
             return PrivilegedBackendManager.getInstance().executeCommand(command).get(20, TimeUnit.SECONDS);

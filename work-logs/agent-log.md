@@ -96,3 +96,21 @@ Status reason: Unchanged (`statusReason` from backend manager).
 Build result: pass (:app:compileDebugJavaWithJavac)
 Manual validation case(s): compile-validated; runtime verify with repeated `tooie resources` calls expecting `cpuPercent` present.
 Next step: Push fix and trigger nightly APK build for install verification.
+Cycle: 7
+Task: Settings IA restructure (dedicated Launcher section with subsections)
+Root cause: Launcher controls were mixed into Termux Style, creating a long page and poor discoverability.
+Files changed: app/src/main/res/xml/root_preferences.xml, app/src/main/res/xml/termux_style_preferences.xml, app/src/main/res/values/strings.xml, app/src/main/res/xml/launcher_preferences.xml, app/src/main/res/xml/launcher_search_preferences.xml, app/src/main/res/xml/launcher_layout_preferences.xml, app/src/main/res/xml/launcher_icons_preferences.xml, app/src/main/java/com/termux/app/fragments/settings/termux/LauncherPreferencesFragment.java, app/src/main/java/com/termux/app/fragments/settings/termux/LauncherSearchPreferencesFragment.java, app/src/main/java/com/termux/app/fragments/settings/termux/LauncherLayoutPreferencesFragment.java, app/src/main/java/com/termux/app/fragments/settings/termux/LauncherIconsPreferencesFragment.java
+Backend selected: N/A (settings UI change only)
+Status reason: N/A (settings UI change only)
+Build result: fail (Gradle resource stage blocked by AAPT2 startup error: "Syntax error: ')' unexpected")
+Manual validation case(s): not run (build gate blocked by environment)
+Next step: Resolve local AAPT2/runtime environment issue, then re-run :app:processDebugResources and :app:compileDebugJavaWithJavac and verify new navigation flow on device.
+Cycle: 8
+Task: Settings restructure + Privileged Access section with policy-backed toggles
+Root cause: Settings discoverability was poor (long mixed pages), and privileged behavior lacked user-facing policy controls.
+Files changed: app/src/main/res/xml/root_preferences.xml, app/src/main/res/xml/termux_preferences.xml, app/src/main/res/xml/termux_style_preferences.xml, app/src/main/res/xml/launcher_preferences.xml, app/src/main/res/xml/launcher_search_preferences.xml, app/src/main/res/xml/launcher_layout_preferences.xml, app/src/main/res/xml/launcher_icons_preferences.xml, app/src/main/res/xml/termux_privileged_access_preferences.xml, app/src/main/res/values/strings.xml, app/src/main/java/com/termux/app/fragments/settings/termux/LauncherPreferencesFragment.java, app/src/main/java/com/termux/app/fragments/settings/termux/LauncherSearchPreferencesFragment.java, app/src/main/java/com/termux/app/fragments/settings/termux/LauncherLayoutPreferencesFragment.java, app/src/main/java/com/termux/app/fragments/settings/termux/LauncherIconsPreferencesFragment.java, app/src/main/java/com/termux/app/fragments/settings/termux/PrivilegedAccessPreferencesFragment.java, app/src/main/java/com/termux/privileged/PrivilegedPolicyStore.java, app/src/main/java/com/termux/privileged/PrivilegedBackendManager.java, app/src/main/java/com/termux/tooie/TooieApiServer.java
+Backend selected: Policy-driven selection (Shizuku preferred by default, shell fallback optional, NoOp when master disabled)
+Status reason: Uses existing reason contract; permission-missing now reports DENIED, binder recovery re-evaluates backend
+Build result: fail (local AAPT2 daemon startup error: "Syntax error: ')' unexpected" during :app:processDebugResources)
+Manual validation case(s): static code-path validation only (UI wiring + endpoint policy guards); device runtime validation pending due build environment blocker
+Next step: Push branch for CI/nightly validation where AAPT2 environment is healthy.

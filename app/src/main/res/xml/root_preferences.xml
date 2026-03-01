@@ -7,6 +7,12 @@
         app:fragment="com.termux.app.fragments.settings.TermuxPreferencesFragment"/>
 
     <Preference
+        app:key="termux_launcher"
+        app:title="@string/termux_launcher_preferences_title"
+        app:summary="@string/termux_launcher_preferences_summary"
+        app:fragment="com.termux.app.fragments.settings.termux.LauncherPreferencesFragment"/>
+
+    <Preference
         app:key="termux_api"
         app:title="@string/termux_api_preferences_title"
         app:summary="@string/termux_api_preferences_summary"
