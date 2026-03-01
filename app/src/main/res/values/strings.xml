@@ -165,15 +165,20 @@
     <string name="title_activity_termux_settings">&TERMUX_APP_NAME; Settings</string>
 
     <!-- Termux App Preferences -->
-    <string name="termux_preferences_title">&TERMUX_APP_NAME;</string>
-    <string name="termux_preferences_summary">Preferences for &TERMUX_APP_NAME; app</string>
+    <string name="termux_preferences_title">Termux</string>
+    <string name="termux_preferences_summary">Core terminal and debugging settings</string>
 
-    <string name="termux_launcher_preferences_title">Launcher</string>
-    <string name="termux_launcher_preferences_summary">Launcher layout, search, and icon preferences</string>
+    <string name="termux_launcher_preferences_title">Apps Bar</string>
+    <string name="termux_launcher_preferences_summary">Search, icons, and visual settings for the apps bar</string>
     <string name="termux_launcher_search_preferences_summary">Configure launcher search behavior and default pinned apps</string>
     <string name="termux_launcher_layout_preferences_summary">Configure launcher bar layout and sizing</string>
     <string name="termux_launcher_icons_header">Launcher: Icons</string>
     <string name="termux_launcher_icons_preferences_summary">Configure launcher icon rendering options</string>
+    <string name="termux_terminal_background_header">Terminal Background</string>
+    <string name="termux_extrakeys_appsbar_header">Extra Keys &amp; Apps Bar</string>
+    <string name="apps_bar_search_header">Search</string>
+    <string name="apps_bar_icons_header">Icons</string>
+    <string name="apps_bar_visual_header">Visual</string>
 
         <!-- Debugging Preferences -->
         <string name="termux_debugging_preferences_title">Debugging</string>
@@ -245,11 +250,11 @@
 
 
         <!-- Termux Style Preferences -->
-        <string name="termux_style_preferences_title">&TERMUX_APP_NAME; Settings</string>
-        <string name="termux_style_preferences_summary">Preferences for &TERMUX_APP_NAME; appearance and customisation</string>
+        <string name="termux_style_preferences_title">Look &amp; Feel</string>
+        <string name="termux_style_preferences_summary">Background, blur, and visual style settings</string>
 
-        <string name="termux_privileged_access_preferences_title">Privileged Access</string>
-        <string name="termux_privileged_access_preferences_summary">Shizuku backend, fallback policy, and privileged endpoint controls</string>
+        <string name="termux_privileged_access_preferences_title">Shizuku</string>
+        <string name="termux_privileged_access_preferences_summary">Shizuku backend and privileged endpoint controls</string>
 
             <string name="termux_privileged_access_overview_title">Overview</string>
             <string name="termux_privileged_backend_status_title">Backend Status</string>
@@ -299,8 +304,6 @@
                 <string name="termux_monet_background_enabled_title">Use Monet background + overlay (Unstable)</string>
                 <string name="termux_monet_background_enabled_off">Use the regular background and overlay color from termux.properties. (Default)</string>
                 <string name="termux_monet_background_enabled_on">Use wallpaper-based Monet color for both terminal background and opacity overlay.</string>
-                <string name="termux_monet_background_guide_title">Guide</string>
-                <string name="termux_monet_background_guide_summary">Enable this toggle, then use Terminal background opacity below to control strength of the Monet overlay.</string>
                 <string name="termux_terminal_background_opacity_title">Terminal background opacity</string>
                 <string name="termux_terminal_background_opacity_summary">Adjusts the translucency (alpha) of the terminal background overlay.</string>
                 <string name="termux_monet_overlay_enabled_title">Use Monet overlay color</string>
