@@ -114,3 +114,12 @@ Status reason: Uses existing reason contract; permission-missing now reports DEN
 Build result: fail (local AAPT2 daemon startup error: "Syntax error: ')' unexpected" during :app:processDebugResources)
 Manual validation case(s): static code-path validation only (UI wiring + endpoint policy guards); device runtime validation pending due build environment blocker
 Next step: Push branch for CI/nightly validation where AAPT2 environment is healthy.
+Cycle: 9
+Task: Fix missing settings layout visibility on shizuku-integration by wiring new root structure
+Root cause: Root settings XML still referenced old navigation (`Termux Launcher`) and `Termux` still contained style/privileged entries, so intended layout did not render.
+Files changed: app/src/main/res/xml/root_preferences.xml, app/src/main/res/xml/termux_preferences.xml, app/src/main/res/xml/termux_style_preferences.xml, app/src/main/res/xml/launcher_preferences.xml
+Backend selected: N/A (settings UI change only)
+Status reason: N/A (settings UI change only)
+Build result: fail (local Termux environment toolchain errors: AAPT2 startup syntax error and Gradle manifest task state-tracking issue)
+Manual validation case(s): static XML/navigation validation completed; device/CI validation pending
+Next step: push to shizuku-integration and validate with GitHub nightly build artifact.

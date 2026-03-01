@@ -7,7 +7,19 @@
         app:fragment="com.termux.app.fragments.settings.TermuxPreferencesFragment"/>
 
     <Preference
-        app:key="termux_launcher"
+        app:key="look_and_feel"
+        app:title="@string/termux_style_preferences_title"
+        app:summary="@string/termux_style_preferences_summary"
+        app:fragment="com.termux.app.fragments.settings.termux.TermuxStylePreferencesFragment"/>
+
+    <Preference
+        app:key="shizuku"
+        app:title="@string/termux_privileged_access_preferences_title"
+        app:summary="@string/termux_privileged_access_preferences_summary"
+        app:fragment="com.termux.app.fragments.settings.termux.PrivilegedAccessPreferencesFragment"/>
+
+    <Preference
+        app:key="apps_bar"
         app:title="@string/termux_launcher_preferences_title"
         app:summary="@string/termux_launcher_preferences_summary"
         app:fragment="com.termux.app.fragments.settings.termux.LauncherPreferencesFragment"/>
@@ -51,7 +63,6 @@
         app:key="about"
         app:title="@string/about_preference_title"
         app:persistent="false"/>
-    <!-- app:layout="@layout/preference_markdown_text" -->
 
     <Preference
         app:key="donate"

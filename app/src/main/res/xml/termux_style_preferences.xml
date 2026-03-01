@@ -24,6 +24,11 @@
             app:summaryOff="@string/termux_monet_background_enabled_off"
             app:summaryOn="@string/termux_monet_background_enabled_on"
             app:title="@string/termux_monet_background_enabled_title" />
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        app:key="termux_terminal_background"
+        app:title="@string/termux_terminal_background_header">
 
         <androidx.preference.SeekBarPreference
             app:key="terminal_background_opacity"
@@ -42,6 +47,11 @@
             android:max="30"
             android:defaultValue="0"
             app:showSeekBarValue="true" />
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        app:key="termux_extrakeys_appsbar"
+        app:title="@string/termux_extrakeys_appsbar_header">
 
         <SwitchPreferenceCompat
             app:key="extrakeys_blur_enabled"
@@ -66,6 +76,11 @@
             android:max="100"
             android:defaultValue="50"
             app:showSeekBarValue="true" />
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        app:key="termux_sessions"
+        app:title="@string/termux_sessions_header">
 
         <SwitchPreferenceCompat
             app:key="sessions_blur_enabled"

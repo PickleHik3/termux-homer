@@ -1,18 +1,74 @@
-<PreferenceScreen xmlns:app="http://schemas.android.com/apk/res-auto">
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
 
-    <Preference
-        app:title="@string/termux_app_launcher_search_header"
-        app:summary="@string/termux_launcher_search_preferences_summary"
-        app:fragment="com.termux.app.fragments.settings.termux.LauncherSearchPreferencesFragment"/>
+    <PreferenceCategory
+        app:key="apps_bar_search"
+        app:title="@string/apps_bar_search_header">
 
-    <Preference
-        app:title="@string/termux_app_launcher_layout_header"
-        app:summary="@string/termux_launcher_layout_preferences_summary"
-        app:fragment="com.termux.app.fragments.settings.termux.LauncherLayoutPreferencesFragment"/>
+        <ListPreference
+            app:key="app_launcher_search_mode"
+            app:title="@string/termux_app_launcher_search_mode_title"
+            app:summary="@string/termux_app_launcher_search_mode_summary"
+            android:defaultValue="balanced"
+            app:entries="@array/app_launcher_search_mode_entries"
+            app:entryValues="@array/app_launcher_search_mode_values" />
 
-    <Preference
-        app:title="@string/termux_launcher_icons_header"
-        app:summary="@string/termux_launcher_icons_preferences_summary"
-        app:fragment="com.termux.app.fragments.settings.termux.LauncherIconsPreferencesFragment"/>
+        <EditTextPreference
+            app:key="app_launcher_input_char"
+            app:title="@string/termux_app_launcher_input_char_title"
+            app:summary="@string/termux_app_launcher_input_char_summary"
+            android:defaultValue=""
+            android:inputType="text" />
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        app:key="apps_bar_icons"
+        app:title="@string/apps_bar_icons_header">
+
+        <EditTextPreference
+            app:key="app_launcher_button_count"
+            app:title="@string/termux_app_launcher_button_count_title"
+            app:summary="@string/termux_app_launcher_button_count_summary"
+            android:defaultValue="5"
+            android:inputType="number" />
+
+        <EditTextPreference
+            app:key="app_launcher_icon_scale"
+            app:title="@string/termux_app_launcher_icon_scale_title"
+            app:summary="@string/termux_app_launcher_icon_scale_summary"
+            android:defaultValue="1.0"
+            android:inputType="numberDecimal" />
+
+        <EditTextPreference
+            app:key="app_launcher_default_buttons"
+            app:title="@string/termux_app_launcher_default_buttons_title"
+            app:summary="@string/termux_app_launcher_default_buttons_summary"
+            android:defaultValue="phone,bromite,whatsapp,telegram,spotify"
+            android:inputType="text" />
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        app:key="apps_bar_visual"
+        app:title="@string/apps_bar_visual_header">
+
+        <EditTextPreference
+            app:key="app_launcher_bar_height"
+            app:title="@string/termux_app_launcher_bar_height_title"
+            app:summary="@string/termux_app_launcher_bar_height_summary"
+            android:defaultValue="1.2"
+            android:inputType="numberDecimal" />
+
+        <SwitchPreferenceCompat
+            app:key="app_launcher_show_icons"
+            app:title="@string/termux_app_launcher_show_icons_title"
+            app:summary="@string/termux_app_launcher_show_icons_summary"
+            android:defaultValue="true" />
+
+        <SwitchPreferenceCompat
+            app:key="app_launcher_bw_icons"
+            app:title="@string/termux_app_launcher_bw_icons_title"
+            app:summary="@string/termux_app_launcher_bw_icons_summary"
+            android:defaultValue="false" />
+    </PreferenceCategory>
 
 </PreferenceScreen>
