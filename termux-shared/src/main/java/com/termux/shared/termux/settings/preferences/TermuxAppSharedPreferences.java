@@ -166,6 +166,33 @@ public class TermuxAppSharedPreferences extends AppSharedPreferences {
         SharedPreferenceUtils.setFloat(mSharedPreferences, TERMUX_APP.KEY_APP_LAUNCHER_ICON_SCALE, value, false);
     }
 
+    public String getAppLauncherPinnedItemsV2() {
+        return SharedPreferenceUtils.getString(mSharedPreferences, TERMUX_APP.KEY_APP_LAUNCHER_PINNED_ITEMS_V2,
+            TERMUX_APP.DEFAULT_APP_LAUNCHER_PINNED_ITEMS_V2, true);
+    }
+
+    public void setAppLauncherPinnedItemsV2(String value) {
+        SharedPreferenceUtils.setString(mSharedPreferences, TERMUX_APP.KEY_APP_LAUNCHER_PINNED_ITEMS_V2, value, false);
+    }
+
+    public int getAppLauncherPinnedItemsSchemaVersion() {
+        return SharedPreferenceUtils.getInt(mSharedPreferences, TERMUX_APP.KEY_APP_LAUNCHER_PINNED_ITEMS_SCHEMA_VERSION,
+            TERMUX_APP.DEFAULT_APP_LAUNCHER_PINNED_ITEMS_SCHEMA_VERSION);
+    }
+
+    public void setAppLauncherPinnedItemsSchemaVersion(int version) {
+        SharedPreferenceUtils.setInt(mSharedPreferences, TERMUX_APP.KEY_APP_LAUNCHER_PINNED_ITEMS_SCHEMA_VERSION, version, false);
+    }
+
+    public boolean isAppLauncherAzRowEnabled() {
+        return SharedPreferenceUtils.getBoolean(mSharedPreferences, TERMUX_APP.KEY_APP_LAUNCHER_AZ_ROW_ENABLED,
+            TERMUX_APP.DEFAULT_APP_LAUNCHER_AZ_ROW_ENABLED);
+    }
+
+    public void setAppLauncherAzRowEnabled(boolean value) {
+        SharedPreferenceUtils.setBoolean(mSharedPreferences, TERMUX_APP.KEY_APP_LAUNCHER_AZ_ROW_ENABLED, value, false);
+    }
+
     public boolean isTerminalMarginAdjustmentEnabled() {
         return SharedPreferenceUtils.getBoolean(mSharedPreferences, TERMUX_APP.KEY_TERMINAL_MARGIN_ADJUSTMENT, TERMUX_APP.DEFAULT_TERMINAL_MARGIN_ADJUSTMENT);
     }

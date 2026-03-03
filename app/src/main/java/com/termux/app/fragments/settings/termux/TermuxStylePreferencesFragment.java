@@ -118,6 +118,9 @@ class TermuxStylePreferencesDataStore extends PreferenceDataStore {
             case "app_launcher_bw_icons":
                 mPreferences.setAppLauncherBwIconsEnabled(value);
                 break;
+            case "app_launcher_az_row_enabled":
+                mPreferences.setAppLauncherAzRowEnabled(value);
+                break;
             default:
                 break;
         }
@@ -144,6 +147,8 @@ class TermuxStylePreferencesDataStore extends PreferenceDataStore {
                 return mPreferences.isAppLauncherShowIconsEnabled();
             case "app_launcher_bw_icons":
                 return mPreferences.isAppLauncherBwIconsEnabled();
+            case "app_launcher_az_row_enabled":
+                return mPreferences.isAppLauncherAzRowEnabled();
             default:
                 return defValue;
         }

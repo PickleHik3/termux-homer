@@ -346,6 +346,8 @@
                 <string name="termux_app_launcher_show_icons_summary">Display app icons instead of text labels.</string>
                 <string name="termux_app_launcher_bw_icons_title">Black and white icons</string>
                 <string name="termux_app_launcher_bw_icons_summary">Render app icons in grayscale.</string>
+                <string name="termux_app_launcher_az_row_enabled_title">Enable A-Z scrub row</string>
+                <string name="termux_app_launcher_az_row_enabled_summary">Shows an alphabet strip between apps bar and extra keys for quick launch scrubbing.</string>
                 <string name="termux_app_launcher_bar_height_title">Bar height</string>
                 <string name="termux_app_launcher_bar_height_summary">Height multiplier for the app launcher bar (1.0 = default).</string>
                 <string name="termux_app_launcher_icon_scale_title">Icon scaling</string>

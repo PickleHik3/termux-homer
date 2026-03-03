@@ -173,6 +173,27 @@ public final class TermuxPreferenceConstants {
         public static final float DEFAULT_APP_LAUNCHER_ICON_SCALE = 1.0f;
 
         /**
+         * Defines the key for typed pinned apps/folders launcher configuration.
+         */
+        public static final String KEY_APP_LAUNCHER_PINNED_ITEMS_V2 = "app_launcher_pinned_items_v2";
+
+        public static final String DEFAULT_APP_LAUNCHER_PINNED_ITEMS_V2 = "";
+
+        /**
+         * Defines the key for typed pinned items config schema version.
+         */
+        public static final String KEY_APP_LAUNCHER_PINNED_ITEMS_SCHEMA_VERSION = "app_launcher_pinned_items_schema_version";
+
+        public static final int DEFAULT_APP_LAUNCHER_PINNED_ITEMS_SCHEMA_VERSION = 0;
+
+        /**
+         * Defines the key for enabling A-Z scrub row for launcher.
+         */
+        public static final String KEY_APP_LAUNCHER_AZ_ROW_ENABLED = "app_launcher_az_row_enabled";
+
+        public static final boolean DEFAULT_APP_LAUNCHER_AZ_ROW_ENABLED = false;
+
+        /**
          * Defines the key for whether the soft keyboard will be enabled, for cases where users want
          * to use a hardware keyboard instead.
          */
