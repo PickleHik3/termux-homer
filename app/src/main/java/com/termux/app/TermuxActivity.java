@@ -747,7 +747,11 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
                 @Override
                 public void onScrub(char letter, int selectionIndex, boolean commit) {
                     if (mSuggestionBarView != null) {
-                        mSuggestionBarView.previewAzLetter(letter, selectionIndex, commit);
+                        if (commit) {
+                            mSuggestionBarView.previewAzLetter(letter, selectionIndex, true);
+                        } else {
+                            mSuggestionBarView.persistAzPreview(letter, selectionIndex);
+                        }
                     }
                 }
 
@@ -1354,6 +1358,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         if (mSuggestionBarView == null || mTerminalView == null) {
             return;
         }
+        mSuggestionBarView.onTerminalInteraction();
         String input = mTerminalView.getCurrentInput(inputChar);
         if (input == null) {
             input = "";
@@ -1366,6 +1371,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         if (mSuggestionBarView == null || mTerminalView == null) {
             return;
         }
+        mSuggestionBarView.onTerminalInteraction();
         if (enter) {
             mSuggestionBarView.reloadWithInput("", mTerminalView);
         } else {

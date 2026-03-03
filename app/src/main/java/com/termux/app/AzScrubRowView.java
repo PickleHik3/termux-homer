@@ -1,6 +1,9 @@
 package com.termux.app;
 
 import android.content.Context;
+import android.graphics.Canvas;
+import android.graphics.Paint;
+import android.graphics.Rect;
 import android.util.AttributeSet;
 import android.view.MotionEvent;
 
@@ -17,6 +20,8 @@ public final class AzScrubRowView extends AppCompatTextView {
 
     @Nullable private ScrubCallback callback;
     private int currentSelectionIndex = 0;
+    private final Paint letterPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Rect textBounds = new Rect();
 
     public AzScrubRowView(Context context) {
         super(context);
@@ -34,11 +39,37 @@ public final class AzScrubRowView extends AppCompatTextView {
     }
 
     private void init() {
-        setText("A B C D E F G H I J K L M N O P Q R S T U V W X Y Z #");
+        setText("");
         setSingleLine(true);
         setTextSize(11f);
-        setPadding(16, 8, 16, 8);
+        setPadding(0, dp(6), 0, dp(6));
         setClickable(true);
+        letterPaint.setTextAlign(Paint.Align.CENTER);
+        letterPaint.setTextSize(getTextSize());
+        letterPaint.setColor(getCurrentTextColor());
+    }
+
+    private int dp(int value) {
+        return Math.round(value * getResources().getDisplayMetrics().density);
+    }
+
+    @Override
+    protected void onDraw(Canvas canvas) {
+        super.onDraw(canvas);
+        float width = getWidth();
+        float height = getHeight();
+        if (width <= 0 || height <= 0) return;
+
+        letterPaint.setColor(getCurrentTextColor());
+        letterPaint.setTextSize(getTextSize());
+        letterPaint.getTextBounds("A", 0, 1, textBounds);
+        float baseline = (height * 0.5f) + (textBounds.height() * 0.35f);
+        float slot = width / LETTERS.length;
+
+        for (int i = 0; i < LETTERS.length; i++) {
+            float x = (slot * i) + (slot * 0.5f);
+            canvas.drawText(String.valueOf(LETTERS[i]), x, baseline, letterPaint);
+        }
     }
 
     public void setScrubCallback(@Nullable ScrubCallback callback) {
@@ -58,7 +89,8 @@ public final class AzScrubRowView extends AppCompatTextView {
                 callback.onScrub(letter, currentSelectionIndex, false);
                 return true;
             case MotionEvent.ACTION_UP:
-                callback.onScrub(letter, currentSelectionIndex, true);
+                boolean launch = event.getY() < -dp(4);
+                callback.onScrub(letter, currentSelectionIndex, launch);
                 return true;
             case MotionEvent.ACTION_CANCEL:
                 callback.onCancel();
@@ -75,4 +107,3 @@ public final class AzScrubRowView extends AppCompatTextView {
         return LETTERS[index];
     }
 }
-

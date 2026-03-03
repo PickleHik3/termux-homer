@@ -186,3 +186,10 @@ Files changed: app/src/main/java/com/termux/app/SuggestionBarView.java
 Build result: pass (:app:compileDebugJavaWithJavac)
 Manual validation case(s): Pending device QA for no-flicker page transition, stable keyboard when opening folder popup, popup anchor position above apps bar, and folder icon visual parity.
 Next step: Push appsbar-dev and trigger nightly after user confirmation.
+Cycle: 19
+Task: A-Z scrub row interaction model overhaul (layout, non-accidental launch, paging, timeout reset)
+Root cause: Scrubber row rendered as left-packed text, touch-up always committed launch, and filtered result mode was non-paged/non-persistent.
+Files changed: app/src/main/java/com/termux/app/AzScrubRowView.java, app/src/main/java/com/termux/app/SuggestionBarView.java, app/src/main/java/com/termux/app/TermuxActivity.java
+Build result: pass (:app:compileDebugJavaWithJavac)
+Manual validation case(s): Pending device QA for evenly spaced letters, touch-release retaining filtered list, upward-slide launch, filtered paging via swipe, and fade reset after timeout/terminal input.
+Next step: Commit/push and run nightly after user confirmation.

@@ -96,12 +96,15 @@ public final class SuggestionBarView extends GridLayout {
 
     private Character activeAzLetter;
     private int activeAzSelection = 0;
+    private int activeAzPageIndex = 0;
+    private List<LauncherAppEntry> activeAzCandidates = new ArrayList<>();
     private int pinnedPageIndex = 0;
     private int pinnedItemsPerPage = 1;
     private float swipeDownX = 0f;
     private float swipeDownY = 0f;
     private VelocityTracker swipeVelocityTracker;
     private boolean pageSwitchAnimating = false;
+    private final Runnable azResetRunnable = this::clearAzPreviewWithFade;
 
     public SuggestionBarView(Context context, AttributeSet attrs) {
         super(context, attrs);
@@ -167,7 +170,10 @@ public final class SuggestionBarView extends GridLayout {
         allApps = new ArrayList<>();
         applicationSequenceNumber = 0;
         activeAzLetter = null;
+        activeAzCandidates = new ArrayList<>();
+        activeAzPageIndex = 0;
         injectedSuggestionButtons = null;
+        cancelAzResetTimeout();
         if (appDataProvider != null) {
             appDataProvider.invalidate();
         }
@@ -200,32 +206,94 @@ public final class SuggestionBarView extends GridLayout {
         if (appDataProvider == null) {
             appDataProvider = new LauncherAppDataProvider(getContext());
         }
-        activeAzLetter = Character.toUpperCase(letter);
+        char normalized = Character.toUpperCase(letter);
+        if (activeAzLetter == null || activeAzLetter != normalized) {
+            activeAzPageIndex = 0;
+        }
+        activeAzLetter = normalized;
         activeAzSelection = Math.max(0, selectionIndex);
-        List<LauncherAppEntry> candidates = appDataProvider.getAppsForLetter(activeAzLetter);
-        if (candidates.isEmpty()) {
+        cancelAzResetTimeout();
+        activeAzCandidates = appDataProvider.getAppsForLetter(activeAzLetter);
+        if (activeAzCandidates.isEmpty()) {
             if (commit) {
-                activeAzLetter = null;
-                reloadWithInput(lastInput, lastTerminalView);
+                clearAzPreview();
             }
             return;
         }
 
         if (commit) {
-            int index = Math.min(activeAzSelection, candidates.size() - 1);
-            launchEntry(candidates.get(index), lastTerminalView);
-            activeAzLetter = null;
-            reloadWithInput("", lastTerminalView);
+            int pageOffset = activeAzPageIndex * Math.max(1, maxButtonCount);
+            int index = pageOffset + Math.min(activeAzSelection, Math.max(0, maxButtonCount - 1));
+            index = Math.min(index, activeAzCandidates.size() - 1);
+            launchEntry(activeAzCandidates.get(index), lastTerminalView);
+            clearAzPreview();
             return;
         }
 
-        renderButtons(candidates, true);
+        renderButtons(activeAzCandidates, true);
+    }
+
+    public void persistAzPreview(char letter, int selectionIndex) {
+        previewAzLetter(letter, selectionIndex, false);
+        scheduleAzResetTimeout();
     }
 
     public void clearAzPreview() {
+        cancelAzResetTimeout();
         activeAzLetter = null;
         activeAzSelection = 0;
+        activeAzPageIndex = 0;
+        activeAzCandidates = new ArrayList<>();
         reloadWithInput(lastInput, lastTerminalView);
+    }
+
+    public void clearAzPreviewWithFade() {
+        if (activeAzLetter == null) return;
+        cancelAzResetTimeout();
+        animate()
+            .alpha(0.35f)
+            .setDuration(120)
+            .setInterpolator(new DecelerateInterpolator())
+            .setListener(new AnimatorListenerAdapter() {
+                @Override
+                public void onAnimationEnd(Animator animation) {
+                    setListenerSafe(null);
+                    activeAzLetter = null;
+                    activeAzSelection = 0;
+                    activeAzPageIndex = 0;
+                    activeAzCandidates = new ArrayList<>();
+                    reloadWithInput(lastInput, lastTerminalView);
+                    setAlpha(0.35f);
+                    animate()
+                        .alpha(1f)
+                        .setDuration(160)
+                        .setInterpolator(new DecelerateInterpolator())
+                        .setListener(new AnimatorListenerAdapter() {
+                            @Override
+                            public void onAnimationEnd(Animator animation) {
+                                setListenerSafe(null);
+                                setAlpha(1f);
+                            }
+                        })
+                        .start();
+                }
+            })
+            .start();
+    }
+
+    public void onTerminalInteraction() {
+        if (activeAzLetter != null) {
+            clearAzPreviewWithFade();
+        }
+    }
+
+    private void scheduleAzResetTimeout() {
+        cancelAzResetTimeout();
+        postDelayed(azResetRunnable, 5000);
+    }
+
+    private void cancelAzResetTimeout() {
+        removeCallbacks(azResetRunnable);
     }
 
     @Override
@@ -253,18 +321,33 @@ public final class SuggestionBarView extends GridLayout {
             float threshold = dp(28);
             boolean swipeQualified = Math.abs(dx) > threshold || Math.abs(vx) > 900f;
             if (swipeQualified && Math.abs(dx) > Math.abs(dy) * 1.2f &&
-                activeAzLetter == null && TextUtils.isEmpty(lastInput.trim()) && pinnedItemsPerPage > 0) {
+                TextUtils.isEmpty(lastInput.trim())) {
                 int pageDelta = dx < 0 ? 1 : -1;
-                int totalPages = getPinnedPagesCount();
-                if (totalPages > 1) {
-                    int next = clamp(pinnedPageIndex + pageDelta, 0, totalPages - 1);
-                    if (next != pinnedPageIndex) {
-                        animatePageSwitch(pageDelta, Math.max(Math.abs(vx), Math.abs(dx) * 8f));
-                        if (swipeVelocityTracker != null) {
-                            swipeVelocityTracker.recycle();
-                            swipeVelocityTracker = null;
+                if (activeAzLetter != null) {
+                    int totalPages = getAzPagesCount();
+                    if (totalPages > 1) {
+                        int next = clamp(activeAzPageIndex + pageDelta, 0, totalPages - 1);
+                        if (next != activeAzPageIndex) {
+                            animateAzPageSwitch(pageDelta, Math.max(Math.abs(vx), Math.abs(dx) * 8f));
+                            if (swipeVelocityTracker != null) {
+                                swipeVelocityTracker.recycle();
+                                swipeVelocityTracker = null;
+                            }
+                            return true;
                         }
-                        return true;
+                    }
+                } else if (pinnedItemsPerPage > 0) {
+                    int totalPages = getPinnedPagesCount();
+                    if (totalPages > 1) {
+                        int next = clamp(pinnedPageIndex + pageDelta, 0, totalPages - 1);
+                        if (next != pinnedPageIndex) {
+                            animatePageSwitch(pageDelta, Math.max(Math.abs(vx), Math.abs(dx) * 8f));
+                            if (swipeVelocityTracker != null) {
+                                swipeVelocityTracker.recycle();
+                                swipeVelocityTracker = null;
+                            }
+                            return true;
+                        }
                     }
                 }
             }
@@ -292,6 +375,13 @@ public final class SuggestionBarView extends GridLayout {
 
         this.lastTerminalView = terminalView;
         this.lastInput = input == null ? "" : input;
+        if (activeAzLetter != null && !this.lastInput.trim().isEmpty()) {
+            activeAzLetter = null;
+            activeAzSelection = 0;
+            activeAzPageIndex = 0;
+            activeAzCandidates = new ArrayList<>();
+            cancelAzResetTimeout();
+        }
 
         PackageManager packageManager = getContext().getPackageManager();
         ChangedPackages changedPackages = packageManager.getChangedPackages(applicationSequenceNumber);
@@ -339,6 +429,21 @@ public final class SuggestionBarView extends GridLayout {
         int buttonCount = Math.max(1, maxButtonCount);
         List<PinnedItem> pinnedForSlots = new ArrayList<>();
         int pinnedPageOffset = 0;
+
+        if (azPreview) {
+            int perPage = Math.max(1, maxButtonCount);
+            int totalPages = getAzPagesCount();
+            activeAzPageIndex = clamp(activeAzPageIndex, 0, Math.max(0, totalPages - 1));
+            int offset = activeAzPageIndex * perPage;
+            List<LauncherAppEntry> pageEntries = new ArrayList<>();
+            for (int i = offset; i < entries.size() && pageEntries.size() < perPage; i++) {
+                pageEntries.add(entries.get(i));
+            }
+            entries = pageEntries;
+            buttonCount = perPage;
+            pinnedItemsPerPage = 1;
+            pinnedPageIndex = 0;
+        }
 
         boolean pinnedSurface = !azPreview && TextUtils.isEmpty(lastInput.trim()) && pinnedItems != null && !pinnedItems.isEmpty();
         if (pinnedSurface) {
@@ -1113,7 +1218,7 @@ public final class SuggestionBarView extends GridLayout {
         GridLayout grid = new GridLayout(getContext());
         grid.setColumnCount(cols);
         grid.setRowCount(rows);
-        grid.setPadding(dp(8), dp(8), dp(8), dp(8));
+        grid.setPadding(dp(3), dp(3), dp(3), dp(3));
         grid.setUseDefaultMargins(false);
         grid.setAlignmentMode(GridLayout.ALIGN_BOUNDS);
 
@@ -1125,14 +1230,14 @@ public final class SuggestionBarView extends GridLayout {
             params.height = popupIconSize;
             params.columnSpec = GridLayout.spec(i % cols);
             params.rowSpec = GridLayout.spec(i / cols);
-            params.setMargins(dp(2), dp(2), dp(2), dp(2));
+            params.setMargins(dp(4), dp(4), dp(4), dp(4));
             btn.setLayoutParams(params);
             grid.addView(btn);
         }
 
         LinearLayout shell = new LinearLayout(getContext());
         shell.setOrientation(LinearLayout.VERTICAL);
-        shell.setPadding(dp(8), dp(8), dp(8), dp(8));
+        shell.setPadding(dp(3), dp(3), dp(3), dp(3));
 
         LinearLayout header = new LinearLayout(getContext());
         header.setOrientation(LinearLayout.HORIZONTAL);
@@ -1542,6 +1647,49 @@ public final class SuggestionBarView extends GridLayout {
             .start();
     }
 
+    private void animateAzPageSwitch(int pageDelta, float velocityPxPerSec) {
+        if (pageSwitchAnimating) return;
+        int totalPages = getAzPagesCount();
+        if (totalPages <= 1) return;
+        int targetPage = clamp(activeAzPageIndex + pageDelta, 0, totalPages - 1);
+        if (targetPage == activeAzPageIndex) return;
+
+        pageSwitchAnimating = true;
+        final int direction = pageDelta > 0 ? 1 : -1;
+        final float travel = Math.max(dp(24), getWidth() * 0.28f);
+        final long duration = computePageAnimDuration(velocityPxPerSec);
+
+        animate()
+            .translationX(-direction * travel)
+            .alpha(0.42f)
+            .setDuration(duration)
+            .setInterpolator(new DecelerateInterpolator())
+            .setListener(new AnimatorListenerAdapter() {
+                @Override
+                public void onAnimationEnd(Animator animation) {
+                    setListenerSafe(null);
+                    activeAzPageIndex = targetPage;
+                    renderButtons(activeAzCandidates, true);
+                    setTranslationX(direction * travel * 0.48f);
+                    setAlpha(0.52f);
+                    animate()
+                        .translationX(0f)
+                        .alpha(1f)
+                        .setDuration(Math.max(110, duration - 20))
+                        .setInterpolator(new DecelerateInterpolator())
+                        .setListener(new AnimatorListenerAdapter() {
+                            @Override
+                            public void onAnimationEnd(Animator animation) {
+                                setListenerSafe(null);
+                                pageSwitchAnimating = false;
+                            }
+                        })
+                        .start();
+                }
+            })
+            .start();
+    }
+
     private long computePageAnimDuration(float velocityPxPerSec) {
         float v = Math.max(200f, Math.min(6000f, Math.abs(velocityPxPerSec)));
         long ms = (long) (280f - ((v - 200f) / (6000f - 200f)) * 140f);
@@ -1614,6 +1762,13 @@ public final class SuggestionBarView extends GridLayout {
         int perPage = Math.max(1, pinnedItemsPerPage);
         if (totalPinned <= 0) return 1;
         return (totalPinned + perPage - 1) / perPage;
+    }
+
+    private int getAzPagesCount() {
+        int total = activeAzCandidates == null ? 0 : activeAzCandidates.size();
+        int perPage = Math.max(1, maxButtonCount);
+        if (total <= 0) return 1;
+        return (total + perPage - 1) / perPage;
     }
 
     private int dp(int value) {
