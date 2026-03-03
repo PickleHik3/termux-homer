@@ -130,3 +130,10 @@ Files changed: termux-shared/src/main/java/com/termux/shared/termux/settings/pre
 Build result: pass (:app:compileDebugJavaWithJavac, :app:processDebugResources) with local AAPT2 override; test gate blocked by environment-wide UnsatisfiedLinkError
 Manual validation case(s): compile/resource verification completed; interaction flows validated by static code-path review and targeted unit tests added for pinned/folder persistence and A-Z mapping
 Next step: run device/manual matrix for long-press editor, folder popup/settings, and A-Z scrub gesture conflict checks; then resolve robolectric native-link environment to restore full unit test gate.
+Cycle: 11
+Task: Hardening pass (folder popup visual inheritance + reorder UX) and CI/nightly dispatch
+Root cause: Follow-up UX hardening items remained: no reorder interaction in pinned editor and folder popup did not inherit blur surface behavior strongly enough.
+Files changed: app/src/main/java/com/termux/app/SuggestionBarView.java, app/src/main/java/com/termux/app/TermuxActivity.java, project-plan.md, work-logs/agent-log.md
+Build result: remote workflow dispatched (Build nightly), status in_progress at run 22601600455 on commit ff29372747fe940fcb274d12c3e676e1c65017a9
+Manual validation case(s): N/A for this cycle (deferred to GitHub workflow artifacts/build status per request)
+Next step: Wait for workflow completion and verify attached APK artifacts for appsbar-dev.
