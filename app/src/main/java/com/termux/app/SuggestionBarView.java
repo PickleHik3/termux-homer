@@ -11,6 +11,7 @@ import android.graphics.ColorMatrixColorFilter;
 import android.graphics.Typeface;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
+import android.graphics.drawable.GradientDrawable;
 import android.text.TextUtils;
 import android.util.AttributeSet;
 import android.view.Gravity;
@@ -22,6 +23,7 @@ import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.GridLayout;
 import android.widget.ImageButton;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ListView;
 import android.widget.PopupWindow;
@@ -293,15 +295,18 @@ public final class SuggestionBarView extends GridLayout {
                 final int pinnedIndex = col;
                 final PinnedItem pinnedItem = pinnedForSlots.get(col);
                 if (pinnedItem instanceof PinnedFolderItem) {
+                    view = createFolderPreviewButton((PinnedFolderItem) pinnedItem);
+                    view.setLayoutParams(param);
                     view.setOnClickListener(v -> showFolderPopup((PinnedFolderItem) pinnedItem, v));
                 }
                 view.setOnLongClickListener(v -> {
-                    onPinnedItemLongPress(pinnedIndex, pinnedItem);
+                    showUnifiedPinEditor(pinnedIndex, pinnedItem);
                     return true;
                 });
             } else if (!azPreview) {
+                final int slotIndex = col;
                 view.setOnLongClickListener(v -> {
-                    showPinnedAppsEditor();
+                    showUnifiedPinEditor(slotIndex, null);
                     return true;
                 });
             }
@@ -316,8 +321,9 @@ public final class SuggestionBarView extends GridLayout {
             filler.setVisibility(INVISIBLE);
             filler.setLayoutParams(createSlotParams(addedCount + i));
             if (!azPreview) {
+                final int slotIndex = addedCount + i;
                 filler.setOnLongClickListener(v -> {
-                    showPinnedAppsEditor();
+                    showUnifiedPinEditor(slotIndex, null);
                     return true;
                 });
             }
@@ -481,17 +487,7 @@ public final class SuggestionBarView extends GridLayout {
         return null;
     }
 
-    private void onPinnedItemLongPress(int pinnedIndex, PinnedItem pinnedItem) {
-        if (pinnedItem instanceof PinnedFolderItem) {
-            showFolderItemOptions(pinnedIndex, (PinnedFolderItem) pinnedItem);
-            return;
-        }
-        if (pinnedItem instanceof PinnedAppItem) {
-            showPinnedAppOptions(pinnedIndex, (PinnedAppItem) pinnedItem);
-        }
-    }
-
-    private void showPinnedAppsEditor() {
+    private void showUnifiedPinEditor(final int slotIndex, @Nullable final PinnedItem pinnedAtSlot) {
         if (configRepository == null) return;
         if (allApps == null || allApps.isEmpty()) reloadAllApps();
 
@@ -556,6 +552,30 @@ public final class SuggestionBarView extends GridLayout {
         allAppsTitle.setTextColor(TEXT_COLOR);
         allAppsTitle.setPadding(0, 16, 0, 8);
 
+        LinearLayout topActions = new LinearLayout(getContext());
+        topActions.setOrientation(LinearLayout.HORIZONTAL);
+        topActions.setGravity(Gravity.END);
+
+        Button folderAction = new Button(getContext());
+        folderAction.setText("Create Folder");
+
+        final boolean[] folderMode = new boolean[] {false};
+        folderAction.setOnClickListener(v -> {
+            folderMode[0] = !folderMode[0];
+            folderAction.setText(folderMode[0] ? "Folder Mode: ON" : "Create Folder");
+        });
+        topActions.addView(folderAction);
+
+        if (pinnedAtSlot instanceof PinnedFolderItem) {
+            Button deleteFolder = new Button(getContext());
+            deleteFolder.setText("Delete Folder");
+            deleteFolder.setOnClickListener(v -> {
+                removePinnedAt(slotIndex);
+                dialog.dismiss();
+            });
+            topActions.addView(deleteFolder);
+        }
+
         ListView listView = new ListView(getContext());
         listView.setChoiceMode(ListView.CHOICE_MODE_MULTIPLE);
         ArrayAdapter<String> adapter = new ArrayAdapter<>(getContext(), android.R.layout.simple_list_item_multiple_choice, labels);
@@ -593,7 +613,11 @@ public final class SuggestionBarView extends GridLayout {
         Button save = new Button(getContext());
         save.setText("Save Pins");
         save.setOnClickListener(v -> {
-            applyPinnedSelection(orderedSelected);
+            if (folderMode[0]) {
+                createOrReplaceFolderAtSlot(slotIndex, orderedSelected);
+            } else {
+                applyPinnedSelection(orderedSelected);
+            }
             dialog.dismiss();
             reloadWithInput("", lastTerminalView);
         });
@@ -601,6 +625,7 @@ public final class SuggestionBarView extends GridLayout {
         buttons.addView(cancel);
         buttons.addView(save);
 
+        root.addView(topActions, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         root.addView(selectedTitle, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         root.addView(orderedRecycler, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 320));
         root.addView(allAppsTitle, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
@@ -609,6 +634,72 @@ public final class SuggestionBarView extends GridLayout {
 
         dialog.setContentView(root);
         dialog.show();
+    }
+
+    private void createOrReplaceFolderAtSlot(int slotIndex, @NonNull List<AppRef> selectedOrdered) {
+        if (selectedOrdered.isEmpty()) {
+            return;
+        }
+        PinnedFolderItem folder = new PinnedFolderItem(UUID.randomUUID().toString(), "Folder");
+        for (AppRef ref : selectedOrdered) {
+            folder.apps.add(resolveForSelectionRef(ref));
+        }
+        if (slotIndex >= 0 && slotIndex < pinnedItems.size()) {
+            pinnedItems.set(slotIndex, folder);
+        } else {
+            pinnedItems.add(folder);
+        }
+        persistPinsAndReload();
+    }
+
+    private View createFolderPreviewButton(@NonNull PinnedFolderItem folder) {
+        LinearLayout root = new LinearLayout(getContext());
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setGravity(Gravity.CENTER);
+        root.setPadding(4, 2, 4, 2);
+
+        FrameLayout iconShell = new FrameLayout(getContext());
+        int shellSize = Math.max(28, Math.round(28f * iconScale * getResources().getDisplayMetrics().density));
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(0x22FFFFFF);
+        bg.setCornerRadius(12f);
+        bg.setStroke(1, 0x33FFFFFF);
+        iconShell.setBackground(bg);
+        iconShell.setLayoutParams(new LinearLayout.LayoutParams(shellSize, shellSize));
+
+        GridLayout miniGrid = new GridLayout(getContext());
+        miniGrid.setColumnCount(2);
+        miniGrid.setRowCount(2);
+        miniGrid.setUseDefaultMargins(true);
+
+        int miniSize = Math.max(10, shellSize / 3);
+        int placed = 0;
+        for (AppRef ref : folder.apps) {
+            if (placed >= 4) break;
+            LauncherAppEntry e = resolveRef(ref);
+            if (e == null || e.icon == null) continue;
+            ImageView mini = new ImageView(getContext());
+            mini.setImageDrawable(e.icon);
+            mini.setScaleType(ImageView.ScaleType.CENTER_CROP);
+            GridLayout.LayoutParams params = new GridLayout.LayoutParams();
+            params.width = miniSize;
+            params.height = miniSize;
+            mini.setLayoutParams(params);
+            miniGrid.addView(mini);
+            placed++;
+        }
+        iconShell.addView(miniGrid, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.CENTER));
+
+        TextView label = new TextView(getContext());
+        label.setText(TextUtils.isEmpty(folder.title) ? "Folder" : folder.title);
+        label.setTextColor(TEXT_COLOR);
+        label.setTextSize(8f);
+        label.setEllipsize(TextUtils.TruncateAt.END);
+        label.setMaxLines(1);
+
+        root.addView(iconShell);
+        root.addView(label);
+        return root;
     }
 
     private void applyPinnedSelection(@NonNull List<AppRef> selectedOrdered) {
@@ -863,10 +954,11 @@ public final class SuggestionBarView extends GridLayout {
             LauncherAppEntry entry = folderEntries.get(i);
             View btn = createEntryButton(entry);
             GridLayout.LayoutParams params = new GridLayout.LayoutParams();
-            params.width = 0;
+            params.width = ViewGroup.LayoutParams.WRAP_CONTENT;
             params.height = ViewGroup.LayoutParams.WRAP_CONTENT;
-            params.columnSpec = GridLayout.spec(i % folder.cols, 1f);
-            params.rowSpec = GridLayout.spec(i / folder.cols, 1f);
+            params.columnSpec = GridLayout.spec(i % folder.cols);
+            params.rowSpec = GridLayout.spec(i / folder.cols);
+            params.setMargins(8, 8, 8, 8);
             btn.setLayoutParams(params);
             grid.addView(btn);
         }
@@ -902,18 +994,28 @@ public final class SuggestionBarView extends GridLayout {
         View overlay = new View(getContext());
         overlay.setBackgroundColor(overlayColor);
         popupRoot.addView(overlay, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
-        popupRoot.addView(scroll, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        popupRoot.addView(scroll, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
-        folderPopupWindow = new PopupWindow(popupRoot, ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, true);
+        popupRoot.measure(View.MeasureSpec.makeMeasureSpec(getResources().getDisplayMetrics().widthPixels, View.MeasureSpec.AT_MOST),
+            View.MeasureSpec.makeMeasureSpec(getResources().getDisplayMetrics().heightPixels, View.MeasureSpec.AT_MOST));
+        int popupWidth = popupRoot.getMeasuredWidth();
+        int popupHeight = popupRoot.getMeasuredHeight();
+
+        folderPopupWindow = new PopupWindow(popupRoot, ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, true);
         folderPopupWindow.setOutsideTouchable(true);
         folderPopupWindow.setBackgroundDrawable(new ColorDrawable(0x00000000));
         folderPopupWindow.setElevation(8f);
-
-        View parent = this;
+        int gap = Math.round(5f * getResources().getDisplayMetrics().density);
         if (anchor != null) {
-            folderPopupWindow.showAsDropDown(anchor, 0, -anchor.getHeight() * 2);
+            int[] location = new int[2];
+            anchor.getLocationOnScreen(location);
+            int x = location[0] + (anchor.getWidth() / 2) - (popupWidth / 2);
+            int y = location[1] - popupHeight - gap;
+            x = clamp(x, 0, Math.max(0, getResources().getDisplayMetrics().widthPixels - popupWidth));
+            y = Math.max(0, y);
+            folderPopupWindow.showAtLocation(this, Gravity.NO_GRAVITY, x, y);
         } else {
-            folderPopupWindow.showAtLocation(parent, Gravity.BOTTOM, 0, getHeight() + 24);
+            folderPopupWindow.showAtLocation(this, Gravity.CENTER_HORIZONTAL | Gravity.BOTTOM, 0, getHeight() + gap);
         }
     }
 
