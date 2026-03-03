@@ -172,3 +172,10 @@ Files changed: app/src/main/java/com/termux/app/SuggestionBarView.java, app/src/
 Build result: pass (:app:compileDebugJavaWithJavac)
 Manual validation case(s): Pending device check: set "Icon count" to N, pin >N apps, verify page split into ceil(total/N) and swipe navigation.
 Next step: Commit/push and run nightly for artifact validation.
+Cycle: 17
+Task: Add velocity-based apps-bar page-switch animation and repair folder-create action placement/icon
+Root cause: Page switching was abrupt and gesture-only index switch; folder create control had regressed in discoverability/function after prior UI rearrangements.
+Files changed: app/src/main/java/com/termux/app/SuggestionBarView.java, app/src/main/res/drawable/ic_create_new_folder_24.xml
+Build result: pass (:app:compileDebugJavaWithJavac)
+Manual validation case(s): Pending device QA for velocity-scaled swipe transition timing and bottom-right create-folder action behavior in long-press editor.
+Next step: Push appsbar-dev and trigger nightly build for artifact validation.

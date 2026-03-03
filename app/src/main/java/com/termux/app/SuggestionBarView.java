@@ -1,6 +1,9 @@
 package com.termux.app;
 
 import android.annotation.SuppressLint;
+import android.animation.Animator;
+import android.animation.AnimatorListenerAdapter;
+import android.animation.ValueAnimator;
 import android.app.AlertDialog;
 import android.content.Context;
 import android.content.Intent;
@@ -15,11 +18,13 @@ import android.graphics.drawable.GradientDrawable;
 import android.os.Build;
 import android.text.TextUtils;
 import android.util.AttributeSet;
+import android.view.VelocityTracker;
 import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewParent;
+import android.view.animation.DecelerateInterpolator;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
@@ -40,6 +45,7 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.github.mmin18.widget.RealtimeBlurView;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
+import com.termux.R;
 import com.termux.app.launcher.data.LauncherAppDataProvider;
 import com.termux.app.launcher.data.LauncherConfigRepository;
 import com.termux.app.launcher.data.LauncherRankingEngine;
@@ -94,6 +100,8 @@ public final class SuggestionBarView extends GridLayout {
     private int pinnedItemsPerPage = 1;
     private float swipeDownX = 0f;
     private float swipeDownY = 0f;
+    private VelocityTracker swipeVelocityTracker;
+    private boolean pageSwitchAnimating = false;
 
     public SuggestionBarView(Context context, AttributeSet attrs) {
         super(context, attrs);
@@ -225,32 +233,54 @@ public final class SuggestionBarView extends GridLayout {
         if (event == null) return super.dispatchTouchEvent(event);
         int action = event.getActionMasked();
         if (action == MotionEvent.ACTION_DOWN) {
+            if (swipeVelocityTracker != null) swipeVelocityTracker.recycle();
+            swipeVelocityTracker = VelocityTracker.obtain();
+            swipeVelocityTracker.addMovement(event);
             ViewParent parent = getParent();
             if (parent != null) parent.requestDisallowInterceptTouchEvent(true);
             swipeDownX = event.getX();
             swipeDownY = event.getY();
+        } else if (action == MotionEvent.ACTION_MOVE) {
+            if (swipeVelocityTracker != null) swipeVelocityTracker.addMovement(event);
         } else if (action == MotionEvent.ACTION_UP) {
+            if (swipeVelocityTracker != null) {
+                swipeVelocityTracker.addMovement(event);
+                swipeVelocityTracker.computeCurrentVelocity(1000);
+            }
             float dx = event.getX() - swipeDownX;
             float dy = event.getY() - swipeDownY;
+            float vx = swipeVelocityTracker == null ? 0f : swipeVelocityTracker.getXVelocity();
             float threshold = dp(28);
-            if (Math.abs(dx) > threshold && Math.abs(dx) > Math.abs(dy) * 1.2f &&
+            boolean swipeQualified = Math.abs(dx) > threshold || Math.abs(vx) > 900f;
+            if (swipeQualified && Math.abs(dx) > Math.abs(dy) * 1.2f &&
                 activeAzLetter == null && TextUtils.isEmpty(lastInput.trim()) && pinnedItemsPerPage > 0) {
                 int pageDelta = dx < 0 ? 1 : -1;
                 int totalPages = getPinnedPagesCount();
                 if (totalPages > 1) {
                     int next = clamp(pinnedPageIndex + pageDelta, 0, totalPages - 1);
                     if (next != pinnedPageIndex) {
-                        pinnedPageIndex = next;
-                        reloadWithInput("", lastTerminalView);
+                        animatePageSwitch(pageDelta, Math.max(Math.abs(vx), Math.abs(dx) * 8f));
+                        if (swipeVelocityTracker != null) {
+                            swipeVelocityTracker.recycle();
+                            swipeVelocityTracker = null;
+                        }
                         return true;
                     }
                 }
             }
             ViewParent parent = getParent();
             if (parent != null) parent.requestDisallowInterceptTouchEvent(false);
+            if (swipeVelocityTracker != null) {
+                swipeVelocityTracker.recycle();
+                swipeVelocityTracker = null;
+            }
         } else if (action == MotionEvent.ACTION_CANCEL) {
             ViewParent parent = getParent();
             if (parent != null) parent.requestDisallowInterceptTouchEvent(false);
+            if (swipeVelocityTracker != null) {
+                swipeVelocityTracker.recycle();
+                swipeVelocityTracker = null;
+            }
         }
         return super.dispatchTouchEvent(event);
     }
@@ -580,24 +610,6 @@ public final class SuggestionBarView extends GridLayout {
         allAppsTitle.setTextColor(TEXT_COLOR);
         allAppsTitle.setPadding(0, 16, 0, 8);
 
-        LinearLayout topActions = new LinearLayout(getContext());
-        topActions.setOrientation(LinearLayout.HORIZONTAL);
-        topActions.setGravity(Gravity.END);
-
-        ImageButton folderAction = new ImageButton(getContext());
-        folderAction.setImageResource(android.R.drawable.ic_menu_add);
-        folderAction.setContentDescription("Create folder at this slot");
-        styleIconButton(folderAction, dp(4));
-        LinearLayout.LayoutParams folderActionParams = new LinearLayout.LayoutParams(dp(28), dp(28));
-
-        final boolean[] folderMode = new boolean[] {false};
-        folderAction.setOnClickListener(v -> {
-            folderMode[0] = !folderMode[0];
-            folderAction.setAlpha(folderMode[0] ? 1f : 0.55f);
-        });
-        folderAction.setAlpha(0.55f);
-        topActions.addView(folderAction, folderActionParams);
-
         ListView listView = new ListView(getContext());
         listViewHolder[0] = listView;
         listView.setChoiceMode(ListView.CHOICE_MODE_MULTIPLE);
@@ -640,6 +652,25 @@ public final class SuggestionBarView extends GridLayout {
         Button save = new Button(getContext());
         save.setText("Save Pins");
         styleGhostButton(save);
+
+        ImageButton folderAction = new ImageButton(getContext());
+        folderAction.setImageResource(R.drawable.ic_create_new_folder_24);
+        folderAction.setContentDescription("Create folder at this slot");
+        styleIconButton(folderAction, dp(4));
+        LinearLayout.LayoutParams folderActionParams = new LinearLayout.LayoutParams(dp(30), dp(30));
+        folderActionParams.setMargins(dp(8), 0, 0, 0);
+
+        final boolean[] folderMode = new boolean[] {false};
+        final Runnable refreshFolderModeUi = () -> {
+            save.setText(folderMode[0] ? "Create Folder" : "Save Pins");
+            folderAction.setAlpha(folderMode[0] ? 1f : 0.6f);
+        };
+        folderAction.setOnClickListener(v -> {
+            folderMode[0] = !folderMode[0];
+            refreshFolderModeUi.run();
+        });
+        refreshFolderModeUi.run();
+
         save.setOnClickListener(v -> {
             if (folderMode[0]) {
                 List<AppRef> folderApps = new ArrayList<>();
@@ -658,13 +689,13 @@ public final class SuggestionBarView extends GridLayout {
 
         buttons.addView(cancel);
         buttons.addView(save);
+        buttons.addView(folderAction, folderActionParams);
 
         orderedRecycler.setOnTouchListener((v, event) -> {
             v.getParent().requestDisallowInterceptTouchEvent(true);
             return false;
         });
 
-        root.addView(topActions, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         root.addView(selectedTitle, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         root.addView(orderedRecycler, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(180)));
         root.addView(allAppsTitle, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
@@ -1432,6 +1463,90 @@ public final class SuggestionBarView extends GridLayout {
 
     private static int clamp(int value, int min, int max) {
         return Math.max(min, Math.min(max, value));
+    }
+
+    private void animatePageSwitch(int pageDelta, float velocityPxPerSec) {
+        if (pageSwitchAnimating) return;
+        int totalPages = getPinnedPagesCount();
+        if (totalPages <= 1) return;
+        int targetPage = clamp(pinnedPageIndex + pageDelta, 0, totalPages - 1);
+        if (targetPage == pinnedPageIndex) return;
+
+        pageSwitchAnimating = true;
+        final int direction = pageDelta > 0 ? 1 : -1;
+        final float travel = Math.max(dp(24), getWidth() * 0.28f);
+        final long duration = computePageAnimDuration(velocityPxPerSec);
+        final List<View> currentChildren = snapshotChildren();
+
+        ValueAnimator outAnimator = ValueAnimator.ofFloat(0f, 1f);
+        outAnimator.setDuration(duration);
+        outAnimator.setInterpolator(new DecelerateInterpolator());
+        outAnimator.addUpdateListener(animation -> {
+            float t = (float) animation.getAnimatedValue();
+            float tx = -direction * travel * t;
+            float alpha = 1f - (0.6f * t);
+            for (View child : currentChildren) {
+                child.setTranslationX(tx);
+                child.setAlpha(alpha);
+            }
+        });
+        outAnimator.addListener(new AnimatorListenerAdapter() {
+            @Override
+            public void onAnimationEnd(Animator animation) {
+                pinnedPageIndex = targetPage;
+                reloadWithInput("", lastTerminalView);
+                post(() -> animatePageIn(direction, travel, duration));
+            }
+        });
+        outAnimator.start();
+    }
+
+    private void animatePageIn(int direction, float travel, long duration) {
+        List<View> newChildren = snapshotChildren();
+        for (View child : newChildren) {
+            child.setTranslationX(direction * travel * 0.55f);
+            child.setAlpha(0.35f);
+        }
+
+        ValueAnimator inAnimator = ValueAnimator.ofFloat(0f, 1f);
+        inAnimator.setDuration(duration);
+        inAnimator.setInterpolator(new DecelerateInterpolator());
+        inAnimator.addUpdateListener(animation -> {
+            float t = (float) animation.getAnimatedValue();
+            float tx = direction * travel * (0.55f * (1f - t));
+            float alpha = 0.35f + (0.65f * t);
+            for (View child : newChildren) {
+                child.setTranslationX(tx);
+                child.setAlpha(alpha);
+            }
+        });
+        inAnimator.addListener(new AnimatorListenerAdapter() {
+            @Override
+            public void onAnimationEnd(Animator animation) {
+                for (View child : newChildren) {
+                    child.setTranslationX(0f);
+                    child.setAlpha(1f);
+                }
+                pageSwitchAnimating = false;
+            }
+        });
+        inAnimator.start();
+    }
+
+    private long computePageAnimDuration(float velocityPxPerSec) {
+        float v = Math.max(200f, Math.min(6000f, Math.abs(velocityPxPerSec)));
+        long ms = (long) (280f - ((v - 200f) / (6000f - 200f)) * 140f);
+        return clamp((int) ms, 120, 280);
+    }
+
+    @NonNull
+    private List<View> snapshotChildren() {
+        List<View> out = new ArrayList<>();
+        for (int i = 0; i < getChildCount(); i++) {
+            View child = getChildAt(i);
+            if (child != null) out.add(child);
+        }
+        return out;
     }
 
     private View createPopupEntryButton(@NonNull LauncherAppEntry entry, int sizePx) {
