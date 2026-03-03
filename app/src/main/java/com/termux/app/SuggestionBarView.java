@@ -19,6 +19,7 @@ import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.ViewParent;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
@@ -224,6 +225,8 @@ public final class SuggestionBarView extends GridLayout {
         if (event == null) return super.dispatchTouchEvent(event);
         int action = event.getActionMasked();
         if (action == MotionEvent.ACTION_DOWN) {
+            ViewParent parent = getParent();
+            if (parent != null) parent.requestDisallowInterceptTouchEvent(true);
             swipeDownX = event.getX();
             swipeDownY = event.getY();
         } else if (action == MotionEvent.ACTION_UP) {
@@ -243,6 +246,11 @@ public final class SuggestionBarView extends GridLayout {
                     }
                 }
             }
+            ViewParent parent = getParent();
+            if (parent != null) parent.requestDisallowInterceptTouchEvent(false);
+        } else if (action == MotionEvent.ACTION_CANCEL) {
+            ViewParent parent = getParent();
+            if (parent != null) parent.requestDisallowInterceptTouchEvent(false);
         }
         return super.dispatchTouchEvent(event);
     }
@@ -384,6 +392,9 @@ public final class SuggestionBarView extends GridLayout {
 
     private View createEntryButton(@NonNull LauncherAppEntry entry) {
         if (entry.icon != null && showIcons) {
+            FrameLayout shell = new FrameLayout(getContext());
+            shell.setLayoutParams(new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+
             ImageButton imageButton = new ImageButton(getContext());
             imageButton.setImageDrawable(entry.icon);
             int size = iconSizePx();
@@ -391,7 +402,7 @@ public final class SuggestionBarView extends GridLayout {
             imageButton.setAdjustViewBounds(true);
             imageButton.setPadding(0, 0, 0, 0);
             imageButton.setBackgroundColor(0x00000000);
-            imageButton.setLayoutParams(new ViewGroup.LayoutParams(size, size));
+            imageButton.setLayoutParams(new FrameLayout.LayoutParams(size, size, Gravity.CENTER));
             imageButton.setMinimumHeight(size);
             imageButton.setMinimumWidth(size);
             if (bandW) {
@@ -406,7 +417,8 @@ public final class SuggestionBarView extends GridLayout {
             }
             imageButton.setOnClickListener(v -> launchEntry(entry, lastTerminalView));
             imageButton.setContentDescription(entry.label);
-            return imageButton;
+            shell.addView(imageButton);
+            return shell;
         }
 
         Button button = new Button(getContext(), null, android.R.attr.buttonBarButtonStyle);
