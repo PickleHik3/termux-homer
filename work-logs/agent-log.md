@@ -137,3 +137,10 @@ Files changed: app/src/main/java/com/termux/app/SuggestionBarView.java, app/src/
 Build result: remote workflow dispatched (Build nightly), status in_progress at run 22601600455 on commit ff29372747fe940fcb274d12c3e676e1c65017a9
 Manual validation case(s): N/A for this cycle (deferred to GitHub workflow artifacts/build status per request)
 Next step: Wait for workflow completion and verify attached APK artifacts for appsbar-dev.
+Cycle: 12
+Task: Folder icon/popup UX refinement from user feedback
+Root cause: Folder preview rendered as square + label, and folder popup layout sizing/anchor behavior did not match intended launcher-style anchored popup.
+Files changed: app/src/main/java/com/termux/app/SuggestionBarView.java
+Build result: pass (:app:compileDebugJavaWithJavac)
+Manual validation case(s): Compile validation complete; manual device checks pending for circular folder icon (no label), anchored popup position (3-5dp above folder), and icon-size parity with app bar scale.
+Next step: User visual QA on device; if approved, commit and push to appsbar-dev and trigger nightly workflow.

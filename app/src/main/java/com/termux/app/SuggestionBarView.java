@@ -12,6 +12,7 @@ import android.graphics.Typeface;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
+import android.os.Build;
 import android.text.TextUtils;
 import android.util.AttributeSet;
 import android.view.Gravity;
@@ -27,7 +28,6 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ListView;
 import android.widget.PopupWindow;
-import android.widget.ScrollView;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
@@ -653,26 +653,26 @@ public final class SuggestionBarView extends GridLayout {
     }
 
     private View createFolderPreviewButton(@NonNull PinnedFolderItem folder) {
-        LinearLayout root = new LinearLayout(getContext());
-        root.setOrientation(LinearLayout.VERTICAL);
-        root.setGravity(Gravity.CENTER);
-        root.setPadding(4, 2, 4, 2);
-
         FrameLayout iconShell = new FrameLayout(getContext());
-        int shellSize = Math.max(28, Math.round(28f * iconScale * getResources().getDisplayMetrics().density));
+        int shellSize = iconSizePx();
         GradientDrawable bg = new GradientDrawable();
-        bg.setColor(0x22FFFFFF);
-        bg.setCornerRadius(12f);
+        bg.setShape(GradientDrawable.OVAL);
+        bg.setColor(0x26FFFFFF);
         bg.setStroke(1, 0x33FFFFFF);
         iconShell.setBackground(bg);
         iconShell.setLayoutParams(new LinearLayout.LayoutParams(shellSize, shellSize));
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            iconShell.setClipToOutline(true);
+        }
+        iconShell.setPadding(dp(2), dp(2), dp(2), dp(2));
 
         GridLayout miniGrid = new GridLayout(getContext());
         miniGrid.setColumnCount(2);
         miniGrid.setRowCount(2);
-        miniGrid.setUseDefaultMargins(true);
+        miniGrid.setUseDefaultMargins(false);
+        miniGrid.setAlignmentMode(GridLayout.ALIGN_BOUNDS);
 
-        int miniSize = Math.max(10, shellSize / 3);
+        int miniSize = Math.max(dp(8), Math.round(shellSize * 0.36f));
         int placed = 0;
         for (AppRef ref : folder.apps) {
             if (placed >= 4) break;
@@ -680,26 +680,17 @@ public final class SuggestionBarView extends GridLayout {
             if (e == null || e.icon == null) continue;
             ImageView mini = new ImageView(getContext());
             mini.setImageDrawable(e.icon);
-            mini.setScaleType(ImageView.ScaleType.CENTER_CROP);
+            mini.setScaleType(ImageView.ScaleType.FIT_CENTER);
             GridLayout.LayoutParams params = new GridLayout.LayoutParams();
             params.width = miniSize;
             params.height = miniSize;
+            params.setMargins(dp(1), dp(1), dp(1), dp(1));
             mini.setLayoutParams(params);
             miniGrid.addView(mini);
             placed++;
         }
         iconShell.addView(miniGrid, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.CENTER));
-
-        TextView label = new TextView(getContext());
-        label.setText(TextUtils.isEmpty(folder.title) ? "Folder" : folder.title);
-        label.setTextColor(TEXT_COLOR);
-        label.setTextSize(8f);
-        label.setEllipsize(TextUtils.TruncateAt.END);
-        label.setMaxLines(1);
-
-        root.addView(iconShell);
-        root.addView(label);
-        return root;
+        return iconShell;
     }
 
     private void applyPinnedSelection(@NonNull List<AppRef> selectedOrdered) {
@@ -944,42 +935,63 @@ public final class SuggestionBarView extends GridLayout {
             return;
         }
 
-        GridLayout grid = new GridLayout(getContext());
-        grid.setColumnCount(clamp(folder.cols, 1, PinnedFolderItem.MAX_GRID));
-        grid.setRowCount(clamp(folder.rows, 1, PinnedFolderItem.MAX_GRID));
-        grid.setPadding(16, 16, 16, 16);
+        int rows = clamp(folder.rows, 1, PinnedFolderItem.MAX_GRID);
+        int cols = clamp(folder.cols, 1, PinnedFolderItem.MAX_GRID);
+        int cellCount = rows * cols;
 
-        int cellCount = clamp(folder.rows, 1, PinnedFolderItem.MAX_GRID) * clamp(folder.cols, 1, PinnedFolderItem.MAX_GRID);
+        GridLayout grid = new GridLayout(getContext());
+        grid.setColumnCount(cols);
+        grid.setRowCount(rows);
+        grid.setPadding(dp(8), dp(8), dp(8), dp(8));
+        grid.setUseDefaultMargins(false);
+        grid.setAlignmentMode(GridLayout.ALIGN_BOUNDS);
+
         for (int i = 0; i < folderEntries.size() && i < cellCount; i++) {
             LauncherAppEntry entry = folderEntries.get(i);
             View btn = createEntryButton(entry);
             GridLayout.LayoutParams params = new GridLayout.LayoutParams();
             params.width = ViewGroup.LayoutParams.WRAP_CONTENT;
             params.height = ViewGroup.LayoutParams.WRAP_CONTENT;
-            params.columnSpec = GridLayout.spec(i % folder.cols);
-            params.rowSpec = GridLayout.spec(i / folder.cols);
-            params.setMargins(8, 8, 8, 8);
+            params.columnSpec = GridLayout.spec(i % cols);
+            params.rowSpec = GridLayout.spec(i / cols);
+            params.setMargins(dp(2), dp(2), dp(2), dp(2));
             btn.setLayoutParams(params);
             grid.addView(btn);
         }
 
-        ScrollView scroll = new ScrollView(getContext());
         LinearLayout shell = new LinearLayout(getContext());
         shell.setOrientation(LinearLayout.VERTICAL);
-        shell.setPadding(8, 8, 8, 8);
+        shell.setPadding(dp(8), dp(8), dp(8), dp(8));
+
+        LinearLayout header = new LinearLayout(getContext());
+        header.setOrientation(LinearLayout.HORIZONTAL);
+        header.setGravity(Gravity.CENTER_VERTICAL);
+        header.setPadding(dp(4), dp(2), dp(4), dp(4));
+
+        TextView title = new TextView(getContext());
+        title.setText(TextUtils.isEmpty(folder.title) ? "Folder" : folder.title);
+        title.setTextColor(TEXT_COLOR);
+        title.setTextSize(12f);
+        title.setTypeface(Typeface.DEFAULT_BOLD);
+        title.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
 
         Button gear = new Button(getContext());
-        gear.setText("⚙");
+        gear.setText("\u2699");
         gear.setOnClickListener(v -> {
             dismissFolderPopup();
             showFolderSettings(folder);
         });
 
-        shell.addView(gear, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-        shell.addView(grid, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        header.addView(title);
+        header.addView(gear, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        shell.addView(header, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        shell.addView(grid, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
-        scroll.addView(shell);
         FrameLayout popupRoot = new FrameLayout(getContext());
+        GradientDrawable panelBg = new GradientDrawable();
+        panelBg.setCornerRadius(dp(10));
+        panelBg.setColor(0x00000000);
+        popupRoot.setBackground(panelBg);
 
         if (blurEnabled) {
             RealtimeBlurView blurView = new RealtimeBlurView(getContext(), null);
@@ -994,10 +1006,12 @@ public final class SuggestionBarView extends GridLayout {
         View overlay = new View(getContext());
         overlay.setBackgroundColor(overlayColor);
         popupRoot.addView(overlay, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
-        popupRoot.addView(scroll, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        popupRoot.addView(shell, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
-        popupRoot.measure(View.MeasureSpec.makeMeasureSpec(getResources().getDisplayMetrics().widthPixels, View.MeasureSpec.AT_MOST),
-            View.MeasureSpec.makeMeasureSpec(getResources().getDisplayMetrics().heightPixels, View.MeasureSpec.AT_MOST));
+        int screenW = getResources().getDisplayMetrics().widthPixels;
+        int screenH = getResources().getDisplayMetrics().heightPixels;
+        popupRoot.measure(View.MeasureSpec.makeMeasureSpec(screenW, View.MeasureSpec.AT_MOST),
+            View.MeasureSpec.makeMeasureSpec(screenH, View.MeasureSpec.AT_MOST));
         int popupWidth = popupRoot.getMeasuredWidth();
         int popupHeight = popupRoot.getMeasuredHeight();
 
@@ -1005,13 +1019,13 @@ public final class SuggestionBarView extends GridLayout {
         folderPopupWindow.setOutsideTouchable(true);
         folderPopupWindow.setBackgroundDrawable(new ColorDrawable(0x00000000));
         folderPopupWindow.setElevation(8f);
-        int gap = Math.round(5f * getResources().getDisplayMetrics().density);
+        int gap = dp(4);
         if (anchor != null) {
             int[] location = new int[2];
             anchor.getLocationOnScreen(location);
             int x = location[0] + (anchor.getWidth() / 2) - (popupWidth / 2);
             int y = location[1] - popupHeight - gap;
-            x = clamp(x, 0, Math.max(0, getResources().getDisplayMetrics().widthPixels - popupWidth));
+            x = clamp(x, 0, Math.max(0, screenW - popupWidth));
             y = Math.max(0, y);
             folderPopupWindow.showAtLocation(this, Gravity.NO_GRAVITY, x, y);
         } else {
@@ -1179,6 +1193,14 @@ public final class SuggestionBarView extends GridLayout {
 
     private static int clamp(int value, int min, int max) {
         return Math.max(min, Math.min(max, value));
+    }
+
+    private int dp(int value) {
+        return Math.round(value * getResources().getDisplayMetrics().density);
+    }
+
+    private int iconSizePx() {
+        return Math.max(dp(20), Math.round(24f * iconScale * getResources().getDisplayMetrics().density));
     }
 
     @NonNull
