@@ -179,3 +179,10 @@ Files changed: app/src/main/java/com/termux/app/SuggestionBarView.java, app/src/
 Build result: pass (:app:compileDebugJavaWithJavac)
 Manual validation case(s): Pending device QA for velocity-scaled swipe transition timing and bottom-right create-folder action behavior in long-press editor.
 Next step: Push appsbar-dev and trigger nightly build for artifact validation.
+Cycle: 18
+Task: Rework page animation + folder popup interaction polish
+Root cause: Child-level page transition introduced perceptual flicker at animation tail; folder popup focus behavior hid soft keyboard and shifted popup placement; folder preview shell looked undersized relative to app icons.
+Files changed: app/src/main/java/com/termux/app/SuggestionBarView.java
+Build result: pass (:app:compileDebugJavaWithJavac)
+Manual validation case(s): Pending device QA for no-flicker page transition, stable keyboard when opening folder popup, popup anchor position above apps bar, and folder icon visual parity.
+Next step: Push appsbar-dev and trigger nightly after user confirmation.

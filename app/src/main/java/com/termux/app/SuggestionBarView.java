@@ -3,7 +3,6 @@ package com.termux.app;
 import android.annotation.SuppressLint;
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
-import android.animation.ValueAnimator;
 import android.app.AlertDialog;
 import android.content.Context;
 import android.content.Intent;
@@ -24,6 +23,7 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewParent;
+import android.view.WindowManager;
 import android.view.animation.DecelerateInterpolator;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
@@ -824,7 +824,7 @@ public final class SuggestionBarView extends GridLayout {
         root.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 
         FrameLayout iconShell = new FrameLayout(getContext());
-        int shellSize = iconSizePx();
+        int shellSize = iconSizePx() + dp(2);
         GradientDrawable bg = new GradientDrawable();
         bg.setShape(GradientDrawable.OVAL);
         bg.setColor(0x26FFFFFF);
@@ -834,7 +834,7 @@ public final class SuggestionBarView extends GridLayout {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             iconShell.setClipToOutline(true);
         }
-        iconShell.setPadding(dp(2), dp(2), dp(2), dp(2));
+        iconShell.setPadding(0, 0, 0, 0);
 
         GridLayout miniGrid = new GridLayout(getContext());
         miniGrid.setColumnCount(2);
@@ -1193,10 +1193,19 @@ public final class SuggestionBarView extends GridLayout {
         int popupWidth = popupRoot.getMeasuredWidth();
         int popupHeight = popupRoot.getMeasuredHeight();
 
-        folderPopupWindow = new PopupWindow(popupRoot, ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, true);
+        folderPopupWindow = new PopupWindow(popupRoot, ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, false);
+        folderPopupWindow.setFocusable(false);
+        folderPopupWindow.setTouchable(true);
         folderPopupWindow.setOutsideTouchable(true);
+        folderPopupWindow.setInputMethodMode(PopupWindow.INPUT_METHOD_NOT_NEEDED);
+        folderPopupWindow.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_UNCHANGED);
         folderPopupWindow.setBackgroundDrawable(new ColorDrawable(0x00000000));
         folderPopupWindow.setElevation(8f);
+        folderPopupWindow.setOnDismissListener(() -> {
+            if (folderPopupWindow != null && !folderPopupWindow.isShowing()) {
+                folderPopupWindow = null;
+            }
+        });
         int gap = dp(4);
         if (anchor != null) {
             int[] location = new int[2];
@@ -1209,6 +1218,14 @@ public final class SuggestionBarView extends GridLayout {
         } else {
             folderPopupWindow.showAtLocation(this, Gravity.CENTER_HORIZONTAL | Gravity.BOTTOM, 0, getHeight() + gap);
         }
+        popupRoot.setAlpha(0f);
+        popupRoot.setTranslationY(dp(8));
+        popupRoot.animate()
+            .alpha(1f)
+            .translationY(0f)
+            .setDuration(150)
+            .setInterpolator(new DecelerateInterpolator())
+            .start();
     }
 
     private void removePinnedAt(int index) {
@@ -1228,8 +1245,25 @@ public final class SuggestionBarView extends GridLayout {
 
     private void dismissFolderPopup() {
         if (folderPopupWindow != null) {
-            folderPopupWindow.dismiss();
-            folderPopupWindow = null;
+            final PopupWindow popup = folderPopupWindow;
+            View content = popup.getContentView();
+            if (content != null && popup.isShowing()) {
+                content.animate()
+                    .alpha(0f)
+                    .translationY(dp(6))
+                    .setDuration(110)
+                    .withEndAction(() -> {
+                        try {
+                            popup.dismiss();
+                        } catch (Exception ignored) {
+                        }
+                        if (folderPopupWindow == popup) folderPopupWindow = null;
+                    })
+                    .start();
+            } else {
+                popup.dismiss();
+                if (folderPopupWindow == popup) folderPopupWindow = null;
+            }
         }
     }
 
@@ -1476,61 +1510,36 @@ public final class SuggestionBarView extends GridLayout {
         final int direction = pageDelta > 0 ? 1 : -1;
         final float travel = Math.max(dp(24), getWidth() * 0.28f);
         final long duration = computePageAnimDuration(velocityPxPerSec);
-        final List<View> currentChildren = snapshotChildren();
 
-        ValueAnimator outAnimator = ValueAnimator.ofFloat(0f, 1f);
-        outAnimator.setDuration(duration);
-        outAnimator.setInterpolator(new DecelerateInterpolator());
-        outAnimator.addUpdateListener(animation -> {
-            float t = (float) animation.getAnimatedValue();
-            float tx = -direction * travel * t;
-            float alpha = 1f - (0.6f * t);
-            for (View child : currentChildren) {
-                child.setTranslationX(tx);
-                child.setAlpha(alpha);
-            }
-        });
-        outAnimator.addListener(new AnimatorListenerAdapter() {
+        animate()
+            .translationX(-direction * travel)
+            .alpha(0.42f)
+            .setDuration(duration)
+            .setInterpolator(new DecelerateInterpolator())
+            .setListener(new AnimatorListenerAdapter() {
             @Override
             public void onAnimationEnd(Animator animation) {
+                setListenerSafe(null);
                 pinnedPageIndex = targetPage;
                 reloadWithInput("", lastTerminalView);
-                post(() -> animatePageIn(direction, travel, duration));
+                setTranslationX(direction * travel * 0.48f);
+                setAlpha(0.52f);
+                animate()
+                    .translationX(0f)
+                    .alpha(1f)
+                    .setDuration(Math.max(110, duration - 20))
+                    .setInterpolator(new DecelerateInterpolator())
+                    .setListener(new AnimatorListenerAdapter() {
+                        @Override
+                        public void onAnimationEnd(Animator animation) {
+                            setListenerSafe(null);
+                            pageSwitchAnimating = false;
+                        }
+                    })
+                    .start();
             }
-        });
-        outAnimator.start();
-    }
-
-    private void animatePageIn(int direction, float travel, long duration) {
-        List<View> newChildren = snapshotChildren();
-        for (View child : newChildren) {
-            child.setTranslationX(direction * travel * 0.55f);
-            child.setAlpha(0.35f);
-        }
-
-        ValueAnimator inAnimator = ValueAnimator.ofFloat(0f, 1f);
-        inAnimator.setDuration(duration);
-        inAnimator.setInterpolator(new DecelerateInterpolator());
-        inAnimator.addUpdateListener(animation -> {
-            float t = (float) animation.getAnimatedValue();
-            float tx = direction * travel * (0.55f * (1f - t));
-            float alpha = 0.35f + (0.65f * t);
-            for (View child : newChildren) {
-                child.setTranslationX(tx);
-                child.setAlpha(alpha);
-            }
-        });
-        inAnimator.addListener(new AnimatorListenerAdapter() {
-            @Override
-            public void onAnimationEnd(Animator animation) {
-                for (View child : newChildren) {
-                    child.setTranslationX(0f);
-                    child.setAlpha(1f);
-                }
-                pageSwitchAnimating = false;
-            }
-        });
-        inAnimator.start();
+            })
+            .start();
     }
 
     private long computePageAnimDuration(float velocityPxPerSec) {
@@ -1539,14 +1548,8 @@ public final class SuggestionBarView extends GridLayout {
         return clamp((int) ms, 120, 280);
     }
 
-    @NonNull
-    private List<View> snapshotChildren() {
-        List<View> out = new ArrayList<>();
-        for (int i = 0; i < getChildCount(); i++) {
-            View child = getChildAt(i);
-            if (child != null) out.add(child);
-        }
-        return out;
+    private void setListenerSafe(@Nullable AnimatorListenerAdapter adapter) {
+        animate().setListener(adapter);
     }
 
     private View createPopupEntryButton(@NonNull LauncherAppEntry entry, int sizePx) {
