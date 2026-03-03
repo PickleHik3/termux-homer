@@ -158,3 +158,17 @@ Files changed: app/src/main/java/com/termux/app/SuggestionBarView.java, app/src/
 Build result: pass (:app:compileDebugJavaWithJavac)
 Manual validation case(s): Pending device QA for long-press editor scrolling, row-delete glyph behavior, folder icon parity, rounded folder popup, and horizontal page swipe when pinned items exceed one page.
 Next step: Commit to appsbar-dev and trigger nightly workflow for artifact validation.
+Cycle: 15
+Task: Folder creation/edit flow and popup polish hardening
+Root cause: Folder creation reused selected pinned apps by default, folder long-press lacked dedicated app-editor flow, empty bar had no long-press entry point, and folder popup/icons/actions remained visually inconsistent.
+Files changed: app/src/main/java/com/termux/app/SuggestionBarView.java
+Build result: pass (:app:compileDebugJavaWithJavac)
+Manual validation case(s): Pending device validation for empty-folder creation, long-press on blank bar, folder-only long-press editor, visible popup gear, aligned pinned-row handle/delete glyphs, and folder popup icon downscaling with dense grids.
+Next step: User visual QA pass, then commit/push and trigger nightly build.
+Cycle: 16
+Task: Reintroduce configurable default pinned count and use it as pagination threshold
+Root cause: Pagination capacity was inferred from pixel-fit logic, which allowed too many items per page and prevented practical page splits in common layouts.
+Files changed: app/src/main/java/com/termux/app/SuggestionBarView.java, app/src/main/java/com/termux/app/TermuxActivity.java, app/src/main/java/com/termux/app/fragments/settings/termux/TermuxStylePreferencesFragment.java, app/src/main/res/xml/launcher_preferences.xml, app/src/main/res/xml/launcher_layout_preferences.xml
+Build result: pass (:app:compileDebugJavaWithJavac)
+Manual validation case(s): Pending device check: set "Icon count" to N, pin >N apps, verify page split into ceil(total/N) and swipe navigation.
+Next step: Commit/push and run nightly for artifact validation.

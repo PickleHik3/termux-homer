@@ -178,6 +178,9 @@ class TermuxStylePreferencesDataStore extends PreferenceDataStore {
             case "app_bar_opacity":
                 mPreferences.setAppBarOpacity(value);
                 break;
+            case "app_launcher_button_count":
+                mPreferences.setAppLauncherButtonCount(value);
+                break;
             case "app_launcher_icon_scale_percent":
                 mPreferences.setAppLauncherIconScale(value / 100f);
                 break;
@@ -206,6 +209,8 @@ class TermuxStylePreferencesDataStore extends PreferenceDataStore {
                 return mPreferences.getExtraKeysBlurRadius();
             case "app_bar_opacity":
                 return mPreferences.getAppBarOpacity();
+            case "app_launcher_button_count":
+                return mPreferences.getAppLauncherButtonCount();
             case "app_launcher_icon_scale_percent":
                 return Math.round(mPreferences.getAppLauncherIconScale() * 100f);
             case "app_launcher_bar_height_percent":

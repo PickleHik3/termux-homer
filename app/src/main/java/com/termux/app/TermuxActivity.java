@@ -780,8 +780,11 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         if (mLauncherConfigRepository == null) {
             mLauncherConfigRepository = new LauncherConfigRepository(mPreferences);
         }
-        DisplayMetrics displayMetrics = getResources().getDisplayMetrics();
-        int maxButtons = calculateSuggestionBarMaxButtons(displayMetrics);
+        int maxButtons = mPreferences.getAppLauncherButtonCount();
+        if (maxButtons <= 0) {
+            DisplayMetrics displayMetrics = getResources().getDisplayMetrics();
+            maxButtons = calculateSuggestionBarMaxButtons(displayMetrics);
+        }
         mSuggestionBarView.setMaxButtonCount(maxButtons);
         mSuggestionBarView.setDefaultButtons(new ArrayList<>());
         mSuggestionBarView.setTextSize(10f);
