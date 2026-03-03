@@ -131,6 +131,9 @@ public final class LauncherConfigRepository {
     public List<PinnedItem> migrateFromLegacyIfNeeded() {
         List<PinnedItem> out = new ArrayList<>();
         String legacy = preferences.getAppLauncherDefaultButtons();
+        if ("phone,bromite,whatsapp,telegram,spotify".equalsIgnoreCase(legacy == null ? "" : legacy.trim())) {
+            legacy = "";
+        }
         if (legacy != null && !legacy.trim().isEmpty()) {
             String[] parts = legacy.split(",");
             for (String part : parts) {

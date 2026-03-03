@@ -780,13 +780,10 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         if (mLauncherConfigRepository == null) {
             mLauncherConfigRepository = new LauncherConfigRepository(mPreferences);
         }
-        int maxButtons = mPreferences.getAppLauncherButtonCount();
-        if (maxButtons <= 0) {
-            DisplayMetrics displayMetrics = getResources().getDisplayMetrics();
-            maxButtons = calculateSuggestionBarMaxButtons(displayMetrics);
-        }
+        DisplayMetrics displayMetrics = getResources().getDisplayMetrics();
+        int maxButtons = calculateSuggestionBarMaxButtons(displayMetrics);
         mSuggestionBarView.setMaxButtonCount(maxButtons);
-        mSuggestionBarView.setDefaultButtons(getDefaultAppLauncherButtons());
+        mSuggestionBarView.setDefaultButtons(new ArrayList<>());
         mSuggestionBarView.setTextSize(10f);
         mSuggestionBarView.setSearchTolerance(mPreferences.getAppLauncherSearchTolerance());
         mSuggestionBarView.setShowIcons(mPreferences.isAppLauncherShowIconsEnabled());
@@ -812,25 +809,6 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
             }
         }
         mTerminalView.setSplitChar(splitChar);
-    }
-
-    private List<String> getDefaultAppLauncherButtons() {
-        if (mPreferences == null) {
-            return new ArrayList<>();
-        }
-        String defaultButtons = mPreferences.getAppLauncherDefaultButtons();
-        if (defaultButtons == null || defaultButtons.trim().isEmpty()) {
-            return new ArrayList<>();
-        }
-        String[] buttons = defaultButtons.split(",");
-        List<String> cleanedButtons = new ArrayList<>();
-        for (String button : buttons) {
-            String trimmed = button.trim();
-            if (!trimmed.isEmpty()) {
-                cleanedButtons.add(trimmed);
-            }
-        }
-        return cleanedButtons;
     }
 
     public void addTermuxActivityRootViewGlobalLayoutListener() {

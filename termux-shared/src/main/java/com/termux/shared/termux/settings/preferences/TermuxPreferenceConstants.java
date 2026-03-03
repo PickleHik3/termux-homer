@@ -142,7 +142,7 @@ public final class TermuxPreferenceConstants {
          */
         public static final String KEY_APP_LAUNCHER_DEFAULT_BUTTONS = "app_launcher_default_buttons";
 
-        public static final String DEFAULT_APP_LAUNCHER_DEFAULT_BUTTONS = "phone,bromite,whatsapp,telegram,spotify";
+        public static final String DEFAULT_APP_LAUNCHER_DEFAULT_BUTTONS = "";
 
         /**
          * Defines the key for app launcher bar height scale.

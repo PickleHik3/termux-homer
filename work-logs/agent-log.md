@@ -151,3 +151,10 @@ Files changed: app/src/main/java/com/termux/app/SuggestionBarView.java
 Build result: pass (:app:compileDebugJavaWithJavac)
 Manual validation case(s): Compile validated; device validation pending for circular folder icon rendering, anchored popup geometry, and pin limit warning behavior (>6 soft warn, max 8 hard stop).
 Next step: User visual QA on device, then commit/push and workflow run if approved.
+Cycle: 14
+Task: Launcher UX alignment pass (pin editor behavior, folder visuals, popup sizing, settings sliders, pagination)
+Root cause: Mixed legacy launcher assumptions (default seeded pins + button-count/default-apps settings) and popup rendering/styling inconsistencies caused behavior mismatch with requested app-bar UX.
+Files changed: app/src/main/java/com/termux/app/SuggestionBarView.java, app/src/main/java/com/termux/app/TermuxActivity.java, app/src/main/java/com/termux/app/fragments/settings/termux/TermuxStylePreferencesFragment.java, app/src/main/java/com/termux/app/launcher/data/LauncherConfigRepository.java, app/src/main/res/xml/launcher_preferences.xml, app/src/main/res/xml/launcher_layout_preferences.xml, termux-shared/src/main/java/com/termux/shared/termux/settings/preferences/TermuxPreferenceConstants.java
+Build result: pass (:app:compileDebugJavaWithJavac)
+Manual validation case(s): Pending device QA for long-press editor scrolling, row-delete glyph behavior, folder icon parity, rounded folder popup, and horizontal page swipe when pinned items exceed one page.
+Next step: Commit to appsbar-dev and trigger nightly workflow for artifact validation.
