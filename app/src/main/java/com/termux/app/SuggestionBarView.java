@@ -29,6 +29,7 @@ import android.widget.LinearLayout;
 import android.widget.ListView;
 import android.widget.PopupWindow;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -60,6 +61,8 @@ import java.util.UUID;
 public final class SuggestionBarView extends GridLayout {
 
     private static final int TEXT_COLOR = 0xFFC0B18B;
+    private static final int MAX_PINNED_ITEMS = 8;
+    private static final int SOFT_PIN_WARNING_THRESHOLD = 6;
 
     private List<LauncherAppEntry> allApps = new ArrayList<>();
     private int applicationSequenceNumber = 0;
@@ -280,9 +283,12 @@ public final class SuggestionBarView extends GridLayout {
 
     private void renderButtons(@NonNull List<LauncherAppEntry> entries, boolean azPreview) {
         removeAllViews();
+        List<PinnedItem> pinnedForSlots = trimmedPinnedItems(MAX_PINNED_ITEMS);
         int buttonCount = Math.max(1, maxButtonCount);
-
-        List<PinnedItem> pinnedForSlots = trimmedPinnedItems();
+        if (!azPreview && TextUtils.isEmpty(lastInput.trim()) && !pinnedForSlots.isEmpty()) {
+            buttonCount = clamp(pinnedForSlots.size(), 1, MAX_PINNED_ITEMS);
+        }
+        setColumnCount(buttonCount);
 
         int addedCount = 0;
         for (int col = 0; col < entries.size() && col < buttonCount; col++) {
@@ -397,13 +403,13 @@ public final class SuggestionBarView extends GridLayout {
         dismissFolderPopup();
     }
 
-    private List<PinnedItem> trimmedPinnedItems() {
+    private List<PinnedItem> trimmedPinnedItems(int limit) {
         List<PinnedItem> out = new ArrayList<>();
         if (pinnedItems == null) return out;
         for (PinnedItem item : pinnedItems) {
             if (item == null) continue;
             out.add(item);
-            if (out.size() >= maxButtonCount) break;
+            if (out.size() >= limit) break;
         }
         return out;
     }
@@ -497,20 +503,17 @@ public final class SuggestionBarView extends GridLayout {
         root.setPadding(32, 24, 32, 24);
 
         final List<LauncherAppEntry> source = new ArrayList<>(allApps);
+        final List<PinOption> options = buildPinOptions(source, pinnedItems);
         final List<String> labels = new ArrayList<>();
-        for (LauncherAppEntry app : source) labels.add(app.label);
+        for (PinOption option : options) labels.add(option.label);
 
-        Set<String> selectedIds = new LinkedHashSet<>();
-        List<AppRef> orderedSelected = new ArrayList<>();
-
+        final Set<String> selectedIds = new LinkedHashSet<>();
+        final List<PinnedItem> orderedSelected = new ArrayList<>();
         for (PinnedItem item : pinnedItems) {
-            if (item instanceof PinnedAppItem) {
-                AppRef ref = ((PinnedAppItem) item).appRef;
-                String resolved = resolveForSelectionId(ref);
-                if (resolved != null && selectedIds.add(resolved)) {
-                    orderedSelected.add(resolveForSelectionRef(ref));
-                }
-            }
+            String stable = stableIdForPinnedItem(item);
+            if (stable == null || !selectedIds.add(stable)) continue;
+            orderedSelected.add(clonePinnedItem(item));
+            if (orderedSelected.size() >= MAX_PINNED_ITEMS) break;
         }
 
         TextView selectedTitle = new TextView(getContext());
@@ -548,7 +551,7 @@ public final class SuggestionBarView extends GridLayout {
         touchHelper.attachToRecyclerView(orderedRecycler);
 
         TextView allAppsTitle = new TextView(getContext());
-        allAppsTitle.setText("All Launchable Apps");
+        allAppsTitle.setText("Apps and Folders");
         allAppsTitle.setTextColor(TEXT_COLOR);
         allAppsTitle.setPadding(0, 16, 0, 8);
 
@@ -581,23 +584,33 @@ public final class SuggestionBarView extends GridLayout {
         ArrayAdapter<String> adapter = new ArrayAdapter<>(getContext(), android.R.layout.simple_list_item_multiple_choice, labels);
         listView.setAdapter(adapter);
 
-        for (int i = 0; i < source.size(); i++) {
-            if (selectedIds.contains(source.get(i).appRef.stableId())) {
+        for (int i = 0; i < options.size(); i++) {
+            if (selectedIds.contains(options.get(i).id)) {
                 listView.setItemChecked(i, true);
             }
         }
 
+        final boolean[] warnedLargeSelection = new boolean[] {false};
         listView.setOnItemClickListener((parent, view, position, id) -> {
-            LauncherAppEntry app = source.get(position);
-            String stable = app.appRef.stableId();
+            PinOption option = options.get(position);
+            String stable = option.id;
             if (listView.isItemChecked(position)) {
-                if (selectedIds.add(stable)) {
-                    orderedSelected.add(app.appRef);
-                    orderedAdapter.notifyDataSetChanged();
+                if (selectedIds.contains(stable)) return;
+                if (selectedIds.size() >= MAX_PINNED_ITEMS) {
+                    listView.setItemChecked(position, false);
+                    Toast.makeText(getContext(), "You can pin up to " + MAX_PINNED_ITEMS + " items.", Toast.LENGTH_SHORT).show();
+                    return;
                 }
+                selectedIds.add(stable);
+                orderedSelected.add(clonePinnedItem(option.item));
+                if (selectedIds.size() > SOFT_PIN_WARNING_THRESHOLD && !warnedLargeSelection[0]) {
+                    Toast.makeText(getContext(), "Large pin sets may feel crowded.", Toast.LENGTH_SHORT).show();
+                    warnedLargeSelection[0] = true;
+                }
+                orderedAdapter.notifyDataSetChanged();
             } else {
                 selectedIds.remove(stable);
-                removeRef(orderedSelected, stable);
+                removePinnedByStableId(orderedSelected, stable);
                 orderedAdapter.notifyDataSetChanged();
             }
         });
@@ -614,7 +627,13 @@ public final class SuggestionBarView extends GridLayout {
         save.setText("Save Pins");
         save.setOnClickListener(v -> {
             if (folderMode[0]) {
-                createOrReplaceFolderAtSlot(slotIndex, orderedSelected);
+                List<AppRef> folderApps = new ArrayList<>();
+                for (PinnedItem item : orderedSelected) {
+                    if (item instanceof PinnedAppItem) {
+                        folderApps.add(((PinnedAppItem) item).appRef);
+                    }
+                }
+                createOrReplaceFolderAtSlot(slotIndex, folderApps);
             } else {
                 applyPinnedSelection(orderedSelected);
             }
@@ -653,6 +672,9 @@ public final class SuggestionBarView extends GridLayout {
     }
 
     private View createFolderPreviewButton(@NonNull PinnedFolderItem folder) {
+        FrameLayout root = new FrameLayout(getContext());
+        root.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+
         FrameLayout iconShell = new FrameLayout(getContext());
         int shellSize = iconSizePx();
         GradientDrawable bg = new GradientDrawable();
@@ -672,7 +694,7 @@ public final class SuggestionBarView extends GridLayout {
         miniGrid.setUseDefaultMargins(false);
         miniGrid.setAlignmentMode(GridLayout.ALIGN_BOUNDS);
 
-        int miniSize = Math.max(dp(8), Math.round(shellSize * 0.36f));
+        int miniSize = Math.max(dp(10), Math.round(shellSize * 0.48f));
         int placed = 0;
         for (AppRef ref : folder.apps) {
             if (placed >= 4) break;
@@ -684,48 +706,23 @@ public final class SuggestionBarView extends GridLayout {
             GridLayout.LayoutParams params = new GridLayout.LayoutParams();
             params.width = miniSize;
             params.height = miniSize;
-            params.setMargins(dp(1), dp(1), dp(1), dp(1));
+            params.setMargins(dp(-1), dp(-1), dp(-1), dp(-1));
             mini.setLayoutParams(params);
             miniGrid.addView(mini);
             placed++;
         }
         iconShell.addView(miniGrid, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.CENTER));
-        return iconShell;
+        root.addView(iconShell, new FrameLayout.LayoutParams(shellSize, shellSize, Gravity.CENTER));
+        return root;
     }
 
-    private void applyPinnedSelection(@NonNull List<AppRef> selectedOrdered) {
-        List<PinnedItem> current = new ArrayList<>(pinnedItems);
-        Set<String> selectedIds = new HashSet<>();
-        for (AppRef ref : selectedOrdered) selectedIds.add(resolveForSelectionId(ref));
-
+    private void applyPinnedSelection(@NonNull List<PinnedItem> selectedOrdered) {
         List<PinnedItem> rebuilt = new ArrayList<>();
-        Set<String> usedIds = new HashSet<>();
-
-        for (PinnedItem item : current) {
-            if (item instanceof PinnedFolderItem) {
-                rebuilt.add(item);
-                continue;
-            }
-            if (item instanceof PinnedAppItem) {
-                String id = resolveForSelectionId(((PinnedAppItem) item).appRef);
-                if (id != null && selectedIds.contains(id)) {
-                    AppRef replacement = findRefById(selectedOrdered, id);
-                    if (replacement != null) {
-                        rebuilt.add(new PinnedAppItem(replacement));
-                        usedIds.add(id);
-                    }
-                }
-            }
+        for (PinnedItem item : selectedOrdered) {
+            if (item == null) continue;
+            rebuilt.add(clonePinnedItem(item));
+            if (rebuilt.size() >= MAX_PINNED_ITEMS) break;
         }
-
-        for (AppRef ref : selectedOrdered) {
-            String id = resolveForSelectionId(ref);
-            if (id != null && !usedIds.contains(id)) {
-                rebuilt.add(new PinnedAppItem(ref));
-                usedIds.add(id);
-            }
-        }
-
         pinnedItems = rebuilt;
         configRepository.savePinnedItems(pinnedItems);
     }
@@ -987,17 +984,21 @@ public final class SuggestionBarView extends GridLayout {
         shell.addView(header, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         shell.addView(grid, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
+        int screenW = getResources().getDisplayMetrics().widthPixels;
+        int screenH = getResources().getDisplayMetrics().heightPixels;
+        shell.measure(View.MeasureSpec.makeMeasureSpec(screenW, View.MeasureSpec.AT_MOST),
+            View.MeasureSpec.makeMeasureSpec(screenH, View.MeasureSpec.AT_MOST));
+        int contentW = shell.getMeasuredWidth();
+        int contentH = shell.getMeasuredHeight();
+
         FrameLayout popupRoot = new FrameLayout(getContext());
-        GradientDrawable panelBg = new GradientDrawable();
-        panelBg.setCornerRadius(dp(10));
-        panelBg.setColor(0x00000000);
-        popupRoot.setBackground(panelBg);
+        FrameLayout.LayoutParams fillParams = new FrameLayout.LayoutParams(contentW, contentH);
 
         if (blurEnabled) {
             RealtimeBlurView blurView = new RealtimeBlurView(getContext(), null);
             blurView.setBlurRadius(blurRadiusDp * getResources().getDisplayMetrics().density);
             blurView.setOverlayColor(0x00000000);
-            popupRoot.addView(blurView, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+            popupRoot.addView(blurView, fillParams);
         }
 
         int alpha = clamp(appBarOpacity, 0, 100);
@@ -1005,13 +1006,10 @@ public final class SuggestionBarView extends GridLayout {
         int overlayColor = (((int) (255f * (alpha / 100f))) << 24) | overlayBase;
         View overlay = new View(getContext());
         overlay.setBackgroundColor(overlayColor);
-        popupRoot.addView(overlay, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        popupRoot.addView(overlay, fillParams);
         popupRoot.addView(shell, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-
-        int screenW = getResources().getDisplayMetrics().widthPixels;
-        int screenH = getResources().getDisplayMetrics().heightPixels;
-        popupRoot.measure(View.MeasureSpec.makeMeasureSpec(screenW, View.MeasureSpec.AT_MOST),
-            View.MeasureSpec.makeMeasureSpec(screenH, View.MeasureSpec.AT_MOST));
+        popupRoot.measure(View.MeasureSpec.makeMeasureSpec(contentW, View.MeasureSpec.EXACTLY),
+            View.MeasureSpec.makeMeasureSpec(contentH, View.MeasureSpec.EXACTLY));
         int popupWidth = popupRoot.getMeasuredWidth();
         int popupHeight = popupRoot.getMeasuredHeight();
 
@@ -1075,9 +1073,9 @@ public final class SuggestionBarView extends GridLayout {
 
     private static final class OrderedPinnedAdapter extends RecyclerView.Adapter<OrderedPinnedAdapter.RowHolder> {
         private final List<LauncherAppEntry> source;
-        private final List<AppRef> ordered;
+        private final List<PinnedItem> ordered;
 
-        OrderedPinnedAdapter(List<LauncherAppEntry> source, List<AppRef> ordered) {
+        OrderedPinnedAdapter(List<LauncherAppEntry> source, List<PinnedItem> ordered) {
             this.source = source;
             this.ordered = ordered;
         }
@@ -1106,8 +1104,7 @@ public final class SuggestionBarView extends GridLayout {
 
         @Override
         public void onBindViewHolder(@NonNull RowHolder holder, int position) {
-            AppRef ref = ordered.get(position);
-            holder.label.setText(resolveLabel(source, ref));
+            holder.label.setText(resolveLabel(source, ordered.get(position)));
         }
 
         @Override
@@ -1115,14 +1112,22 @@ public final class SuggestionBarView extends GridLayout {
             return ordered.size();
         }
 
-        private static String resolveLabel(List<LauncherAppEntry> source, AppRef ref) {
-            String stable = ref.stableId();
-            for (LauncherAppEntry entry : source) {
-                if (stable.equals(entry.appRef.stableId()) || entry.appRef.packageName.equals(ref.packageName)) {
-                    return entry.label;
-                }
+        private static String resolveLabel(List<LauncherAppEntry> source, PinnedItem item) {
+            if (item instanceof PinnedFolderItem) {
+                String title = ((PinnedFolderItem) item).title;
+                return "[Folder] " + (TextUtils.isEmpty(title) ? "Folder" : title);
             }
-            return ref.packageName;
+            if (item instanceof PinnedAppItem) {
+                AppRef ref = ((PinnedAppItem) item).appRef;
+                String stable = ref.stableId();
+                for (LauncherAppEntry entry : source) {
+                    if (stable.equals(entry.appRef.stableId()) || entry.appRef.packageName.equals(ref.packageName)) {
+                        return entry.label;
+                    }
+                }
+                return ref.packageName;
+            }
+            return "Pinned item";
         }
 
         static final class RowHolder extends RecyclerView.ViewHolder {
@@ -1135,20 +1140,73 @@ public final class SuggestionBarView extends GridLayout {
         }
     }
 
-    private static void removeRef(List<AppRef> refs, String stableId) {
-        for (int i = refs.size() - 1; i >= 0; i--) {
-            if (stableId.equals(refs.get(i).stableId())) {
-                refs.remove(i);
+    private static final class PinOption {
+        final String id;
+        final String label;
+        final PinnedItem item;
+
+        PinOption(String id, String label, PinnedItem item) {
+            this.id = id;
+            this.label = label;
+            this.item = item;
+        }
+    }
+
+    private List<PinOption> buildPinOptions(@NonNull List<LauncherAppEntry> apps, @NonNull List<PinnedItem> currentPinned) {
+        List<PinOption> out = new ArrayList<>();
+        for (LauncherAppEntry app : apps) {
+            AppRef ref = resolveForSelectionRef(app.appRef);
+            out.add(new PinOption(ref.stableId(), app.label, new PinnedAppItem(ref)));
+        }
+        for (PinnedItem item : currentPinned) {
+            if (!(item instanceof PinnedFolderItem)) continue;
+            PinnedFolderItem folder = (PinnedFolderItem) item;
+            String id = "folder:" + folder.id;
+            String label = "[Folder] " + (TextUtils.isEmpty(folder.title) ? "Folder" : folder.title);
+            out.add(new PinOption(id, label, clonePinnedItem(folder)));
+        }
+        return out;
+    }
+
+    @Nullable
+    private static String stableIdForPinnedItem(@Nullable PinnedItem item) {
+        if (item instanceof PinnedAppItem) {
+            return ((PinnedAppItem) item).appRef.stableId();
+        }
+        if (item instanceof PinnedFolderItem) {
+            return "folder:" + ((PinnedFolderItem) item).id;
+        }
+        return null;
+    }
+
+    private static void removePinnedByStableId(@NonNull List<PinnedItem> items, @NonNull String stableId) {
+        for (int i = items.size() - 1; i >= 0; i--) {
+            String itemStableId = stableIdForPinnedItem(items.get(i));
+            if (stableId.equals(itemStableId)) {
+                items.remove(i);
             }
         }
     }
 
-    @Nullable
-    private static AppRef findRefById(List<AppRef> refs, String stableId) {
-        for (AppRef ref : refs) {
-            if (stableId.equals(ref.stableId())) return ref;
+    @NonNull
+    private static PinnedItem clonePinnedItem(@NonNull PinnedItem item) {
+        if (item instanceof PinnedAppItem) {
+            AppRef ref = ((PinnedAppItem) item).appRef;
+            return new PinnedAppItem(new AppRef(ref.packageName, ref.activityName));
         }
-        return null;
+        if (item instanceof PinnedFolderItem) {
+            PinnedFolderItem folder = (PinnedFolderItem) item;
+            PinnedFolderItem copy = new PinnedFolderItem(folder.id, folder.title);
+            copy.rows = folder.rows;
+            copy.cols = folder.cols;
+            copy.tintOverrideEnabled = folder.tintOverrideEnabled;
+            copy.tintColor = folder.tintColor;
+            for (AppRef ref : folder.apps) {
+                copy.apps.add(new AppRef(ref.packageName, ref.activityName));
+            }
+            return copy;
+        }
+        return item;
     }
 
     @Nullable

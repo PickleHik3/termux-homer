@@ -144,3 +144,10 @@ Files changed: app/src/main/java/com/termux/app/SuggestionBarView.java
 Build result: pass (:app:compileDebugJavaWithJavac)
 Manual validation case(s): Compile validation complete; manual device checks pending for circular folder icon (no label), anchored popup position (3-5dp above folder), and icon-size parity with app bar scale.
 Next step: User visual QA on device; if approved, commit and push to appsbar-dev and trigger nightly workflow.
+Cycle: 13
+Task: Folder icon/popup behavior correction + mixed pin list ordering + pin count limits
+Root cause: Folder preview container stretched to slot width (oval artifact), popup background layers measured full-screen (sidebar effect), and pin editor used app-only model that could not reorder folders or enforce deterministic pin limits.
+Files changed: app/src/main/java/com/termux/app/SuggestionBarView.java
+Build result: pass (:app:compileDebugJavaWithJavac)
+Manual validation case(s): Compile validated; device validation pending for circular folder icon rendering, anchored popup geometry, and pin limit warning behavior (>6 soft warn, max 8 hard stop).
+Next step: User visual QA on device, then commit/push and workflow run if approved.
