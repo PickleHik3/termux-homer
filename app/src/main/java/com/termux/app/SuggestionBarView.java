@@ -532,8 +532,11 @@ public final class SuggestionBarView extends GridLayout {
             ItemTouchHelper.UP | ItemTouchHelper.DOWN, 0) {
             @Override
             public boolean onMove(@NonNull RecyclerView recyclerView, @NonNull RecyclerView.ViewHolder viewHolder, @NonNull RecyclerView.ViewHolder target) {
-                int from = viewHolder.getBindingAdapterPosition();
-                int to = target.getBindingAdapterPosition();
+                int from = viewHolder.getAdapterPosition();
+                int to = target.getAdapterPosition();
+                if (from == RecyclerView.NO_POSITION || to == RecyclerView.NO_POSITION) {
+                    return false;
+                }
                 if (from < 0 || to < 0 || from >= orderedSelected.size() || to >= orderedSelected.size()) {
                     return false;
                 }
@@ -887,7 +890,7 @@ public final class SuggestionBarView extends GridLayout {
         FrameLayout popupRoot = new FrameLayout(getContext());
 
         if (blurEnabled) {
-            RealtimeBlurView blurView = new RealtimeBlurView(getContext());
+            RealtimeBlurView blurView = new RealtimeBlurView(getContext(), null);
             blurView.setBlurRadius(blurRadiusDp * getResources().getDisplayMetrics().density);
             blurView.setOverlayColor(0x00000000);
             popupRoot.addView(blurView, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
