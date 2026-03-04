@@ -55,7 +55,7 @@ public final class AzScrubRowView extends AppCompatTextView {
         setTextSize(11f);
         setPadding(0, dp(2), 0, dp(5));
         setClickable(true);
-        setTranslationY(-dp(10));
+        setTranslationY(-dp(6));
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
             setElevation(dp(20));
             setTranslationZ(dp(20));
@@ -84,7 +84,7 @@ public final class AzScrubRowView extends AppCompatTextView {
         float contentBottom = height - getPaddingBottom();
         float slot = width / Math.max(1, visibleLetters.length);
         float anchorX = activeTouchX < 0f ? (width * 0.5f) : activeTouchX;
-        float waveAmplitude = dp(24) * waveStrength;
+        float waveAmplitude = dp(15) * waveStrength;
         int activeIndex = (int) (anchorX / Math.max(1f, slot));
         activeIndex = Math.max(0, Math.min(visibleLetters.length - 1, activeIndex));
 
@@ -93,16 +93,17 @@ public final class AzScrubRowView extends AppCompatTextView {
             float distance = Math.abs(x - anchorX) / Math.max(1f, slot);
             float envelope = (float) Math.exp(-(distance * distance) * 0.85f);
             float waveLift = (float) Math.sin(Math.min(1f, envelope) * (Math.PI * 0.5f)) * waveAmplitude;
-            if (i == activeIndex) {
-                waveLift *= 1.35f;
+            boolean activeFocus = waveStrength > 0.01f && i == activeIndex;
+            if (activeFocus) {
+                waveLift *= 1.2f;
             }
             float scale = 1f + (0.34f * envelope * waveStrength);
             letterPaint.setTextSize(baseTextSize * scale);
-            applyLetterWeight(envelope, i == activeIndex);
+            applyLetterWeight(envelope, activeFocus);
             Paint.FontMetrics letterMetrics = letterPaint.getFontMetrics();
             // Keep baseline closer to bottom so raised crest has enough headroom and avoids clipping.
             float baseline = (contentBottom - dp(2) - letterMetrics.descent) - waveLift;
-            if (i == activeIndex && waveStrength > 0.01f) {
+            if (activeFocus) {
                 int bright = blendColors(baseColor, accentColor, 0.68f);
                 letterPaint.setColor(bright);
             } else {
@@ -225,7 +226,7 @@ public final class AzScrubRowView extends AppCompatTextView {
     }
 
     private void updateInteractionLayerOffset() {
-        float lift = -dp(10) - (dp(8) * waveStrength);
+        float lift = -dp(6) - (dp(12) * waveStrength);
         setTranslationY(lift);
     }
 
