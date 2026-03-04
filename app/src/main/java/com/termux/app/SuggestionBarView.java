@@ -4,7 +4,10 @@ import android.annotation.SuppressLint;
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.animation.ObjectAnimator;
+import android.app.Activity;
+import android.app.ActivityOptions;
 import android.app.AlertDialog;
+import android.content.ClipData;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ChangedPackages;
@@ -16,7 +19,10 @@ import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Build;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.text.TextUtils;
+import android.view.DragEvent;
 import android.util.AttributeSet;
 import android.view.VelocityTracker;
 import android.view.Gravity;
@@ -69,6 +75,7 @@ import java.util.UUID;
 public final class SuggestionBarView extends GridLayout {
 
     private static final int TEXT_COLOR = 0xFFC0B18B;
+    private static final char[] AZ_ORDER = "ABCDEFGHIJKLMNOPQRSTUVWXYZ#".toCharArray();
 
     private List<LauncherAppEntry> allApps = new ArrayList<>();
     private int applicationSequenceNumber = 0;
@@ -446,8 +453,10 @@ public final class SuggestionBarView extends GridLayout {
     private void renderButtons(@NonNull List<LauncherAppEntry> entries, boolean azPreview) {
         removeAllViews();
         int buttonCount = Math.max(1, maxButtonCount);
+        int renderStartCol = 0;
         List<PinnedItem> pinnedForSlots = new ArrayList<>();
         int pinnedPageOffset = 0;
+        int azTotalMatches = entries.size();
 
         if (azPreview) {
             int perPage = Math.max(1, maxButtonCount);
@@ -462,6 +471,11 @@ public final class SuggestionBarView extends GridLayout {
             buttonCount = perPage;
             pinnedItemsPerPage = 1;
             pinnedPageIndex = 0;
+            if (azTotalMatches <= perPage && !entries.isEmpty() && activeAzLetter != null) {
+                int anchor = computeAzAnchorSlot(activeAzLetter, perPage);
+                int centeredStart = anchor - (entries.size() / 2);
+                renderStartCol = clamp(centeredStart, 0, Math.max(0, perPage - entries.size()));
+            }
         }
 
         boolean pinnedSurface = !azPreview && TextUtils.isEmpty(lastInput.trim()) && pinnedItems != null && !pinnedItems.isEmpty();
@@ -483,28 +497,30 @@ public final class SuggestionBarView extends GridLayout {
         setColumnCount(buttonCount);
 
         int addedCount = 0;
+        boolean[] usedColumns = new boolean[Math.max(1, buttonCount)];
         for (int col = 0; col < entries.size() && col < buttonCount; col++) {
             LauncherAppEntry entry = entries.get(col);
             View view = createEntryButton(entry);
-            LayoutParams param = createSlotParams(col);
+            int renderCol = azPreview ? (renderStartCol + col) : col;
+            LayoutParams param = createSlotParams(renderCol);
             view.setLayoutParams(param);
 
             if (!azPreview && col < pinnedForSlots.size()) {
                 final int pinnedIndex = pinnedPageOffset + col;
                 final PinnedItem pinnedItem = pinnedForSlots.get(col);
+                view.setOnDragListener((target, event) -> handlePinnedDrop(target, event, pinnedIndex, pinnedItem));
                 if (pinnedItem instanceof PinnedFolderItem) {
                     view = createFolderPreviewButton((PinnedFolderItem) pinnedItem);
                     view.setLayoutParams(param);
+                    view.setOnDragListener((target, event) -> handlePinnedDrop(target, event, pinnedIndex, pinnedItem));
                     view.setOnClickListener(v -> showFolderPopup((PinnedFolderItem) pinnedItem, v));
                     view.setOnLongClickListener(v -> {
                         showFolderContentsEditor(pinnedIndex, (PinnedFolderItem) pinnedItem);
                         return true;
                     });
                 } else {
-                    view.setOnLongClickListener(v -> {
-                        showUnifiedPinEditor(pinnedIndex, pinnedItem);
-                        return true;
-                    });
+                    final PinnedAppItem appItem = (PinnedAppItem) pinnedItem;
+                    view.setOnLongClickListener(v -> startPinnedDrag(v, pinnedIndex, appItem));
                 }
             } else if (!azPreview) {
                 final int slotIndex = col;
@@ -516,9 +532,11 @@ public final class SuggestionBarView extends GridLayout {
 
             addView(view);
             addedCount++;
+            if (renderCol >= 0 && renderCol < usedColumns.length) {
+                usedColumns[renderCol] = true;
+            }
         }
 
-        int missing = buttonCount - addedCount;
         boolean showEmptyPinnedHint = !azPreview
             && TextUtils.isEmpty(lastInput.trim())
             && (pinnedItems == null || pinnedItems.isEmpty())
@@ -550,12 +568,13 @@ public final class SuggestionBarView extends GridLayout {
                 addView(filler);
             }
         } else {
-            for (int i = 0; i < missing; i++) {
+            for (int i = 0; i < buttonCount; i++) {
+                if (usedColumns[i]) continue;
                 ImageButton filler = new ImageButton(getContext(), null, android.R.attr.buttonBarButtonStyle);
                 filler.setVisibility(INVISIBLE);
-                filler.setLayoutParams(createSlotParams(addedCount + i));
+                filler.setLayoutParams(createSlotParams(i));
                 if (!azPreview) {
-                    final int slotIndex = addedCount + i;
+                    final int slotIndex = i;
                     filler.setOnLongClickListener(v -> {
                         showUnifiedPinEditor(slotIndex, null);
                         return true;
@@ -648,15 +667,39 @@ public final class SuggestionBarView extends GridLayout {
         if (entry.appRef.packageName.startsWith("injected.test")) {
             return;
         }
+        Context context = getContext();
         Intent launchIntent = new Intent(Intent.ACTION_MAIN);
         launchIntent.addCategory(Intent.CATEGORY_LAUNCHER);
         launchIntent.setClassName(entry.appRef.packageName, entry.appRef.activityName);
-        launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         try {
-            getContext().startActivity(launchIntent);
+            if (context instanceof Activity) {
+                Activity activity = (Activity) context;
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                    ActivityOptions options = ActivityOptions.makeSceneTransitionAnimation(activity);
+                    activity.startActivity(launchIntent, options.toBundle());
+                } else {
+                    activity.startActivity(launchIntent);
+                }
+            } else {
+                launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                context.startActivity(launchIntent);
+            }
         } catch (Exception ignored) {
-            Intent fallback = getContext().getPackageManager().getLaunchIntentForPackage(entry.appRef.packageName);
-            if (fallback != null) getContext().startActivity(fallback);
+            Intent fallback = context.getPackageManager().getLaunchIntentForPackage(entry.appRef.packageName);
+            if (fallback != null) {
+                if (context instanceof Activity) {
+                    Activity activity = (Activity) context;
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                        ActivityOptions options = ActivityOptions.makeSceneTransitionAnimation(activity);
+                        activity.startActivity(fallback, options.toBundle());
+                    } else {
+                        activity.startActivity(fallback);
+                    }
+                } else {
+                    fallback.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                    context.startActivity(fallback);
+                }
+            }
         }
 
         if (terminalView != null) {
@@ -793,22 +836,51 @@ public final class SuggestionBarView extends GridLayout {
         allAppsTitle.setTextColor(TEXT_COLOR);
         allAppsTitle.setPadding(0, 16, 0, 8);
 
+        EditText searchInput = new EditText(getContext());
+        searchInput.setHint("Search apps");
+        searchInput.setSingleLine(true);
+
         ListView listView = new ListView(getContext());
         listViewHolder[0] = listView;
         listView.setChoiceMode(ListView.CHOICE_MODE_MULTIPLE);
-        ArrayAdapter<String> adapter = new ArrayAdapter<>(getContext(), android.R.layout.simple_list_item_multiple_choice, labels);
+        final List<PinOption> filteredOptions = new ArrayList<>(options);
+        final List<String> filteredLabels = new ArrayList<>(labels);
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(getContext(), android.R.layout.simple_list_item_multiple_choice, filteredLabels);
         listView.setAdapter(adapter);
         listView.setOnTouchListener((v, event) -> {
             v.getParent().requestDisallowInterceptTouchEvent(true);
             return false;
         });
 
-        for (int i = 0; i < options.size(); i++) {
-            listView.setItemChecked(i, selectedIds.contains(options.get(i).id));
-        }
+        syncListChecksFiltered(listView, filteredOptions, selectedIds);
+
+        searchInput.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) { }
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+                String query = stringValue(s).trim().toLowerCase(Locale.ROOT);
+                filteredOptions.clear();
+                filteredLabels.clear();
+                for (PinOption option : options) {
+                    String haystack = (option.label == null ? "" : option.label).toLowerCase(Locale.ROOT);
+                    if (query.isEmpty() || haystack.contains(query)) {
+                        filteredOptions.add(option);
+                        filteredLabels.add(option.label);
+                    }
+                }
+                adapter.notifyDataSetChanged();
+                syncListChecksFiltered(listView, filteredOptions, selectedIds);
+            }
+
+            @Override
+            public void afterTextChanged(Editable s) { }
+        });
 
         listView.setOnItemClickListener((parent, view, position, id) -> {
-            PinOption option = options.get(position);
+            if (position < 0 || position >= filteredOptions.size()) return;
+            PinOption option = filteredOptions.get(position);
             String stable = option.id;
             if (listView.isItemChecked(position)) {
                 if (selectedIds.contains(stable)) return;
@@ -820,7 +892,7 @@ public final class SuggestionBarView extends GridLayout {
                 removePinnedByStableId(orderedSelected, stable);
                 orderedAdapter.notifyDataSetChanged();
             }
-            syncListChecks(listView, options, selectedIds);
+            syncListChecksFiltered(listView, filteredOptions, selectedIds);
         });
 
         LinearLayout buttons = new LinearLayout(getContext());
@@ -883,6 +955,7 @@ public final class SuggestionBarView extends GridLayout {
         root.addView(selectedTitle, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         root.addView(orderedRecycler, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(180)));
         root.addView(allAppsTitle, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        root.addView(searchInput, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         root.addView(listView, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(280)));
         root.addView(buttons, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
@@ -922,20 +995,53 @@ public final class SuggestionBarView extends GridLayout {
         final List<String> labels = new ArrayList<>();
         for (LauncherAppEntry app : source) labels.add(app.label);
 
+        EditText searchInput = new EditText(getContext());
+        searchInput.setHint("Search apps");
+        searchInput.setSingleLine(true);
+
+        final List<LauncherAppEntry> filteredApps = new ArrayList<>(source);
+        final List<String> filteredLabels = new ArrayList<>(labels);
+
         ListView listView = new ListView(getContext());
         listView.setChoiceMode(ListView.CHOICE_MODE_MULTIPLE);
-        listView.setAdapter(new ArrayAdapter<>(getContext(), android.R.layout.simple_list_item_multiple_choice, labels));
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(getContext(), android.R.layout.simple_list_item_multiple_choice, filteredLabels);
+        listView.setAdapter(adapter);
         listView.setOnTouchListener((v, event) -> {
             v.getParent().requestDisallowInterceptTouchEvent(true);
             return false;
         });
 
-        for (int i = 0; i < source.size(); i++) {
-            listView.setItemChecked(i, selectedIds.contains(source.get(i).appRef.stableId()));
-        }
+        syncFolderChecks(listView, filteredApps, selectedIds);
+
+        searchInput.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) { }
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+                String query = stringValue(s).trim().toLowerCase(Locale.ROOT);
+                filteredApps.clear();
+                filteredLabels.clear();
+                for (LauncherAppEntry app : source) {
+                    String label = app.label == null ? "" : app.label;
+                    String packageName = app.appRef.packageName == null ? "" : app.appRef.packageName;
+                    String haystack = (label + " " + packageName).toLowerCase(Locale.ROOT);
+                    if (query.isEmpty() || haystack.contains(query)) {
+                        filteredApps.add(app);
+                        filteredLabels.add(label);
+                    }
+                }
+                adapter.notifyDataSetChanged();
+                syncFolderChecks(listView, filteredApps, selectedIds);
+            }
+
+            @Override
+            public void afterTextChanged(Editable s) { }
+        });
 
         listView.setOnItemClickListener((parent, view, position, id) -> {
-            String stable = source.get(position).appRef.stableId();
+            if (position < 0 || position >= filteredApps.size()) return;
+            String stable = filteredApps.get(position).appRef.stableId();
             if (listView.isItemChecked(position)) {
                 selectedIds.add(stable);
             } else {
@@ -997,6 +1103,7 @@ public final class SuggestionBarView extends GridLayout {
 
         root.addView(topActions, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         root.addView(title, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        root.addView(searchInput, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         root.addView(listView, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(320)));
         root.addView(buttons, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
@@ -1006,6 +1113,9 @@ public final class SuggestionBarView extends GridLayout {
 
     private void createOrReplaceFolderAtSlot(int slotIndex, @NonNull List<AppRef> selectedOrdered) {
         PinnedFolderItem folder = new PinnedFolderItem(UUID.randomUUID().toString(), "Folder");
+        for (AppRef ref : selectedOrdered) {
+            folder.apps.add(resolveForSelectionRef(ref));
+        }
         if (slotIndex >= 0 && slotIndex < pinnedItems.size()) {
             pinnedItems.set(slotIndex, folder);
         } else {
@@ -1624,6 +1734,102 @@ public final class SuggestionBarView extends GridLayout {
         }
     }
 
+    private static void syncListChecksFiltered(@NonNull ListView listView, @NonNull List<PinOption> options, @NonNull Set<String> selectedIds) {
+        for (int i = 0; i < options.size(); i++) {
+            listView.setItemChecked(i, selectedIds.contains(options.get(i).id));
+        }
+    }
+
+    private static void syncFolderChecks(@NonNull ListView listView, @NonNull List<LauncherAppEntry> apps, @NonNull Set<String> selectedIds) {
+        for (int i = 0; i < apps.size(); i++) {
+            listView.setItemChecked(i, selectedIds.contains(apps.get(i).appRef.stableId()));
+        }
+    }
+
+    private boolean startPinnedDrag(@NonNull View view, int sourceIndex, @NonNull PinnedAppItem item) {
+        ClipData clip = ClipData.newPlainText("pinned-app", item.appRef.stableId());
+        PinnedDragState dragState = new PinnedDragState(sourceIndex, resolveForSelectionRef(item.appRef));
+        View.DragShadowBuilder shadow = new View.DragShadowBuilder(view);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            view.startDragAndDrop(clip, shadow, dragState, 0);
+        } else {
+            view.startDrag(clip, shadow, dragState, 0);
+        }
+        return true;
+    }
+
+    private boolean handlePinnedDrop(@NonNull View targetView, @NonNull DragEvent event, int targetIndex, @Nullable PinnedItem targetItem) {
+        Object localState = event.getLocalState();
+        if (!(localState instanceof PinnedDragState)) return false;
+        PinnedDragState dragState = (PinnedDragState) localState;
+        switch (event.getAction()) {
+            case DragEvent.ACTION_DRAG_STARTED:
+                return true;
+            case DragEvent.ACTION_DRAG_ENTERED:
+                targetView.setAlpha(0.72f);
+                return true;
+            case DragEvent.ACTION_DRAG_EXITED:
+                targetView.setAlpha(1f);
+                return true;
+            case DragEvent.ACTION_DROP:
+                targetView.setAlpha(1f);
+                return applyPinnedDrop(dragState, targetIndex, targetItem);
+            case DragEvent.ACTION_DRAG_ENDED:
+                targetView.setAlpha(1f);
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    private boolean applyPinnedDrop(@NonNull PinnedDragState dragState, int targetIndex, @Nullable PinnedItem targetItem) {
+        if (dragState.sourceIndex < 0 || dragState.sourceIndex >= pinnedItems.size()) return false;
+        if (targetIndex < 0 || targetIndex >= pinnedItems.size()) return false;
+        if (dragState.sourceIndex == targetIndex) return false;
+
+        PinnedItem sourceItem = pinnedItems.get(dragState.sourceIndex);
+        if (!(sourceItem instanceof PinnedAppItem)) return false;
+        AppRef sourceRef = resolveForSelectionRef(((PinnedAppItem) sourceItem).appRef);
+
+        if (targetItem instanceof PinnedFolderItem) {
+            PinnedFolderItem folder = (PinnedFolderItem) targetItem;
+            boolean alreadyInFolder = false;
+            for (AppRef ref : folder.apps) {
+                if (ref.stableId().equals(sourceRef.stableId())) {
+                    alreadyInFolder = true;
+                    break;
+                }
+            }
+            if (!alreadyInFolder) folder.apps.add(sourceRef);
+            pinnedItems.remove(dragState.sourceIndex);
+            persistPinsAndReload();
+            return true;
+        }
+
+        if (targetItem instanceof PinnedAppItem) {
+            AppRef targetRef = resolveForSelectionRef(((PinnedAppItem) targetItem).appRef);
+            int source = dragState.sourceIndex;
+            int target = targetIndex;
+            if (source < target) {
+                pinnedItems.remove(source);
+                target = target - 1;
+            } else {
+                pinnedItems.remove(source);
+            }
+            target = clamp(target, 0, Math.max(0, pinnedItems.size() - 1));
+            PinnedFolderItem folder = new PinnedFolderItem(UUID.randomUUID().toString(), "Folder");
+            folder.apps.add(targetRef);
+            if (!targetRef.stableId().equals(sourceRef.stableId())) {
+                folder.apps.add(sourceRef);
+            }
+            pinnedItems.set(target, folder);
+            persistPinsAndReload();
+            return true;
+        }
+
+        return false;
+    }
+
     @Nullable
     private static String stableIdForPinnedItem(@Nullable PinnedItem item) {
         if (item instanceof PinnedAppItem) {
@@ -1676,6 +1882,16 @@ public final class SuggestionBarView extends GridLayout {
         if (!TextUtils.isEmpty(ref.activityName)) return ref;
         LauncherAppEntry resolved = resolveRef(ref);
         return resolved != null ? resolved.appRef : ref;
+    }
+
+    private static final class PinnedDragState {
+        final int sourceIndex;
+        final AppRef appRef;
+
+        PinnedDragState(int sourceIndex, @NonNull AppRef appRef) {
+            this.sourceIndex = sourceIndex;
+            this.appRef = appRef;
+        }
     }
 
     private LinearLayout buildStepperRow(@NonNull String label, @NonNull int[] valueRef, int min, int max) {
@@ -1748,6 +1964,24 @@ public final class SuggestionBarView extends GridLayout {
 
     private static int clamp(int value, int min, int max) {
         return Math.max(min, Math.min(max, value));
+    }
+
+    private int computeAzAnchorSlot(char letter, int slots) {
+        if (slots <= 1) return 0;
+        Set<Character> available = getAvailableAzLetters();
+        List<Character> ordered = new ArrayList<>();
+        for (char c : AZ_ORDER) {
+            if (available.contains(c)) {
+                ordered.add(c);
+            }
+        }
+        if (ordered.isEmpty()) return slots / 2;
+        char target = Character.toUpperCase(letter);
+        int index = ordered.indexOf(target);
+        if (index < 0) index = 0;
+        if (ordered.size() == 1) return slots / 2;
+        float normalized = (float) index / (float) (ordered.size() - 1);
+        return clamp(Math.round(normalized * (slots - 1)), 0, slots - 1);
     }
 
     private void animatePageSwitch(int pageDelta, float velocityPxPerSec) {
