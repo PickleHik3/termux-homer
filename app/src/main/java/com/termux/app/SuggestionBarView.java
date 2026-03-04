@@ -674,9 +674,16 @@ public final class SuggestionBarView extends GridLayout {
             return;
         }
         Context context = getContext();
+        String activityName = entry.appRef.activityName;
+        if (!TextUtils.isEmpty(activityName) && activityName.startsWith(".")) {
+            activityName = entry.appRef.packageName + activityName;
+        }
         Intent explicit = new Intent(Intent.ACTION_MAIN);
         explicit.addCategory(Intent.CATEGORY_LAUNCHER);
-        explicit.setComponent(new ComponentName(entry.appRef.packageName, entry.appRef.activityName));
+        explicit.setComponent(new ComponentName(entry.appRef.packageName, activityName));
+
+        Intent explicitNoCategory = new Intent(Intent.ACTION_MAIN);
+        explicitNoCategory.setComponent(new ComponentName(entry.appRef.packageName, activityName));
 
         Intent pkgDefault = context.getPackageManager().getLaunchIntentForPackage(entry.appRef.packageName);
 
@@ -689,6 +696,7 @@ public final class SuggestionBarView extends GridLayout {
         }
 
         if (!tryStartActivity(context, explicit)
+            && !tryStartActivity(context, explicitNoCategory)
             && !tryStartActivity(context, pkgDefault)
             && !(resolved != null && tryStartActivity(context, resolveFallback))) {
             return;
@@ -769,13 +777,7 @@ public final class SuggestionBarView extends GridLayout {
         if (intent == null) return false;
         try {
             if (context instanceof Activity) {
-                Activity activity = (Activity) context;
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                    ActivityOptions options = ActivityOptions.makeSceneTransitionAnimation(activity);
-                    activity.startActivity(intent, options.toBundle());
-                } else {
-                    activity.startActivity(intent);
-                }
+                ((Activity) context).startActivity(intent);
             } else {
                 intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                 context.startActivity(intent);
