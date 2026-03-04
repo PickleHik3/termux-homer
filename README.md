@@ -66,3 +66,12 @@ COMPILE_SDK_OVERRIDE=34 ./gradlew \
 ## Upstream Base
 
 - Upstream Termux app: https://github.com/termux/termux-app
+
+## Companion Apps (Forks)
+
+Use companion apps from this project owner to match launcher signing/source:
+
+- Termux:API fork: https://github.com/PickleHik3/termux-api
+- Termux:Styling fork: https://github.com/PickleHik3/termux-styling
+
+Install launcher + companion apps from the same source set to avoid shared UID/signature incompatibility.
