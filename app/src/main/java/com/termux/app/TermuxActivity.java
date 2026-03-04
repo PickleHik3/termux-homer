@@ -827,6 +827,16 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
             mAzScrubRowView.setElevation(dpToPx(20));
             mAzScrubRowView.setTranslationZ(dpToPx(20));
         }
+        if (mAzScrubRowView.getParent() instanceof ViewGroup) {
+            ViewGroup parent = (ViewGroup) mAzScrubRowView.getParent();
+            parent.setClipChildren(false);
+            parent.setClipToPadding(false);
+            if (parent.getParent() instanceof ViewGroup) {
+                ViewGroup grandParent = (ViewGroup) parent.getParent();
+                grandParent.setClipChildren(false);
+                grandParent.setClipToPadding(false);
+            }
+        }
     }
 
     private float dpToPx(int dp) {
@@ -912,7 +922,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
             barHeightPx = 0;
         }
         int azRowHeightPx = mPreferences.isAppLauncherAzRowEnabled() ?
-            Math.round(44f * getResources().getDisplayMetrics().density) : 0;
+            Math.round(56f * getResources().getDisplayMetrics().density) : 0;
         updateViewHeight(R.id.apps_bar_viewpager, barHeightPx);
         updateViewHeight(R.id.apps_bar_az_row, azRowHeightPx);
         updateViewHeight(R.id.apps_bar_background, barHeightPx);

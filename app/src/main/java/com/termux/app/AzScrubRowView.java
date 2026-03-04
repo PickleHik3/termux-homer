@@ -83,7 +83,7 @@ public final class AzScrubRowView extends AppCompatTextView {
         float contentBottom = height - getPaddingBottom();
         float slot = width / Math.max(1, visibleLetters.length);
         float anchorX = activeTouchX < 0f ? (width * 0.5f) : activeTouchX;
-        float waveAmplitude = dp(18) * waveStrength;
+        float waveAmplitude = dp(24) * waveStrength;
         int activeIndex = (int) (anchorX / Math.max(1f, slot));
         activeIndex = Math.max(0, Math.min(visibleLetters.length - 1, activeIndex));
 
