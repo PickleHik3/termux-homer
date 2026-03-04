@@ -51,11 +51,11 @@ public final class AzScrubRowView extends AppCompatTextView {
         setText("");
         setSingleLine(true);
         setTextSize(11f);
-        setPadding(0, dp(3), 0, dp(6));
+        setPadding(0, dp(2), 0, dp(5));
         setClickable(true);
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
-            setElevation(dp(12));
-            setTranslationZ(dp(12));
+            setElevation(dp(20));
+            setTranslationZ(dp(20));
         }
         letterPaint.setTextAlign(Paint.Align.CENTER);
         letterPaint.setTextSize(getTextSize());
@@ -96,7 +96,8 @@ public final class AzScrubRowView extends AppCompatTextView {
             float scale = 1f + (0.34f * envelope * waveStrength);
             letterPaint.setTextSize(baseTextSize * scale);
             Paint.FontMetrics letterMetrics = letterPaint.getFontMetrics();
-            float baseline = ((contentTop + contentBottom) - letterMetrics.ascent - letterMetrics.descent) * 0.5f + dp(2) - waveLift;
+            // Keep baseline closer to bottom so raised crest has enough headroom and avoids clipping.
+            float baseline = (contentBottom - dp(2) - letterMetrics.descent) - waveLift;
             if (i == activeIndex && waveStrength > 0.01f) {
                 int bright = blendColors(baseColor, accentColor, 0.68f);
                 letterPaint.setColor(bright);
@@ -220,7 +221,7 @@ public final class AzScrubRowView extends AppCompatTextView {
     }
 
     private void updateInteractionLayerOffset() {
-        float lift = -dp(12) * waveStrength;
+        float lift = -dp(18) * waveStrength;
         setTranslationY(lift);
     }
 

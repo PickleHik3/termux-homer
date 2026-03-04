@@ -823,6 +823,14 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         mAzScrubRowView.setInteractionAccentColor(base);
         mAzScrubRowView.setBackgroundColor(Color.TRANSPARENT);
         mAzScrubRowView.bringToFront();
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            mAzScrubRowView.setElevation(dpToPx(20));
+            mAzScrubRowView.setTranslationZ(dpToPx(20));
+        }
+    }
+
+    private float dpToPx(int dp) {
+        return dp * getResources().getDisplayMetrics().density;
     }
 
     private int mutedMonetShade(int color) {
