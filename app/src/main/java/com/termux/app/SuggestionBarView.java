@@ -116,7 +116,6 @@ public final class SuggestionBarView extends GridLayout {
     private VelocityTracker swipeVelocityTracker;
     private boolean pageSwitchAnimating = false;
     private int folderDragHoverIndex = -1;
-    private boolean terminalDropTargetInstalled = false;
     private boolean deleteDropZoneVisible = false;
     private boolean deleteDropZoneHover = false;
     @Nullable private View deleteDropZoneView;
@@ -403,7 +402,6 @@ public final class SuggestionBarView extends GridLayout {
     }
 
     void reloadWithInput(String input, final TerminalView terminalView) {
-        ensureTerminalDropTarget();
         if (allApps == null || allApps.isEmpty()) {
             reloadAllApps();
         }
@@ -1760,75 +1758,6 @@ public final class SuggestionBarView extends GridLayout {
             zone.setTranslationZ(dp(18));
         }
         return zone;
-    }
-
-    private void ensureTerminalDropTarget() {
-        if (terminalDropTargetInstalled) return;
-        Context context = getContext();
-        if (!(context instanceof Activity)) return;
-        Activity activity = (Activity) context;
-        View terminal = activity.findViewById(R.id.terminal_view);
-        if (terminal == null) return;
-        terminal.setOnDragListener((v, event) -> handleTerminalDrop(v, event));
-        terminalDropTargetInstalled = true;
-    }
-
-    private boolean handleTerminalDrop(@NonNull View targetView, @NonNull DragEvent event) {
-        Object state = event.getLocalState();
-        if (!(state instanceof FolderAppDragState)) return false;
-        FolderAppDragState dragState = (FolderAppDragState) state;
-        switch (event.getAction()) {
-            case DragEvent.ACTION_DRAG_STARTED:
-                return true;
-            case DragEvent.ACTION_DRAG_ENTERED:
-                targetView.setAlpha(0.95f);
-                return true;
-            case DragEvent.ACTION_DRAG_EXITED:
-                targetView.setAlpha(1f);
-                return true;
-            case DragEvent.ACTION_DROP:
-                targetView.setAlpha(1f);
-                if (dragState.sourceFolder != null) {
-                    removeAppFromFolder(dragState.sourceFolder, dragState.appRef);
-                    persistPinsAndReload();
-                    animateDestroyDrop(targetView, event.getX(), event.getY(), resolveRef(dragState.appRef));
-                }
-                return true;
-            case DragEvent.ACTION_DRAG_ENDED:
-                targetView.setAlpha(1f);
-                return true;
-            default:
-                return false;
-        }
-    }
-
-    private void animateDestroyDrop(@NonNull View targetView, float x, float y, @Nullable LauncherAppEntry entry) {
-        if (entry == null || entry.icon == null) return;
-        View root = targetView.getRootView();
-        if (!(root instanceof ViewGroup)) return;
-        ViewGroup rootGroup = (ViewGroup) root;
-        ImageView ghost = new ImageView(getContext());
-        ghost.setImageDrawable(entry.icon);
-        int size = Math.max(dp(20), iconSizePx());
-        int[] loc = new int[2];
-        targetView.getLocationOnScreen(loc);
-        int[] rootLoc = new int[2];
-        rootGroup.getLocationOnScreen(rootLoc);
-        int left = Math.round(loc[0] - rootLoc[0] + x - size / 2f);
-        int top = Math.round(loc[1] - rootLoc[1] + y - size / 2f);
-        ghost.setLayoutParams(new ViewGroup.LayoutParams(size, size));
-        ghost.setX(left);
-        ghost.setY(top);
-        rootGroup.addView(ghost);
-        ghost.animate()
-            .alpha(0f)
-            .scaleX(0.3f)
-            .scaleY(0.3f)
-            .rotation(14f)
-            .setDuration(180)
-            .setInterpolator(new DecelerateInterpolator())
-            .withEndAction(() -> rootGroup.removeView(ghost))
-            .start();
     }
 
     private String[] appLabels(List<LauncherAppEntry> entries) {
