@@ -51,8 +51,12 @@ public final class AzScrubRowView extends AppCompatTextView {
         setText("");
         setSingleLine(true);
         setTextSize(11f);
-        setPadding(0, dp(2), 0, dp(4));
+        setPadding(0, dp(3), 0, dp(6));
         setClickable(true);
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
+            setElevation(dp(12));
+            setTranslationZ(dp(12));
+        }
         letterPaint.setTextAlign(Paint.Align.CENTER);
         letterPaint.setTextSize(getTextSize());
         letterPaint.setColor(getCurrentTextColor());
@@ -77,7 +81,7 @@ public final class AzScrubRowView extends AppCompatTextView {
         float contentBottom = height - getPaddingBottom();
         float slot = width / Math.max(1, visibleLetters.length);
         float anchorX = activeTouchX < 0f ? (width * 0.5f) : activeTouchX;
-        float waveAmplitude = dp(11) * waveStrength;
+        float waveAmplitude = dp(22) * waveStrength;
         int activeIndex = (int) (anchorX / Math.max(1f, slot));
         activeIndex = Math.max(0, Math.min(visibleLetters.length - 1, activeIndex));
 
@@ -86,7 +90,10 @@ public final class AzScrubRowView extends AppCompatTextView {
             float distance = Math.abs(x - anchorX) / Math.max(1f, slot);
             float envelope = (float) Math.exp(-(distance * distance) * 0.85f);
             float waveLift = (float) Math.sin(Math.min(1f, envelope) * (Math.PI * 0.5f)) * waveAmplitude;
-            float scale = 1f + (0.22f * envelope * waveStrength);
+            if (i == activeIndex) {
+                waveLift *= 1.35f;
+            }
+            float scale = 1f + (0.34f * envelope * waveStrength);
             letterPaint.setTextSize(baseTextSize * scale);
             Paint.FontMetrics letterMetrics = letterPaint.getFontMetrics();
             float baseline = ((contentTop + contentBottom) - letterMetrics.ascent - letterMetrics.descent) * 0.5f + dp(2) - waveLift;

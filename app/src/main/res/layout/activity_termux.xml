@@ -185,16 +185,17 @@
         android:id="@+id/apps_bar_viewpager"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_above="@+id/apps_bar_az_row"
+        android:layout_above="@+id/terminal_toolbar_view_pager"
         android:visibility="gone" />
 
     <com.termux.app.AzScrubRowView
         android:id="@+id/apps_bar_az_row"
         android:layout_width="match_parent"
-        android:layout_height="28dp"
-        android:layout_above="@+id/terminal_toolbar_view_pager"
+        android:layout_height="34dp"
+        android:layout_alignBottom="@+id/apps_bar_viewpager"
         android:gravity="center_vertical"
         android:textColor="@color/menu_accent"
+        android:elevation="10dp"
         android:visibility="gone" />
 
         <androidx.viewpager.widget.ViewPager

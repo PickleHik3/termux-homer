@@ -822,6 +822,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         mAzScrubRowView.setTextColor(muted);
         mAzScrubRowView.setInteractionAccentColor(base);
         mAzScrubRowView.setBackgroundColor(Color.TRANSPARENT);
+        mAzScrubRowView.bringToFront();
     }
 
     private int mutedMonetShade(int color) {
@@ -943,16 +944,10 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
                 }
             }
         }
-        View azRow = findViewById(R.id.apps_bar_az_row);
-        int azRowHeightPx = 0;
-        if (azRow != null && azRow.getLayoutParams() != null) {
-            azRowHeightPx = Math.max(0, azRow.getLayoutParams().height);
-        }
-
         if (extraKeysBackground == null || extraKeysBackgroundBlur == null)
             return;
 
-        int combinedHeight = toolbarHeightPx + appsBarHeightPx + azRowHeightPx;
+        int combinedHeight = toolbarHeightPx + appsBarHeightPx;
         updateExtraKeysBackgroundHeight(extraKeysBackground, combinedHeight);
         updateExtraKeysBackgroundHeight(extraKeysBackgroundBlur, combinedHeight);
     }
