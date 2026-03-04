@@ -832,6 +832,12 @@ public class TooieApiServer {
     }
 
     private void installTooieCliScript() {
+        File loginBinary = new File(TermuxConstants.TERMUX_BIN_PREFIX_DIR_PATH + "/login");
+        if (!loginBinary.exists()) {
+            Logger.logInfo(LOG_TAG, "Skipping Tooie CLI install until bootstrap is initialized.");
+            return;
+        }
+
         String script =
             "#!/data/data/com.termux/files/usr/bin/sh\n" +
             "set -eu\n" +
