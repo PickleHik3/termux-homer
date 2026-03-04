@@ -503,7 +503,6 @@ public final class SuggestionBarView extends GridLayout {
         }
         setColumnCount(buttonCount);
 
-        int addedCount = 0;
         boolean[] usedColumns = new boolean[Math.max(1, buttonCount)];
         for (int col = 0; col < entries.size() && col < buttonCount; col++) {
             LauncherAppEntry entry = entries.get(col);
@@ -536,7 +535,6 @@ public final class SuggestionBarView extends GridLayout {
             }
 
             addView(view);
-            addedCount++;
             if (renderCol >= 0 && renderCol < usedColumns.length) {
                 usedColumns[renderCol] = true;
             }
@@ -2029,41 +2027,6 @@ public final class SuggestionBarView extends GridLayout {
         removeAppFromFolder(dragState.sourceFolder, dragState.appRef);
         persistPinsAndReload();
         return true;
-    }
-
-    private boolean handlePinnedDrop(@NonNull View targetView, @NonNull DragEvent event, int targetIndex, @Nullable PinnedItem targetItem) {
-        Object localState = event.getLocalState();
-        boolean pinnedDrag = localState instanceof PinnedDragState;
-        boolean folderDrag = localState instanceof FolderAppDragState;
-        if (!pinnedDrag && !folderDrag) return false;
-        switch (event.getAction()) {
-            case DragEvent.ACTION_DRAG_STARTED:
-                updateFolderDragInsertionPreview(targetIndex);
-                return true;
-            case DragEvent.ACTION_DRAG_ENTERED:
-                targetView.setAlpha(0.72f);
-                updateFolderDragInsertionPreview(targetIndex);
-                return true;
-            case DragEvent.ACTION_DRAG_EXITED:
-                targetView.setAlpha(1f);
-                return true;
-            case DragEvent.ACTION_DROP:
-                targetView.setAlpha(1f);
-                float dropXRatio = targetView.getWidth() <= 0 ? 0.5f : clamp(Math.round((event.getX() / (float) targetView.getWidth()) * 100f), 0, 100) / 100f;
-                if (pinnedDrag) {
-                    clearFolderDragInsertionPreview();
-                    return applyPinnedDrop((PinnedDragState) localState, targetIndex, targetItem, dropXRatio);
-                } else {
-                    clearFolderDragInsertionPreview();
-                    return applyFolderDropToBar((FolderAppDragState) localState, targetIndex, targetItem, dropXRatio);
-                }
-            case DragEvent.ACTION_DRAG_ENDED:
-                targetView.setAlpha(1f);
-                clearFolderDragInsertionPreview();
-                return true;
-            default:
-                return false;
-        }
     }
 
     private boolean applyPinnedDrop(@NonNull PinnedDragState dragState, int targetIndex, @Nullable PinnedItem targetItem, float dropXRatio) {
