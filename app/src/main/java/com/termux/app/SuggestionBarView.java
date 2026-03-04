@@ -3,8 +3,8 @@ package com.termux.app;
 import android.annotation.SuppressLint;
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
+import android.animation.ObjectAnimator;
 import android.app.AlertDialog;
-import android.app.Dialog;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ChangedPackages;
@@ -24,9 +24,9 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewParent;
-import android.view.Window;
 import android.view.WindowManager;
 import android.view.animation.DecelerateInterpolator;
+import android.view.animation.LinearInterpolator;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
@@ -237,6 +237,24 @@ public final class SuggestionBarView extends GridLayout {
     public void persistAzPreview(char letter, int selectionIndex) {
         previewAzLetter(letter, selectionIndex, false);
         scheduleAzResetTimeout();
+    }
+
+    @NonNull
+    public Set<Character> getAvailableAzLetters() {
+        if (allApps == null || allApps.isEmpty()) {
+            reloadAllApps();
+        }
+        LinkedHashSet<Character> letters = new LinkedHashSet<>();
+        if (allApps != null) {
+            for (LauncherAppEntry app : allApps) {
+                char letter = LauncherAppDataProvider.normalizeLetter(app.label == null ? "" : app.label);
+                letters.add(letter);
+            }
+        }
+        if (letters.isEmpty()) {
+            letters.add('#');
+        }
+        return letters;
     }
 
     public void clearAzPreview() {
@@ -501,18 +519,50 @@ public final class SuggestionBarView extends GridLayout {
         }
 
         int missing = buttonCount - addedCount;
-        for (int i = 0; i < missing; i++) {
-            ImageButton filler = new ImageButton(getContext(), null, android.R.attr.buttonBarButtonStyle);
-            filler.setVisibility(INVISIBLE);
-            filler.setLayoutParams(createSlotParams(addedCount + i));
-            if (!azPreview) {
-                final int slotIndex = addedCount + i;
-                filler.setOnLongClickListener(v -> {
-                    showUnifiedPinEditor(slotIndex, null);
-                    return true;
-                });
+        boolean showEmptyPinnedHint = !azPreview
+            && TextUtils.isEmpty(lastInput.trim())
+            && (pinnedItems == null || pinnedItems.isEmpty())
+            && entries.isEmpty();
+
+        if (showEmptyPinnedHint) {
+            TextView hint = new TextView(getContext());
+            hint.setText("Long-press here to pin your favorite apps");
+            hint.setTextColor(0x99B8B8B8);
+            hint.setTextSize(11f);
+            hint.setTypeface(Typeface.create(Typeface.DEFAULT, Typeface.ITALIC));
+            hint.setGravity(Gravity.CENTER);
+            hint.setSingleLine(true);
+            hint.setPadding(dp(6), 0, dp(6), 0);
+            GridLayout.LayoutParams hintParams = createSlotParams(0);
+            hintParams.columnSpec = GridLayout.spec(0, Math.max(1, buttonCount), 1f);
+            hintParams.width = 0;
+            hint.setLayoutParams(hintParams);
+            hint.setOnLongClickListener(v -> {
+                showUnifiedPinEditor(0, null);
+                return true;
+            });
+            applyPinnedHintAnimation(hint);
+            addView(hint);
+            for (int i = 1; i < buttonCount; i++) {
+                ImageButton filler = new ImageButton(getContext(), null, android.R.attr.buttonBarButtonStyle);
+                filler.setVisibility(INVISIBLE);
+                filler.setLayoutParams(createSlotParams(i));
+                addView(filler);
             }
-            addView(filler);
+        } else {
+            for (int i = 0; i < missing; i++) {
+                ImageButton filler = new ImageButton(getContext(), null, android.R.attr.buttonBarButtonStyle);
+                filler.setVisibility(INVISIBLE);
+                filler.setLayoutParams(createSlotParams(addedCount + i));
+                if (!azPreview) {
+                    final int slotIndex = addedCount + i;
+                    filler.setOnLongClickListener(v -> {
+                        showUnifiedPinEditor(slotIndex, null);
+                        return true;
+                    });
+                }
+                addView(filler);
+            }
         }
 
         if (!azPreview) {
@@ -524,6 +574,23 @@ public final class SuggestionBarView extends GridLayout {
         } else {
             setOnLongClickListener(null);
         }
+    }
+
+    private void applyPinnedHintAnimation(@NonNull TextView hintView) {
+        ObjectAnimator shimmerX = ObjectAnimator.ofFloat(hintView, View.TRANSLATION_X, -dp(10), dp(10));
+        shimmerX.setDuration(1700L);
+        shimmerX.setRepeatCount(ObjectAnimator.INFINITE);
+        shimmerX.setRepeatMode(ObjectAnimator.REVERSE);
+        shimmerX.setInterpolator(new LinearInterpolator());
+
+        ObjectAnimator shimmerAlpha = ObjectAnimator.ofFloat(hintView, View.ALPHA, 0.45f, 0.8f, 0.45f);
+        shimmerAlpha.setDuration(1700L);
+        shimmerAlpha.setRepeatCount(ObjectAnimator.INFINITE);
+        shimmerAlpha.setRepeatMode(ObjectAnimator.RESTART);
+        shimmerAlpha.setInterpolator(new LinearInterpolator());
+
+        shimmerX.start();
+        shimmerAlpha.start();
     }
 
     private View createEntryButton(@NonNull LauncherAppEntry entry) {
@@ -843,6 +910,15 @@ public final class SuggestionBarView extends GridLayout {
         }
 
         final List<LauncherAppEntry> source = new ArrayList<>(allApps);
+        Collections.sort(source, (a, b) -> {
+            boolean aSelected = selectedIds.contains(a.appRef.stableId());
+            boolean bSelected = selectedIds.contains(b.appRef.stableId());
+            if (aSelected != bSelected) return aSelected ? -1 : 1;
+            return String.CASE_INSENSITIVE_ORDER.compare(
+                a.label == null ? "" : a.label,
+                b.label == null ? "" : b.label
+            );
+        });
         final List<String> labels = new ArrayList<>();
         for (LauncherAppEntry app : source) labels.add(app.label);
 
@@ -1144,9 +1220,6 @@ public final class SuggestionBarView extends GridLayout {
     }
 
     private void showFolderSettings(PinnedFolderItem folder) {
-        Dialog dialog = new Dialog(getContext());
-        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
-
         LinearLayout layout = new LinearLayout(getContext());
         layout.setOrientation(LinearLayout.VERTICAL);
         layout.setPadding(dp(16), dp(12), dp(16), dp(12));
@@ -1185,11 +1258,26 @@ public final class SuggestionBarView extends GridLayout {
         Button cancel = new Button(getContext());
         cancel.setText("Cancel");
         styleGhostButton(cancel);
-        cancel.setOnClickListener(v -> dialog.dismiss());
 
         Button save = new Button(getContext());
         save.setText("Save");
         styleGhostButton(save);
+
+        buttons.addView(cancel);
+        buttons.addView(save);
+
+        layout.addView(title);
+        layout.addView(nameInput, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        layout.addView(rowsControl, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        layout.addView(colsControl, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        layout.addView(colorInput, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        layout.addView(buttons, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        AlertDialog dialog = new AlertDialog.Builder(getContext())
+            .setView(layout)
+            .create();
+
+        cancel.setOnClickListener(v -> dialog.dismiss());
         save.setOnClickListener(v -> {
             String newName = stringValue(nameInput.getText()).trim();
             folder.title = newName.isEmpty() ? "Folder" : newName;
@@ -1209,25 +1297,13 @@ public final class SuggestionBarView extends GridLayout {
             persistPinsAndReload();
         });
 
-        buttons.addView(cancel);
-        buttons.addView(save);
-
-        layout.addView(title);
-        layout.addView(nameInput, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-        layout.addView(rowsControl, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-        layout.addView(colsControl, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-        layout.addView(colorInput, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-        layout.addView(buttons, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-
-        dialog.setContentView(layout);
-        Window window = dialog.getWindow();
-        if (window != null) {
-            window.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-            window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE | WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE);
-            window.setGravity(Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
-            window.getAttributes().y = dp(48);
-        }
         dialog.show();
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setSoftInputMode(
+                WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE |
+                WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE
+            );
+        }
     }
 
     private void showFolderPopup(PinnedFolderItem folder, @Nullable View anchor) {

@@ -200,3 +200,17 @@ Files changed: app/src/main/java/com/termux/app/SuggestionBarView.java
 Build result: pass (:app:compileDebugJavaWithJavac)
 Manual validation case(s): Pending device QA for pinned-row drag/delete glyph alignment, swipe-to-delete in pinned list, create icon bottom-left alignment, folder mini-icon sizing/padding, no blur shift on folder popup open, and folder settings rename/stepper controls.
 Next step: Run on-device validation, then commit/push to appsbar-dev and trigger nightly if approved.
+Cycle: 21
+Task: Folder settings popup modernization + A-Z scrub safety/visibility/tint updates
+Root cause: Folder settings dialog window gravity forced bottom-sheet-like behavior causing IME overlap, and scrub row still allowed accidental launch + displayed unused letters with static styling.
+Files changed: app/src/main/java/com/termux/app/SuggestionBarView.java, app/src/main/java/com/termux/app/AzScrubRowView.java, app/src/main/java/com/termux/app/TermuxActivity.java
+Build result: pass (:app:compileDebugJavaWithJavac)
+Manual validation case(s): Pending device QA for centered folder settings dialog above keyboard, no-launch scrub release behavior, hidden unused initials, and scrub row muted monet tint independent from extra keys row.
+Next step: On-device visual/interaction validation, then commit/push and trigger nightly workflow if approved.
+Cycle: 22
+Task: Folder editor checked-item grouping + empty apps-bar first-launch hint
+Root cause: Folder app selector preserved global app order without surfacing already-selected folder apps first; first-launch no-pin state looked empty without guidance.
+Files changed: app/src/main/java/com/termux/app/SuggestionBarView.java
+Build result: pass (:app:compileDebugJavaWithJavac)
+Manual validation case(s): Pending device QA for checked apps grouped at top in folder editor, and animated empty-state hint text with long-press entry to pin editor when no pins exist.
+Next step: Push to appsbar-dev and trigger nightly workflow after user confirmation.

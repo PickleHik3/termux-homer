@@ -7,8 +7,12 @@ import android.graphics.Rect;
 import android.util.AttributeSet;
 import android.view.MotionEvent;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.widget.AppCompatTextView;
+
+import java.util.LinkedHashSet;
+import java.util.Set;
 
 public final class AzScrubRowView extends AppCompatTextView {
     public interface ScrubCallback {
@@ -17,6 +21,7 @@ public final class AzScrubRowView extends AppCompatTextView {
     }
 
     private static final char[] LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ#".toCharArray();
+    private char[] visibleLetters = LETTERS;
 
     @Nullable private ScrubCallback callback;
     private int currentSelectionIndex = 0;
@@ -64,16 +69,54 @@ public final class AzScrubRowView extends AppCompatTextView {
         letterPaint.setTextSize(getTextSize());
         letterPaint.getTextBounds("A", 0, 1, textBounds);
         float baseline = (height * 0.5f) + (textBounds.height() * 0.35f);
-        float slot = width / LETTERS.length;
+        float slot = width / Math.max(1, visibleLetters.length);
 
-        for (int i = 0; i < LETTERS.length; i++) {
+        for (int i = 0; i < visibleLetters.length; i++) {
             float x = (slot * i) + (slot * 0.5f);
-            canvas.drawText(String.valueOf(LETTERS[i]), x, baseline, letterPaint);
+            canvas.drawText(String.valueOf(visibleLetters[i]), x, baseline, letterPaint);
         }
     }
 
     public void setScrubCallback(@Nullable ScrubCallback callback) {
         this.callback = callback;
+    }
+
+    public void setVisibleLetters(@NonNull Set<Character> letters) {
+        if (letters.isEmpty()) {
+            visibleLetters = LETTERS;
+            invalidate();
+            return;
+        }
+        LinkedHashSet<Character> normalized = new LinkedHashSet<>();
+        for (Character c : letters) {
+            if (c == null) continue;
+            char upper = Character.toUpperCase(c);
+            if ((upper >= 'A' && upper <= 'Z') || upper == '#') {
+                normalized.add(upper);
+            }
+        }
+        if (normalized.isEmpty()) {
+            visibleLetters = LETTERS;
+            invalidate();
+            return;
+        }
+        char[] out = new char[normalized.size()];
+        int i = 0;
+        for (char base : LETTERS) {
+            if (normalized.contains(base)) {
+                out[i++] = base;
+            }
+        }
+        if (i == 0) {
+            visibleLetters = LETTERS;
+        } else if (i == out.length) {
+            visibleLetters = out;
+        } else {
+            char[] trimmed = new char[i];
+            System.arraycopy(out, 0, trimmed, 0, i);
+            visibleLetters = trimmed;
+        }
+        invalidate();
     }
 
     @Override
@@ -89,8 +132,7 @@ public final class AzScrubRowView extends AppCompatTextView {
                 callback.onScrub(letter, currentSelectionIndex, false);
                 return true;
             case MotionEvent.ACTION_UP:
-                boolean launch = event.getY() < -dp(4);
-                callback.onScrub(letter, currentSelectionIndex, launch);
+                callback.onScrub(letter, currentSelectionIndex, false);
                 return true;
             case MotionEvent.ACTION_CANCEL:
                 callback.onCancel();
@@ -102,8 +144,9 @@ public final class AzScrubRowView extends AppCompatTextView {
 
     private char pickLetter(float x) {
         float width = Math.max(1f, getWidth());
-        int index = (int) ((x / width) * LETTERS.length);
-        index = Math.max(0, Math.min(LETTERS.length - 1, index));
-        return LETTERS[index];
+        int len = Math.max(1, visibleLetters.length);
+        int index = (int) ((x / width) * len);
+        index = Math.max(0, Math.min(len - 1, index));
+        return visibleLetters[index];
     }
 }

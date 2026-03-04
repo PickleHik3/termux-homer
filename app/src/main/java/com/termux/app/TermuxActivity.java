@@ -89,7 +89,9 @@ import androidx.drawerlayout.widget.DrawerLayout;
 import androidx.viewpager.widget.ViewPager;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * A terminal emulator activity.
@@ -747,11 +749,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
                 @Override
                 public void onScrub(char letter, int selectionIndex, boolean commit) {
                     if (mSuggestionBarView != null) {
-                        if (commit) {
-                            mSuggestionBarView.previewAzLetter(letter, selectionIndex, true);
-                        } else {
-                            mSuggestionBarView.persistAzPreview(letter, selectionIndex);
-                        }
+                        mSuggestionBarView.persistAzPreview(letter, selectionIndex);
                     }
                 }
 
@@ -802,6 +800,26 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         mSuggestionBarView.setAppDataProvider(mLauncherAppDataProvider);
         mSuggestionBarView.setConfigRepository(mLauncherConfigRepository);
         mSuggestionBarView.reloadAllApps();
+        syncAzScrubLettersAndTint();
+    }
+
+    private void syncAzScrubLettersAndTint() {
+        if (mAzScrubRowView == null || mSuggestionBarView == null) return;
+        Set<Character> letters = new LinkedHashSet<>(mSuggestionBarView.getAvailableAzLetters());
+        mAzScrubRowView.setVisibleLetters(letters);
+        int base = ContextCompat.getColor(this, R.color.background_accent);
+        int muted = mutedMonetShade(base);
+        int alpha = Math.max(0, Math.min(100, mPreferences != null ? mPreferences.getAppBarOpacity() : 80));
+        int color = ((int) (255f * (alpha / 100f)) << 24) | (muted & 0x00FFFFFF);
+        mAzScrubRowView.setBackgroundColor(color);
+    }
+
+    private int mutedMonetShade(int color) {
+        float[] hsv = new float[3];
+        Color.colorToHSV(color, hsv);
+        hsv[1] = Math.max(0f, Math.min(1f, hsv[1] * 0.92f));
+        hsv[2] = Math.max(0f, Math.min(1f, hsv[2] * 0.88f));
+        return Color.HSVToColor(hsv);
     }
 
     private void applySuggestionBarInputChar() {
@@ -1495,6 +1513,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
                 Intent.ACTION_PACKAGE_CHANGED.equals(action)) {
                 mSuggestionBarView.clearAppCache();
                 mSuggestionBarView.reloadAllApps();
+                syncAzScrubLettersAndTint();
             }
         }
     }
