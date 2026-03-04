@@ -117,6 +117,9 @@ public final class SuggestionBarView extends GridLayout {
     private boolean pageSwitchAnimating = false;
     private int folderDragHoverIndex = -1;
     private boolean terminalDropTargetInstalled = false;
+    private boolean deleteDropZoneVisible = false;
+    private boolean deleteDropZoneHover = false;
+    @Nullable private View deleteDropZoneView;
     private final Runnable azResetRunnable = this::clearAzPreviewWithFade;
 
     public SuggestionBarView(Context context, AttributeSet attrs) {
@@ -1666,23 +1669,97 @@ public final class SuggestionBarView extends GridLayout {
         int clamped = clamp(targetIndex, 0, maxSlots - 1);
         if (folderDragHoverIndex == clamped) return;
         folderDragHoverIndex = clamped;
-        float shift = Math.max(dp(10), getWidth() / (float) Math.max(4, maxSlots) * 0.35f);
-        for (int i = 0; i < getChildCount(); i++) {
-            View child = getChildAt(i);
-            if (child == null) continue;
-            float tx = i >= folderDragHoverIndex ? shift : 0f;
-            child.animate().translationX(tx).setDuration(90).setInterpolator(new DecelerateInterpolator()).start();
-        }
+        applyBarDragTransforms();
     }
 
     private void clearFolderDragInsertionPreview() {
         if (folderDragHoverIndex < 0) return;
         folderDragHoverIndex = -1;
+        applyBarDragTransforms();
+    }
+
+    private void applyBarDragTransforms() {
+        int maxSlots = Math.max(1, maxButtonCount);
+        float slotWidth = Math.max(dp(24), getWidth() / (float) maxSlots);
+        float deleteShift = deleteDropZoneVisible ? slotWidth : 0f;
+        float insertShift = (folderDragHoverIndex >= 0) ? Math.max(dp(10), getWidth() / (float) Math.max(4, maxSlots) * 0.35f) : 0f;
         for (int i = 0; i < getChildCount(); i++) {
             View child = getChildAt(i);
             if (child == null) continue;
-            child.animate().translationX(0f).setDuration(90).setInterpolator(new DecelerateInterpolator()).start();
+            if (child == deleteDropZoneView) continue;
+            float tx = deleteShift;
+            if (folderDragHoverIndex >= 0 && i >= folderDragHoverIndex) {
+                tx += insertShift;
+            }
+            child.animate().translationX(tx).setDuration(90).setInterpolator(new DecelerateInterpolator()).start();
         }
+    }
+
+    private void showDeleteDropZone() {
+        if (deleteDropZoneVisible) return;
+        deleteDropZoneVisible = true;
+        deleteDropZoneHover = false;
+        if (deleteDropZoneView == null) {
+            deleteDropZoneView = createDeleteDropZoneView();
+        }
+        if (deleteDropZoneView.getParent() != this) {
+            deleteDropZoneView.setLayoutParams(createSlotParams(0));
+            addView(deleteDropZoneView);
+        }
+        applyBarDragTransforms();
+        updateDeleteDropZoneVisual(false);
+    }
+
+    private void hideDeleteDropZone() {
+        if (!deleteDropZoneVisible) return;
+        deleteDropZoneVisible = false;
+        deleteDropZoneHover = false;
+        if (deleteDropZoneView != null && deleteDropZoneView.getParent() == this) {
+            removeView(deleteDropZoneView);
+        }
+        applyBarDragTransforms();
+    }
+
+    private void setDeleteDropZoneHover(boolean hovering) {
+        if (!deleteDropZoneVisible) return;
+        if (deleteDropZoneHover == hovering) return;
+        deleteDropZoneHover = hovering;
+        updateDeleteDropZoneVisual(hovering);
+        if (hovering) {
+            clearFolderDragInsertionPreview();
+        }
+    }
+
+    private void updateDeleteDropZoneVisual(boolean hover) {
+        if (deleteDropZoneView == null) return;
+        deleteDropZoneView.animate()
+            .alpha(hover ? 0.96f : 0.75f)
+            .scaleX(hover ? 1.04f : 1f)
+            .scaleY(hover ? 1.04f : 1f)
+            .setDuration(90L)
+            .setInterpolator(new DecelerateInterpolator())
+            .start();
+    }
+
+    @NonNull
+    private View createDeleteDropZoneView() {
+        FrameLayout zone = new FrameLayout(getContext());
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(0x66B00020);
+        bg.setCornerRadius(dp(10));
+        bg.setStroke(dp(1), 0x99FF6B6B);
+        zone.setBackground(bg);
+        zone.setAlpha(0.75f);
+        ImageView icon = new ImageView(getContext());
+        icon.setImageResource(R.drawable.ic_delete_sweep_24);
+        icon.setColorFilter(0xFFFFD8D8);
+        FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(dp(20), dp(20), Gravity.CENTER);
+        zone.addView(icon, params);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            zone.setElevation(dp(18));
+            zone.setTranslationZ(dp(18));
+        }
+        return zone;
     }
 
     private void ensureTerminalDropTarget() {
@@ -1947,9 +2024,11 @@ public final class SuggestionBarView extends GridLayout {
         float width = Math.max(1f, targetView.getWidth());
         float x = Math.max(0f, Math.min(width, event.getX()));
         float slotWidth = width / slotCount;
-        int hoveredSlot = clamp((int) (x / Math.max(1f, slotWidth)), 0, slotCount - 1);
+        boolean inDeleteZone = deleteDropZoneVisible && x <= (slotWidth * 0.95f);
+        float contentX = deleteDropZoneVisible ? Math.max(0f, x - slotWidth) : x;
+        int hoveredSlot = clamp((int) (contentX / Math.max(1f, slotWidth)), 0, slotCount - 1);
         float slotStartX = hoveredSlot * slotWidth;
-        float dropXRatio = slotWidth <= 0f ? 0.5f : Math.max(0f, Math.min(1f, (x - slotStartX) / slotWidth));
+        float dropXRatio = slotWidth <= 0f ? 0.5f : Math.max(0f, Math.min(1f, (contentX - slotStartX) / slotWidth));
 
         int pageOffset = Math.max(0, pinnedPageIndex) * Math.max(1, pinnedItemsPerPage);
         int targetIndex = clamp(pageOffset + hoveredSlot, 0, pinnedItems == null ? 0 : pinnedItems.size());
@@ -1960,20 +2039,38 @@ public final class SuggestionBarView extends GridLayout {
 
         switch (event.getAction()) {
             case DragEvent.ACTION_DRAG_STARTED:
+                showDeleteDropZone();
                 updateFolderDragInsertionPreview(hoveredSlot);
                 return true;
             case DragEvent.ACTION_DRAG_LOCATION:
-                updateFolderDragInsertionPreview(hoveredSlot);
+                setDeleteDropZoneHover(inDeleteZone);
+                if (!inDeleteZone) {
+                    updateFolderDragInsertionPreview(hoveredSlot);
+                }
                 return true;
             case DragEvent.ACTION_DRAG_ENTERED:
                 targetView.setAlpha(0.92f);
-                updateFolderDragInsertionPreview(hoveredSlot);
+                setDeleteDropZoneHover(inDeleteZone);
+                if (!inDeleteZone) {
+                    updateFolderDragInsertionPreview(hoveredSlot);
+                }
                 return true;
             case DragEvent.ACTION_DRAG_EXITED:
                 targetView.setAlpha(1f);
+                setDeleteDropZoneHover(false);
                 return true;
             case DragEvent.ACTION_DROP:
                 targetView.setAlpha(1f);
+                if (inDeleteZone) {
+                    setDeleteDropZoneHover(false);
+                    hideDeleteDropZone();
+                    clearFolderDragInsertionPreview();
+                    if (pinnedDrag) {
+                        return applyPinnedDelete((PinnedDragState) localState);
+                    } else {
+                        return applyFolderDragDelete((FolderAppDragState) localState);
+                    }
+                }
                 clearFolderDragInsertionPreview();
                 if (pinnedDrag) {
                     return applyPinnedDrop((PinnedDragState) localState, targetIndex, targetItem, dropXRatio);
@@ -1982,11 +2079,27 @@ public final class SuggestionBarView extends GridLayout {
                 }
             case DragEvent.ACTION_DRAG_ENDED:
                 targetView.setAlpha(1f);
+                setDeleteDropZoneHover(false);
+                hideDeleteDropZone();
                 clearFolderDragInsertionPreview();
                 return true;
             default:
                 return false;
         }
+    }
+
+    private boolean applyPinnedDelete(@NonNull PinnedDragState dragState) {
+        if (dragState.sourceIndex < 0 || dragState.sourceIndex >= pinnedItems.size()) return false;
+        pinnedItems.remove(dragState.sourceIndex);
+        persistPinsAndReload();
+        return true;
+    }
+
+    private boolean applyFolderDragDelete(@NonNull FolderAppDragState dragState) {
+        if (dragState.sourceFolder == null || dragState.appRef == null) return false;
+        removeAppFromFolder(dragState.sourceFolder, dragState.appRef);
+        persistPinsAndReload();
+        return true;
     }
 
     private boolean handlePinnedDrop(@NonNull View targetView, @NonNull DragEvent event, int targetIndex, @Nullable PinnedItem targetItem) {
@@ -2448,14 +2561,14 @@ public final class SuggestionBarView extends GridLayout {
         GradientDrawable glow = new GradientDrawable();
         glow.setShape(GradientDrawable.OVAL);
         int base = inheritedTintColor & 0x00FFFFFF;
-        glow.setColor((0x88 << 24) | base);
-        glow.setStroke(dp(1), (0xA6 << 24) | base);
+        glow.setColor(0x00000000);
+        glow.setStroke(dp(2), (0xCC << 24) | base);
         bloom.setBackground(glow);
         int size = Math.max(sourceView.getWidth(), sourceView.getHeight());
         if (size <= 0) {
             size = iconSizePx();
         }
-        int bloomSize = Math.round(size * 1.8f);
+        int bloomSize = Math.round(size * 0.95f);
         ViewGroup.LayoutParams params = new ViewGroup.LayoutParams(bloomSize, bloomSize);
         bloom.setLayoutParams(params);
         bloom.setAlpha(0f);
@@ -2467,8 +2580,8 @@ public final class SuggestionBarView extends GridLayout {
         float cy = (srcLoc[1] - rootLoc[1]) + sourceView.getHeight() / 2f;
         bloom.setX(cx - bloomSize / 2f);
         bloom.setY(cy - bloomSize / 2f);
-        bloom.setScaleX(0.32f);
-        bloom.setScaleY(0.32f);
+        bloom.setScaleX(0.72f);
+        bloom.setScaleY(0.72f);
         container.addView(bloom);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             bloom.setElevation(dp(24));
@@ -2487,17 +2600,17 @@ public final class SuggestionBarView extends GridLayout {
                 .start())
             .start();
         bloom.animate()
-            .alpha(0.78f)
-            .scaleX(1.48f)
-            .scaleY(1.48f)
-            .setDuration(140L)
+            .alpha(0.9f)
+            .scaleX(1.34f)
+            .scaleY(1.34f)
+            .setDuration(130L)
             .setInterpolator(new DecelerateInterpolator())
             .withEndAction(() -> bloom.animate()
                 .alpha(0f)
-                .scaleX(2.12f)
-                .scaleY(2.12f)
-                .setDuration(190L)
-                .setInterpolator(new DecelerateInterpolator())
+                .scaleX(1.82f)
+                .scaleY(1.82f)
+                .setDuration(170L)
+                .setInterpolator(new LinearInterpolator())
                 .withEndAction(() -> container.removeView(bloom))
                 .start())
             .start();

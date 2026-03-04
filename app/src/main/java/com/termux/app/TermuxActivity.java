@@ -925,15 +925,15 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         if (mPreferences.isAppLauncherAzRowEnabled()) {
             float density = getResources().getDisplayMetrics().density;
             float iconScale = mPreferences.getAppLauncherIconScale();
-            float ratio = 0.44f + ((iconScale - 1f) * 0.10f);
+            float ratio = 0.40f + ((iconScale - 1f) * 0.08f);
             int target = Math.round(barHeightPx * ratio);
-            int min = Math.round(18f * density);
-            int max = Math.round(30f * density);
+            int min = Math.round(16f * density);
+            int max = Math.round(27f * density);
             azRowHeightPx = Math.max(min, Math.min(max, target));
         }
         updateViewHeight(R.id.apps_bar_viewpager, barHeightPx);
         updateViewHeight(R.id.apps_bar_az_row, azRowHeightPx);
-        int interRowGapPx = Math.round(getResources().getDisplayMetrics().density * (2f + (Math.max(0f, mPreferences.getAppLauncherIconScale() - 1f) * 2f)));
+        int interRowGapPx = Math.round(getResources().getDisplayMetrics().density * (3f + (Math.max(0f, mPreferences.getAppLauncherIconScale() - 1f) * 2f)));
         updateViewBottomMargin(R.id.apps_bar_viewpager, interRowGapPx);
         updateViewHeight(R.id.apps_bar_background, barHeightPx);
         updateViewHeight(R.id.apps_bar_backgroundblur, barHeightPx);
