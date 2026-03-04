@@ -55,7 +55,6 @@ public final class AzScrubRowView extends AppCompatTextView {
         setTextSize(11f);
         setPadding(0, dp(2), 0, dp(5));
         setClickable(true);
-        setTranslationY(-dp(6));
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
             setElevation(dp(20));
             setTranslationZ(dp(20));
@@ -226,8 +225,7 @@ public final class AzScrubRowView extends AppCompatTextView {
     }
 
     private void updateInteractionLayerOffset() {
-        float lift = -dp(6) - (dp(12) * waveStrength);
-        setTranslationY(lift);
+        setTranslationY(0f);
     }
 
     private void applyLetterWeight(float envelope, boolean active) {
