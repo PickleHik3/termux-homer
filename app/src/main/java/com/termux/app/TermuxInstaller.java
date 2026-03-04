@@ -99,11 +99,16 @@ final class TermuxInstaller {
                 Logger.logInfo(LOG_TAG, "The termux prefix directory \"" + TERMUX_PREFIX_DIR_PATH + "\" exists but is empty or only contains specific unimportant files.");
             } else {
                 String loginBinaryPath = TermuxConstants.TERMUX_BIN_PREFIX_DIR_PATH + "/login";
-                if (FileUtils.fileExists(loginBinaryPath, false)) {
+                Error loginBinaryError = FileUtils.validateRegularFileExistenceAndPermissions(
+                    "termux login binary", loginBinaryPath, TERMUX_PREFIX_DIR_PATH,
+                    FileUtils.APP_EXECUTABLE_FILE_PERMISSIONS, true, true, false
+                );
+                if (loginBinaryError == null) {
                     whenDone.run();
                     return;
                 }
-                Logger.logWarn(LOG_TAG, "The termux prefix directory exists but core bootstrap binary is missing at \"" + loginBinaryPath + "\". Reinstalling bootstrap.");
+                Logger.logWarn(LOG_TAG, "The termux prefix directory exists but bootstrap appears incomplete/broken. Reinstalling bootstrap. " +
+                    Error.getMinimalErrorString(loginBinaryError));
             }
         } else if (FileUtils.fileExists(TERMUX_PREFIX_DIR_PATH, false)) {
             Logger.logInfo(LOG_TAG, "The termux prefix directory \"" + TERMUX_PREFIX_DIR_PATH + "\" does not exist but another file exists at its destination.");
