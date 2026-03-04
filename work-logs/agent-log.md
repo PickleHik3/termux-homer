@@ -221,3 +221,10 @@ Files changed: work-logs/agent-log.md
 Build result: fail (not run in this analysis-only cycle)
 Manual validation case(s): N/A (static diff analysis against upstream/master refs)
 Next step: Validate on device with keyboard open/close across 3-button and gesture navigation, then decide whether to revert spacer/inset changes or re-enable guarded margin adjustment.
+Cycle: 24
+Task: Bootstrap/terminal exec fallback for Android 16 Permission denied on $PREFIX binaries
+Root cause: Direct exec of $PREFIX binaries fails with EACCES under current SELinux app domain (untrusted_app_29), breaking bootstrap second stage and login startup.
+Files changed: termux-shared/src/main/java/com/termux/shared/shell/command/runner/app/AppShell.java, terminal-emulator/src/main/jni/termux.c
+Build result: fail (local build blocked by missing accepted Android NDK license for ndk;29.0.14206865)
+Manual validation case(s): pending device validation: fresh data install should complete bootstrap second stage and open interactive login shell without Permission denied.
+Next step: Build/install APK from CI (or local after SDK license acceptance) and re-test first-launch bootstrap + `ls` execution.
