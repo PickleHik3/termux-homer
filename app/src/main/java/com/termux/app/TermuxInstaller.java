@@ -61,6 +61,8 @@ import static com.termux.shared.termux.TermuxConstants.TERMUX_STAGING_PREFIX_DIR
 final class TermuxInstaller {
 
     private static final String LOG_TAG = "TermuxInstaller";
+    private static final String BOOTSTRAP_SECOND_STAGE_OLD_PATH = "etc/termux/bootstrap/termux-bootstrap-second-stage.sh";
+    private static final String BOOTSTRAP_SECOND_STAGE_NEW_PATH = "etc/termux/termux-bootstrap/second-stage/termux-bootstrap-second-stage.sh";
 
     /**
      * Performs bootstrap setup if necessary.
@@ -184,7 +186,8 @@ final class TermuxInstaller {
                                     }
                                     if (zipEntryName.startsWith("bin/") || zipEntryName.startsWith("libexec") ||
                                         zipEntryName.startsWith("lib/apt/apt-helper") || zipEntryName.startsWith("lib/apt/methods") ||
-                                        zipEntryName.equals("etc/termux/bootstrap/termux-bootstrap-second-stage.sh")) {
+                                        zipEntryName.equals(BOOTSTRAP_SECOND_STAGE_OLD_PATH) ||
+                                        zipEntryName.equals(BOOTSTRAP_SECOND_STAGE_NEW_PATH)) {
                                         //noinspection OctalInteger
                                         Os.chmod(targetFile.getAbsolutePath(), 0700);
                                     }
@@ -204,7 +207,10 @@ final class TermuxInstaller {
 
                     // Run Termux bootstrap second stage
                     Logger.logInfo(LOG_TAG, "Running Termux bootstrap second stage.");
-                    String termuxBootstrapSecondStageFile = TERMUX_PREFIX_DIR_PATH + "/etc/termux/bootstrap/termux-bootstrap-second-stage.sh";
+                    String termuxBootstrapSecondStageFile = TERMUX_PREFIX_DIR_PATH + "/" + BOOTSTRAP_SECOND_STAGE_NEW_PATH;
+                    if (!FileUtils.fileExists(termuxBootstrapSecondStageFile, false)) {
+                        termuxBootstrapSecondStageFile = TERMUX_PREFIX_DIR_PATH + "/" + BOOTSTRAP_SECOND_STAGE_OLD_PATH;
+                    }
                     if (FileUtils.fileExists(termuxBootstrapSecondStageFile, false)) {
                         ExecutionCommand executionCommand = new ExecutionCommand(-1,
                                 termuxBootstrapSecondStageFile, null, null,
