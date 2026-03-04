@@ -101,6 +101,29 @@ public class TermuxActivityRootView extends LinearLayout implements ViewTreeObse
     }
 
     /**
+     * Re-apply the last known bottom margin before first post-resume layout when IME is already visible.
+     * This reduces one-frame "full terminal then snap" flicker when returning from other apps.
+     */
+    public void preApplyLastKnownImeMarginIfVisible() {
+        if (mActivity == null || lastMarginBottom == null || lastMarginBottom <= 0) {
+            return;
+        }
+        WindowInsets insets = getRootWindowInsets();
+        if (insets == null) {
+            return;
+        }
+        WindowInsetsCompat compat = WindowInsetsCompat.toWindowInsetsCompat(insets, this);
+        if (!compat.isVisible(WindowInsetsCompat.Type.ime())) {
+            return;
+        }
+        ViewGroup.MarginLayoutParams params = (ViewGroup.MarginLayoutParams) getLayoutParams();
+        if (params != null && params.bottomMargin != lastMarginBottom) {
+            params.setMargins(0, 0, 0, lastMarginBottom);
+            setLayoutParams(params);
+        }
+    }
+
+    /**
      * Sets whether root view logging is enabled or not.
      *
      * @param value The boolean value that defines the state.

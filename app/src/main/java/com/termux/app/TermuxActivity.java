@@ -371,8 +371,13 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         if (mTermuxTerminalViewClient != null)
             mTermuxTerminalViewClient.onStart();
     
-        if (mPreferences.isTerminalMarginAdjustmentEnabled())
+        if (mPreferences.isTerminalMarginAdjustmentEnabled()) {
+            // Prime the last known IME margin before new layout passes to reduce resume flicker.
+            if (mTermuxActivityRootView != null) {
+                mTermuxActivityRootView.preApplyLastKnownImeMarginIfVisible();
+            }
             addTermuxActivityRootViewGlobalLayoutListener();
+        }
 
         if (mPreferences.isMonetBackgroundEnabled()) {
             configureViewVisibility(R.id.terminal_monetbackground, true);

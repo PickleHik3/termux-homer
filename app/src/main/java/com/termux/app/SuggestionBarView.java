@@ -520,7 +520,9 @@ public final class SuggestionBarView extends GridLayout {
                     });
                 } else {
                     final PinnedAppItem appItem = (PinnedAppItem) pinnedItem;
-                    view.setOnLongClickListener(v -> startPinnedDrag(v, pinnedIndex, appItem));
+                    View pressTarget = resolvePrimaryPressTarget(view);
+                    pressTarget.setLongClickable(true);
+                    pressTarget.setOnLongClickListener(v -> startPinnedDrag(v, pinnedIndex, appItem));
                 }
             } else if (!azPreview) {
                 final int slotIndex = col;
@@ -571,7 +573,8 @@ public final class SuggestionBarView extends GridLayout {
             for (int i = 0; i < buttonCount; i++) {
                 if (usedColumns[i]) continue;
                 ImageButton filler = new ImageButton(getContext(), null, android.R.attr.buttonBarButtonStyle);
-                filler.setVisibility(INVISIBLE);
+                filler.setVisibility(VISIBLE);
+                filler.setAlpha(0f);
                 filler.setLayoutParams(createSlotParams(i));
                 if (!azPreview) {
                     final int slotIndex = i;
@@ -1470,6 +1473,11 @@ public final class SuggestionBarView extends GridLayout {
         title.setTextSize(12f);
         title.setTypeface(Typeface.DEFAULT_BOLD);
         title.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        title.setClickable(true);
+        title.setOnClickListener(v -> {
+            dismissFolderPopup();
+            showRenameFolderDialog(folder);
+        });
 
         ImageButton gear = new ImageButton(getContext());
         gear.setImageResource(R.drawable.ic_settings);
@@ -1589,6 +1597,33 @@ public final class SuggestionBarView extends GridLayout {
             }
         }
         return out;
+    }
+
+    private void showRenameFolderDialog(@NonNull PinnedFolderItem folder) {
+        EditText titleInput = new EditText(getContext());
+        titleInput.setHint("Folder name");
+        titleInput.setText(TextUtils.isEmpty(folder.title) ? "Folder" : folder.title);
+        new AlertDialog.Builder(getContext())
+            .setTitle("Rename folder")
+            .setView(titleInput)
+            .setPositiveButton("Save", (dialog, which) -> {
+                String updated = stringValue(titleInput.getText()).trim();
+                folder.title = updated.isEmpty() ? "Folder" : updated;
+                persistPinsAndReload();
+            })
+            .setNegativeButton("Cancel", null)
+            .show();
+    }
+
+    @NonNull
+    private static View resolvePrimaryPressTarget(@NonNull View view) {
+        if (view instanceof FrameLayout) {
+            FrameLayout frame = (FrameLayout) view;
+            if (frame.getChildCount() > 0 && frame.getChildAt(0) != null) {
+                return frame.getChildAt(0);
+            }
+        }
+        return view;
     }
 
     private String[] appLabels(List<LauncherAppEntry> entries) {
