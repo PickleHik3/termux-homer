@@ -212,8 +212,9 @@ final class TermuxInstaller {
                         termuxBootstrapSecondStageFile = TERMUX_PREFIX_DIR_PATH + "/" + BOOTSTRAP_SECOND_STAGE_OLD_PATH;
                     }
                     if (FileUtils.fileExists(termuxBootstrapSecondStageFile, false)) {
+                        String termuxBashFile = TERMUX_PREFIX_DIR_PATH + "/bin/bash";
                         ExecutionCommand executionCommand = new ExecutionCommand(-1,
-                                "/system/bin/sh", new String[]{termuxBootstrapSecondStageFile}, null,
+                                termuxBashFile, new String[]{termuxBootstrapSecondStageFile}, null,
                                 null, ExecutionCommand.Runner.APP_SHELL.getName(), false);
                         executionCommand.commandLabel = "Termux Bootstrap Second Stage Command";
                         executionCommand.backgroundCustomLogLevel = Logger.LOG_LEVEL_NORMAL;
