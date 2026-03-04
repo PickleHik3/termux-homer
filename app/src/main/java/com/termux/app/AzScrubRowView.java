@@ -167,12 +167,15 @@ public final class AzScrubRowView extends AppCompatTextView {
                 stopSettleAnimation();
                 activeTouchX = x;
                 waveStrength = 1f;
+                bringToFront();
+                updateInteractionLayerOffset();
                 invalidate();
                 callback.onScrub(letter, currentSelectionIndex, false);
                 return true;
             case MotionEvent.ACTION_MOVE:
                 activeTouchX = x;
                 waveStrength = 1f;
+                updateInteractionLayerOffset();
                 invalidate();
                 callback.onScrub(letter, currentSelectionIndex, false);
                 return true;
@@ -195,6 +198,7 @@ public final class AzScrubRowView extends AppCompatTextView {
         settleAnimator.setDuration(165L);
         settleAnimator.addUpdateListener(animation -> {
             waveStrength = (float) animation.getAnimatedValue();
+            updateInteractionLayerOffset();
             invalidate();
         });
         settleAnimator.start();
@@ -213,6 +217,11 @@ public final class AzScrubRowView extends AppCompatTextView {
         int index = (int) ((x / width) * len);
         index = Math.max(0, Math.min(len - 1, index));
         return visibleLetters[index];
+    }
+
+    private void updateInteractionLayerOffset() {
+        float lift = -dp(12) * waveStrength;
+        setTranslationY(lift);
     }
 
     private static int blendColors(int from, int to, float ratio) {

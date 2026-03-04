@@ -944,10 +944,15 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
                 }
             }
         }
+        View azRow = findViewById(R.id.apps_bar_az_row);
+        int azRowHeightPx = 0;
+        if (azRow != null && azRow.getLayoutParams() != null) {
+            azRowHeightPx = Math.max(0, azRow.getLayoutParams().height);
+        }
         if (extraKeysBackground == null || extraKeysBackgroundBlur == null)
             return;
 
-        int combinedHeight = toolbarHeightPx + appsBarHeightPx;
+        int combinedHeight = toolbarHeightPx + appsBarHeightPx + azRowHeightPx;
         updateExtraKeysBackgroundHeight(extraKeysBackground, combinedHeight);
         updateExtraKeysBackgroundHeight(extraKeysBackgroundBlur, combinedHeight);
     }
