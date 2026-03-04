@@ -61,6 +61,8 @@ import static com.termux.shared.termux.TermuxConstants.TERMUX_STAGING_PREFIX_DIR
 final class TermuxInstaller {
 
     private static final String LOG_TAG = "TermuxInstaller";
+    private static final String BOOTSTRAP_SECOND_STAGE_OLD_PATH = "etc/termux/bootstrap/termux-bootstrap-second-stage.sh";
+    private static final String BOOTSTRAP_SECOND_STAGE_NEW_PATH = "etc/termux/termux-bootstrap/second-stage/termux-bootstrap-second-stage.sh";
 
     /**
      * Performs bootstrap setup if necessary.
@@ -98,8 +100,17 @@ final class TermuxInstaller {
             if (TermuxFileUtils.isTermuxPrefixDirectoryEmpty()) {
                 Logger.logInfo(LOG_TAG, "The termux prefix directory \"" + TERMUX_PREFIX_DIR_PATH + "\" exists but is empty or only contains specific unimportant files.");
             } else {
-                whenDone.run();
-                return;
+                String loginBinaryPath = TermuxConstants.TERMUX_BIN_PREFIX_DIR_PATH + "/login";
+                Error loginBinaryError = FileUtils.validateRegularFileExistenceAndPermissions(
+                    "termux login binary", loginBinaryPath, TERMUX_PREFIX_DIR_PATH,
+                    FileUtils.APP_EXECUTABLE_FILE_PERMISSIONS, true, true, false
+                );
+                if (loginBinaryError == null) {
+                    whenDone.run();
+                    return;
+                }
+                Logger.logWarn(LOG_TAG, "The termux prefix directory exists but bootstrap appears incomplete/broken. Reinstalling bootstrap. " +
+                    Error.getMinimalErrorString(loginBinaryError));
             }
         } else if (FileUtils.fileExists(TERMUX_PREFIX_DIR_PATH, false)) {
             Logger.logInfo(LOG_TAG, "The termux prefix directory \"" + TERMUX_PREFIX_DIR_PATH + "\" does not exist but another file exists at its destination.");
@@ -175,7 +186,8 @@ final class TermuxInstaller {
                                     }
                                     if (zipEntryName.startsWith("bin/") || zipEntryName.startsWith("libexec") ||
                                         zipEntryName.startsWith("lib/apt/apt-helper") || zipEntryName.startsWith("lib/apt/methods") ||
-                                        zipEntryName.equals("etc/termux/bootstrap/termux-bootstrap-second-stage.sh")) {
+                                        zipEntryName.equals(BOOTSTRAP_SECOND_STAGE_OLD_PATH) ||
+                                        zipEntryName.equals(BOOTSTRAP_SECOND_STAGE_NEW_PATH)) {
                                         //noinspection OctalInteger
                                         Os.chmod(targetFile.getAbsolutePath(), 0700);
                                     }
@@ -195,16 +207,19 @@ final class TermuxInstaller {
 
                     // Run Termux bootstrap second stage
                     Logger.logInfo(LOG_TAG, "Running Termux bootstrap second stage.");
-                    String termuxBootstrapSecondStageFile = TERMUX_PREFIX_DIR_PATH + "/etc/termux/bootstrap/termux-bootstrap-second-stage.sh";
+                    String termuxBootstrapSecondStageFile = TERMUX_PREFIX_DIR_PATH + "/" + BOOTSTRAP_SECOND_STAGE_NEW_PATH;
+                    if (!FileUtils.fileExists(termuxBootstrapSecondStageFile, false)) {
+                        termuxBootstrapSecondStageFile = TERMUX_PREFIX_DIR_PATH + "/" + BOOTSTRAP_SECOND_STAGE_OLD_PATH;
+                    }
                     if (FileUtils.fileExists(termuxBootstrapSecondStageFile, false)) {
+                        String termuxBashFile = TERMUX_PREFIX_DIR_PATH + "/bin/bash";
                         ExecutionCommand executionCommand = new ExecutionCommand(-1,
-                                termuxBootstrapSecondStageFile, null, null,
+                                termuxBashFile, new String[]{termuxBootstrapSecondStageFile}, null,
                                 null, ExecutionCommand.Runner.APP_SHELL.getName(), false);
                         executionCommand.commandLabel = "Termux Bootstrap Second Stage Command";
                         executionCommand.backgroundCustomLogLevel = Logger.LOG_LEVEL_NORMAL;
                         AppShell appShell = AppShell.execute(activity, executionCommand, null, new TermuxShellEnvironment(), null, true);
-                        boolean stderrSet = !executionCommand.resultData.stderr.toString().isEmpty();
-                        if (appShell == null || !executionCommand.isSuccessful() || executionCommand.resultData.exitCode != 0 || stderrSet) {
+                        if (appShell == null || !executionCommand.isSuccessful() || executionCommand.resultData.exitCode != 0) {
                             // Delete prefix directory as otherwise when app is restarted, the broken prefix directory would be used and logged into
                             error = FileUtils.deleteFile("termux prefix directory", TERMUX_PREFIX_DIR_PATH, true);
                             if (error != null)

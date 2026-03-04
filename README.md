@@ -1,21 +1,9 @@
 # Termux Launcher
 
-Vibe coded proof of concept Android launcher and terminal app fork based on Termux-Monet, heavily inspired by TEL (Termux Expert Launcher). 
+Android launcher and terminal app fork based on Termux, focused on launcher UX and privileged integrations.
 
-## Primary Difference from TEL;
-- Sixel support in terminal.
-- Wallpaper implimentation is different due to how it was implimented in Termux-Monet (TEL can make terminal fully transparent, so you can set android live wallpapers and have it show as terminal background if required) but my version sets an in-app wallpaper (same as termux-monet) + uses termux api to sync with system wallpaper so that the monet color themes properly propagates accross the app and the system.
-
-## Some weirdities you may want to know
-- if you exit the app when its set as home launcher by typing "exit" in the shell, it will restart and will be a stuttery hell (you must force close the app from android settings to fix)
-- By default, your keystrokes in the terminal is tied to the apps search bar, which could get annoying therefore, its better if you add a less common character (e.g: "$") as "Input split character" in app settings so that it app search will be triggered after typing this character (Termux:Launcher -> Termux:Launcher Settings -> Input split character).
-- if the app search bar (and extrakeys row) keeps flickering when you start typing, turn off "Terminal Margin Adjustment" from Settings -> Termux:Launcher -> Terminal View.
-
-## Credits
-- https://github.com/t-e-l/tel
-- https://github.com/Termux-Monet/termux-monet
-- https://github.com/termux/termux-app
-
+This repository now contains only Android app source and related app assets.
+Shell dotfiles/config bundles (tmux, fish, nvim) are intentionally not part of this repo.
 
 ## Screenshots
 
@@ -43,9 +31,6 @@ Use GitHub Actions artifacts.
 - Download artifact from the latest successful run on `shizuku-integration`.
 - Workflow: `Build nightly` (`.github/workflows/debug_build.yml`).
 
-3. Companion Apps (Termux API, Termux Styling etc)
-- Download from https://github.com/Termux-Monet/ 
-
 Note: action artifacts require a logged-in GitHub account.
 
 ## Shizuku Integration
@@ -55,12 +40,18 @@ Note: action artifacts require a logged-in GitHub account.
 Current Tooie endpoints include:
 - `/v1/status`
 - `/v1/apps`
+- `/v1/system/resources` (CPU, memory, storage, battery, network, thermal, backend diagnostics)
 - `/v1/media/now-playing`
+- `/v1/media/art` (now-playing album art payload)
 - `/v1/notifications`
+- `/v1/system/brightness` (read/set screen brightness)
+- `/v1/system/volume` (read/set stream volume)
 - `/v1/exec` (policy-gated)
+- `/v1/privileged/request-permission`
 - `/v1/screen/lock`
+- `/v1/auth/rotate`
 
-Developer/security notes:
+Docs and policy notes:
 - `docs/en/Tooie_API.md`
 
 ## Build (local)
@@ -76,3 +67,11 @@ COMPILE_SDK_OVERRIDE=34 ./gradlew \
 
 - Upstream Termux app: https://github.com/termux/termux-app
 
+## Companion Apps (Forks)
+
+Use companion apps from this project owner to match launcher signing/source:
+
+- Termux:API fork: https://github.com/PickleHik3/termux-api
+- Termux:Styling fork: https://github.com/PickleHik3/termux-styling
+
+Install launcher + companion apps from the same source set to avoid shared UID/signature incompatibility.

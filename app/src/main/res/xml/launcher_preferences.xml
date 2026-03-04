@@ -1,0 +1,79 @@
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <PreferenceCategory
+        app:key="apps_bar_search"
+        app:title="@string/apps_bar_search_header">
+
+        <ListPreference
+            app:key="app_launcher_search_mode"
+            app:title="@string/termux_app_launcher_search_mode_title"
+            app:summary="@string/termux_app_launcher_search_mode_summary"
+            android:defaultValue="balanced"
+            app:entries="@array/app_launcher_search_mode_entries"
+            app:entryValues="@array/app_launcher_search_mode_values" />
+
+        <EditTextPreference
+            app:key="app_launcher_input_char"
+            app:title="@string/termux_app_launcher_input_char_title"
+            app:summary="@string/termux_app_launcher_input_char_summary"
+            android:defaultValue=""
+            android:inputType="text" />
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        app:key="apps_bar_icons"
+        app:title="@string/apps_bar_icons_header">
+
+        <androidx.preference.SeekBarPreference
+            app:key="app_launcher_button_count"
+            app:title="@string/termux_app_launcher_button_count_title"
+            app:summary="@string/termux_app_launcher_button_count_summary"
+            app:min="1"
+            android:max="20"
+            android:defaultValue="5"
+            app:showSeekBarValue="true" />
+
+        <androidx.preference.SeekBarPreference
+            app:key="app_launcher_icon_scale_percent"
+            app:title="@string/termux_app_launcher_icon_scale_title"
+            app:summary="@string/termux_app_launcher_icon_scale_summary"
+            app:min="40"
+            android:max="220"
+            android:defaultValue="100"
+            app:showSeekBarValue="true" />
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        app:key="apps_bar_visual"
+        app:title="@string/apps_bar_visual_header">
+
+        <androidx.preference.SeekBarPreference
+            app:key="app_launcher_bar_height_percent"
+            app:title="@string/termux_app_launcher_bar_height_title"
+            app:summary="@string/termux_app_launcher_bar_height_summary"
+            app:min="60"
+            android:max="220"
+            android:defaultValue="120"
+            app:showSeekBarValue="true" />
+
+        <SwitchPreferenceCompat
+            app:key="app_launcher_show_icons"
+            app:title="@string/termux_app_launcher_show_icons_title"
+            app:summary="@string/termux_app_launcher_show_icons_summary"
+            android:defaultValue="true" />
+
+        <SwitchPreferenceCompat
+            app:key="app_launcher_bw_icons"
+            app:title="@string/termux_app_launcher_bw_icons_title"
+            app:summary="@string/termux_app_launcher_bw_icons_summary"
+            android:defaultValue="false" />
+
+        <SwitchPreferenceCompat
+            app:key="app_launcher_az_row_enabled"
+            app:title="@string/termux_app_launcher_az_row_enabled_title"
+            app:summary="@string/termux_app_launcher_az_row_enabled_summary"
+            android:defaultValue="false" />
+    </PreferenceCategory>
+
+</PreferenceScreen>

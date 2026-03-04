@@ -1188,6 +1188,7 @@ public class FileUtils {
             }
             Logger.logVerbose(LOG_TAG, "Deleting " + label + "file at path \"" + filePath + "\"");
             if (fileType == FileType.DIRECTORY) {
+                // deleteDirectory() instead of forceDelete() gets files list first instead of walking directory tree.
                 org.apache.commons.io.FileUtils.deleteDirectory(file);
             } else {
                 org.apache.commons.io.FileUtils.forceDelete(file);

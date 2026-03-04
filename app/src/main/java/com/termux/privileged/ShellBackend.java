@@ -4,6 +4,7 @@ import android.content.Context;
 import android.util.Log;
 
 import java.io.BufferedReader;
+import java.io.FileNotFoundException;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.List;
@@ -41,9 +42,6 @@ public class ShellBackend implements PrivilegedBackend {
                     rootMethod = RootMethod.SU;
                     Log.i(TAG, "Root access available via su");
                 } else {
-                    if (isPermissionDenied(suCheck)) {
-                        Log.i(TAG, "su root probe denied by platform/policy");
-                    }
                     // Try rish as alternative
                     String rishCheck = executeRootCommand(RootMethod.RISH, List.of("echo", "test"));
                     if (isCommandSuccessful(rishCheck)) {
@@ -51,9 +49,6 @@ public class ShellBackend implements PrivilegedBackend {
                         rootMethod = RootMethod.RISH;
                         Log.i(TAG, "Root access available via rish");
                     } else {
-                        if (isPermissionDenied(rishCheck)) {
-                            Log.i(TAG, "rish root probe denied by platform/policy");
-                        }
                         Log.w(TAG, "Neither su nor rish available");
                         hasPermission = false;
                         rootMethod = RootMethod.NONE;
@@ -299,12 +294,15 @@ public class ShellBackend implements PrivilegedBackend {
 
             return output;
 
-        } catch (Exception e) {
-            if (isExpectedRootProbeFailure(command, e)) {
-                Log.i(TAG, "Root probe denied by platform/policy: " + maskSensitive(logCommand));
+        } catch (IOException e) {
+            if (isExpectedMissingRish(command, e)) {
+                Log.w(TAG, "rish not found; skipping rish root path");
             } else {
                 Log.e(TAG, "Failed to execute shell command: " + maskSensitive(logCommand), e);
             }
+            return "Error: " + e.getMessage();
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to execute shell command: " + maskSensitive(logCommand), e);
             return "Error: " + e.getMessage();
         }
     }
@@ -344,20 +342,21 @@ public class ShellBackend implements PrivilegedBackend {
         return output != null && !output.startsWith("Error");
     }
 
-    private boolean isPermissionDenied(String output) {
-        if (output == null) return false;
-        String lowerOutput = output.toLowerCase();
-        return lowerOutput.contains("permission denied") ||
-            lowerOutput.contains("operation not permitted") ||
-            lowerOutput.contains("not allowed");
-    }
-
-    private boolean isExpectedRootProbeFailure(List<String> command, Exception exception) {
-        if (command == null || command.isEmpty() || exception == null) return false;
-        String binary = command.get(0);
-        if (!"su".equals(binary) && !"rish".equals(binary)) return false;
+    private boolean isExpectedMissingRish(List<String> command, IOException exception) {
+        if (command == null || command.isEmpty() || !"rish".equals(command.get(0))) {
+            return false;
+        }
+        if (exception instanceof FileNotFoundException) {
+            return true;
+        }
         String message = exception.getMessage();
-        return message != null && isPermissionDenied(message);
+        if (message == null) {
+            return false;
+        }
+        String lower = message.toLowerCase();
+        return lower.contains("cannot run program \"rish\"")
+            || lower.contains("no such file")
+            || lower.contains("error=2");
     }
 
     /**

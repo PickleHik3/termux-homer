@@ -1,0 +1,16 @@
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <SwitchPreferenceCompat
+        app:key="app_launcher_show_icons"
+        app:title="@string/termux_app_launcher_show_icons_title"
+        app:summary="@string/termux_app_launcher_show_icons_summary"
+        android:defaultValue="true" />
+
+    <SwitchPreferenceCompat
+        app:key="app_launcher_bw_icons"
+        app:title="@string/termux_app_launcher_bw_icons_title"
+        app:summary="@string/termux_app_launcher_bw_icons_summary"
+        android:defaultValue="false" />
+
+</PreferenceScreen>

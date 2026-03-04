@@ -64,14 +64,14 @@ class TerminalViewPreferencesDataStore extends PreferenceDataStore {
     @Override
     public boolean getBoolean(String key, boolean defValue) {
         if (mPreferences == null)
-            return false;
+            return defValue;
         switch(key) {
             case "terminal_margin_adjustment":
                 return mPreferences.isTerminalMarginAdjustmentEnabled();
             case "activity_finish_remove_task":
                 return mPreferences.isRemoveTaskOnActivityFinishEnabled();
             default:
-                return false;
+                return defValue;
         }
     }
 }

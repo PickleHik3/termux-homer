@@ -2,20 +2,26 @@ package com.termux.app.fragments.settings.termux;
 
 import android.content.Context;
 import android.os.Bundle;
+import android.widget.Toast;
 import androidx.annotation.Keep;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.preference.ListPreference;
+import androidx.preference.Preference;
 import androidx.preference.PreferenceCategory;
 import androidx.preference.PreferenceDataStore;
 import androidx.preference.PreferenceFragmentCompat;
 import androidx.preference.PreferenceManager;
 import com.termux.R;
+import com.termux.privileged.PrivilegedBackend;
+import com.termux.privileged.PrivilegedBackendManager;
+import com.termux.privileged.ShizukuBackend;
 import com.termux.shared.termux.settings.preferences.TermuxAppSharedPreferences;
 import com.termux.shared.logger.Logger;
 
 @Keep
 public class DebuggingPreferencesFragment extends PreferenceFragmentCompat {
+    private static final String LOG_TAG = "DebuggingPrefs";
 
     @Override
     public void onCreatePreferences(Bundle savedInstanceState, String rootKey) {
@@ -26,6 +32,7 @@ public class DebuggingPreferencesFragment extends PreferenceFragmentCompat {
         preferenceManager.setPreferenceDataStore(DebuggingPreferencesDataStore.getInstance(context));
         setPreferencesFromResource(R.xml.termux_debugging_preferences, rootKey);
         configureLoggingPreferences(context);
+        configurePrivilegedBackendSmokeTestPreference(context);
     }
 
     private void configureLoggingPreferences(@NonNull Context context) {
@@ -53,6 +60,53 @@ public class DebuggingPreferencesFragment extends PreferenceFragmentCompat {
         logLevelListPreference.setDefaultValue(Logger.DEFAULT_LOG_LEVEL);
         return logLevelListPreference;
     }
+
+    private void configurePrivilegedBackendSmokeTestPreference(@NonNull Context context) {
+        Preference smokeTestPreference = findPreference("privileged_backend_smoke_test");
+        if (smokeTestPreference == null)
+            return;
+
+        smokeTestPreference.setOnPreferenceClickListener(preference -> {
+            runPrivilegedBackendSmokeTest(context);
+            return true;
+        });
+    }
+
+    private void runPrivilegedBackendSmokeTest(@NonNull Context context) {
+        PrivilegedBackendManager manager = PrivilegedBackendManager.getInstance();
+        Logger.logInfo(LOG_TAG, "[SmokeTest] Triggered from settings");
+        Logger.logInfo(LOG_TAG, "[SmokeTest] BackendType=" + manager.getBackendType()
+            + ", BackendState=" + manager.getBackendState()
+            + ", StatusReason=" + manager.getStatusReason()
+            + ", StatusMessage=" + manager.getStatusMessage()
+            + ", Description=" + manager.getStatusDescription());
+
+        if (manager.getBackendType() == PrivilegedBackend.Type.SHIZUKU && !manager.isPrivilegedAvailable()) {
+            boolean requested = manager.requestPrivilegedPermission(ShizukuBackend.PERMISSION_REQUEST_CODE);
+            Logger.logInfo(LOG_TAG, "[SmokeTest] Requested Shizuku permission: " + requested);
+            Toast.makeText(context,
+                requested ? "Requested Shizuku permission. Re-run smoke test after granting." : "Shizuku permission not available/requested.",
+                Toast.LENGTH_LONG).show();
+            if (requested) return;
+        }
+
+        manager.executeCommand("id").thenAccept(output -> {
+            Logger.logInfo(LOG_TAG, "[SmokeTest] Command=id output=" + output);
+            if (isAdded() && getActivity() != null) {
+                getActivity().runOnUiThread(() ->
+                    Toast.makeText(context, "Smoke test complete. Check logcat for details.", Toast.LENGTH_SHORT).show()
+                );
+            }
+        }).exceptionally(throwable -> {
+            Logger.logErrorExtended(LOG_TAG, "[SmokeTest] Command failed: " + throwable.getMessage());
+            if (isAdded() && getActivity() != null) {
+                getActivity().runOnUiThread(() ->
+                    Toast.makeText(context, "Smoke test failed. Check logcat.", Toast.LENGTH_SHORT).show()
+                );
+            }
+            return null;
+        });
+    }
 }
 
 class DebuggingPreferencesDataStore extends PreferenceDataStore {
@@ -79,14 +133,14 @@ class DebuggingPreferencesDataStore extends PreferenceDataStore {
     @Nullable
     public String getString(String key, @Nullable String defValue) {
         if (mPreferences == null)
-            return null;
+            return defValue;
         if (key == null)
-            return null;
+            return defValue;
         switch(key) {
             case "log_level":
                 return String.valueOf(mPreferences.getLogLevel());
             default:
-                return null;
+                return defValue;
         }
     }
 
@@ -131,7 +185,7 @@ class DebuggingPreferencesDataStore extends PreferenceDataStore {
     @Override
     public boolean getBoolean(String key, boolean defValue) {
         if (mPreferences == null)
-            return false;
+            return defValue;
         switch(key) {
             case "terminal_view_key_logging_enabled":
                 return mPreferences.isTerminalViewKeyLoggingEnabled();
@@ -140,7 +194,7 @@ class DebuggingPreferencesDataStore extends PreferenceDataStore {
             case "crash_report_notifications_enabled":
                 return mPreferences.areCrashReportNotificationsEnabled(false);
             default:
-                return false;
+                return defValue;
         }
     }
 }

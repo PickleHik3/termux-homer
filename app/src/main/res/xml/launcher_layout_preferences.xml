@@ -1,0 +1,31 @@
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <androidx.preference.SeekBarPreference
+        app:key="app_launcher_button_count"
+        app:title="@string/termux_app_launcher_button_count_title"
+        app:summary="@string/termux_app_launcher_button_count_summary"
+        app:min="1"
+        android:max="20"
+        android:defaultValue="5"
+        app:showSeekBarValue="true" />
+
+    <androidx.preference.SeekBarPreference
+        app:key="app_launcher_bar_height_percent"
+        app:title="@string/termux_app_launcher_bar_height_title"
+        app:summary="@string/termux_app_launcher_bar_height_summary"
+        app:min="60"
+        android:max="220"
+        android:defaultValue="120"
+        app:showSeekBarValue="true" />
+
+    <androidx.preference.SeekBarPreference
+        app:key="app_launcher_icon_scale_percent"
+        app:title="@string/termux_app_launcher_icon_scale_title"
+        app:summary="@string/termux_app_launcher_icon_scale_summary"
+        app:min="40"
+        android:max="220"
+        android:defaultValue="100"
+        app:showSeekBarValue="true" />
+
+</PreferenceScreen>

@@ -35,6 +35,7 @@
     <uses-permission android:name="android.permission.READ_LOGS" />
     <uses-permission android:name="android.permission.DUMP" />
     <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS" tools:ignore="ProtectedPermissions" />
@@ -234,6 +235,15 @@
             android:permission="${TERMUX_PACKAGE_NAME}.permission.RUN_COMMAND">
             <intent-filter>
                 <action android:name="${TERMUX_PACKAGE_NAME}.RUN_COMMAND" />
+            </intent-filter>
+        </service>
+
+        <service
+            android:name=".tooie.TooieNotificationListener"
+            android:exported="false"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
             </intent-filter>
         </service>
 

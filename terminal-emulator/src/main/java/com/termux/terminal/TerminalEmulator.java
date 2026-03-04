@@ -728,7 +728,13 @@ public final class TerminalEmulator {
 
     public void processCodePoint(int b) {
         // The Application Program-Control (APC) string might be arbitrary non-printable characters, so handle that early.
-
+        if (mEscapeState == ESC_APC) {
+            doApc(b);
+            return;
+        } else if (mEscapeState == ESC_APC_ESCAPE) {
+            doApcEscape(b);
+            return;
+        }
 
         switch (b) {
             case 0: // Null character (NUL, ^@). Do nothing.
@@ -738,7 +744,9 @@ public final class TerminalEmulator {
                 if (mEscapeState == ESC_OSC)
                     doOsc(b);
                 else {
-
+                    if (mEscapeState == ESC_APC) {
+                        doApc(b);
+                    }
                     mSession.onBell();
                 }
                 break;
@@ -810,7 +818,11 @@ public final class TerminalEmulator {
                     ESC_P_escape = true;
                     return;
                 } else if (mEscapeState != ESC_OSC) {
-                    startEscapeSequence();
+                    if (mEscapeState != ESC_APC) {
+                        startEscapeSequence();
+                    } else {
+                        doApc(b);
+                    }
                 } else {
                     doOsc(b);
                 }
@@ -1031,7 +1043,12 @@ public final class TerminalEmulator {
                         break;
                     case ESC_PERCENT:
                         break;
-
+                    case ESC_APC:
+                        doApc(b);
+                        break;
+                    case ESC_APC_ESCAPE:
+                        doApcEscape(b);
+                        break;
                     case ESC_OSC:
                         doOsc(b);
                         break;
@@ -1341,7 +1358,29 @@ public final class TerminalEmulator {
         }
     }
 
+    /**
+     * When in {@link #ESC_APC} (APC, Application Program Command) sequence.
+     */
+    private void doApc(int b) {
+        if (b == 27) {
+            continueSequence(ESC_APC_ESCAPE);
+        }
+        // Eat APC sequences silently for now.
+    }
 
+    /**
+     * When in {@link #ESC_APC} (APC, Application Program Command) sequence.
+     */
+    private void doApcEscape(int b) {
+        if (b == '\\') {
+            // A String Terminator (ST), ending the APC escape sequence.
+            finishSequence();
+        } else {
+            // The Escape character was not the start of a String Terminator (ST),
+            // but instead just data inside of the APC escape sequence.
+            continueSequence(ESC_APC);
+        }
+    }
 
     private int nextTabStop(int numTabs) {
         for (int i = mCursorCol + 1; i < mColumns; i++) if (mTabStop[i] && --numTabs == 0)
@@ -1813,11 +1852,8 @@ public final class TerminalEmulator {
                 continueSequence(ESC_OSC);
                 ESC_OSC_colon = -1;
                 break;
-            case // DECKPNM
-            '>':
-                setDecsetinternalBit(DECSET_BIT_APPLICATION_KEYPAD, false);
-                break;
             case '_': // APC - Application Program Command.
+                mOSCOrDeviceControlArgs.setLength(0);
                 continueSequence(ESC_APC);
                 break;
             default:
@@ -2380,8 +2416,6 @@ public final class TerminalEmulator {
             }
         }
     }
-
-
 
     private void doOsc(int b) {
         switch(b) {

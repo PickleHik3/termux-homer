@@ -9,18 +9,15 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.ServiceConnection;
-import android.content.pm.PackageManager;
 import android.content.res.Configuration;
 import android.graphics.Color;
 import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
-import android.os.Environment;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
-import android.provider.Settings;
 import android.view.ContextMenu;
 import android.view.ContextMenu.ContextMenuInfo;
 import android.view.Gravity;
@@ -43,6 +40,8 @@ import android.widget.Toast;
 import com.github.mmin18.widget.RealtimeBlurView;
 import com.termux.R;
 import com.termux.app.api.file.FileReceiverActivity;
+import com.termux.app.launcher.data.LauncherAppDataProvider;
+import com.termux.app.launcher.data.LauncherConfigRepository;
 import com.termux.app.style.TermuxBackgroundManager;
 import com.termux.app.style.TermuxSystemWallpaperManager;
 import com.termux.app.terminal.TermuxActivityRootView;
@@ -78,7 +77,6 @@ import com.termux.view.TerminalViewClient;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
@@ -87,7 +85,9 @@ import androidx.drawerlayout.widget.DrawerLayout;
 import androidx.viewpager.widget.ViewPager;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * A terminal emulator activity.
@@ -152,6 +152,10 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
     ExtraKeysView mExtraKeysView2;
 
     SuggestionBarView mSuggestionBarView;
+    AzScrubRowView mAzScrubRowView;
+
+    private LauncherAppDataProvider mLauncherAppDataProvider;
+    private LauncherConfigRepository mLauncherConfigRepository;
 
     /**
      * The client for the {@link #mExtraKeysView}.
@@ -196,6 +200,17 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
      * If onResume() was called after onCreate().
      */
     private boolean mIsOnResumeAfterOnCreate = false;
+
+    /**
+     * If service connected before activity became visible and bootstrap/session start should be retried onStart().
+     */
+    private boolean mPendingBootstrapOnStart = false;
+
+    /**
+     * Launch intent captured when bootstrap/session start is deferred to onStart().
+     */
+    @Nullable
+    private Intent mPendingLaunchIntent;
 
     /**
      * If activity was restarted like due to call to {@link #recreate()} after receiving
@@ -281,8 +296,6 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
             mIsInvalidState = true;
             return;
         }
-        // Disable terminal margin adjustment to prevent flicker/jitter from layout oscillations.
-        mPreferences.setTerminalMarginAdjustment(false);
         setMargins();
         setSuggestionBarView();
         mTermuxActivityRootView = findViewById(R.id.activity_termux_root_view);
@@ -335,23 +348,6 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         // Send the {@link TermuxConstants#BROADCAST_TERMUX_OPENED} broadcast to notify apps that Termux
         // app has been opened.
         TermuxUtils.sendTermuxOpenedBroadcast(this);
-        verifyRWPermission();
-        verifyAndroid11ManageFiles();
-    }
-
-    private void verifyRWPermission() {
-        if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
-            String[] permissions = new String[] { android.Manifest.permission.WRITE_EXTERNAL_STORAGE, android.Manifest.permission.READ_EXTERNAL_STORAGE };
-            ActivityCompat.requestPermissions(this, permissions, 1738);
-        }
-    }
-
-    private void verifyAndroid11ManageFiles() {
-        if (Build.VERSION.SDK_INT >= 30 && !Environment.isExternalStorageManager()) {
-            Intent i = new Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION);
-            i.setData(Uri.fromParts("package", getPackageName(), null));
-            startActivity(i);
-        }
     }
 
     @Override
@@ -362,6 +358,13 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         if (mIsInvalidState) return;
     
         mIsVisible = true;
+
+        if (mPendingBootstrapOnStart && mTermuxService != null && mTermuxService.isTermuxSessionsEmpty()) {
+            mPendingBootstrapOnStart = false;
+            Intent pendingIntent = mPendingLaunchIntent;
+            mPendingLaunchIntent = null;
+            startBootstrapAndSession(pendingIntent);
+        }
     
         if (mTermuxTerminalSessionActivityClient != null)
             mTermuxTerminalSessionActivityClient.onStart();
@@ -464,6 +467,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         View extraKeysBackgroundBlur = findViewById(R.id.extrakeys_backgroundblur);
         View appsBarBackground = findViewById(R.id.apps_bar_background);
         View appsBarBackgroundBlur = findViewById(R.id.apps_bar_backgroundblur);
+        View azRow = findViewById(R.id.apps_bar_az_row);
 
         boolean isToolbarShown = mPreferences.shouldShowTerminalToolbar();
         boolean isBlurEnabled = mPreferences.isExtraKeysBlurEnabled();
@@ -488,11 +492,17 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
             if (appsBarViewPager != null) {
                 appsBarViewPager.setVisibility(View.GONE);
             }
+            if (azRow != null) {
+                azRow.setVisibility(View.GONE);
+            }
             return;
         }
 
         if (appsBarViewPager != null) {
             appsBarViewPager.setVisibility(View.VISIBLE);
+        }
+        if (azRow != null) {
+            azRow.setVisibility(mPreferences.isAppLauncherAzRowEnabled() ? View.VISIBLE : View.GONE);
         }
 
         if (appsBarBackground != null) {
@@ -597,23 +607,16 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         setIntent(null);
         if (mTermuxService.isTermuxSessionsEmpty()) {
             if (mIsVisible) {
-                TermuxInstaller.setupBootstrapIfNeeded(TermuxActivity.this, () -> {
-                    // Activity might have been destroyed.
-                    if (mTermuxService == null)
-                        return;
-                    try {
-                        boolean launchFailsafe = false;
-                        if (intent != null && intent.getExtras() != null) {
-                            launchFailsafe = intent.getExtras().getBoolean(TERMUX_ACTIVITY.EXTRA_FAILSAFE_SESSION, false);
-                        }
-                        mTermuxTerminalSessionActivityClient.addNewSession(launchFailsafe, null);
-                    } catch (WindowManager.BadTokenException e) {
-                        // Activity finished - ignore.
-                    }
-                });
+                startBootstrapAndSession(intent);
             } else {
-                // The service connected while not in foreground - just bail out.
-                finishActivityIfNotFinishing();
+                // Service can connect before onStart() on some devices. Defer bootstrap/session creation.
+                if (mIsOnResumeAfterOnCreate) {
+                    mPendingBootstrapOnStart = true;
+                    mPendingLaunchIntent = intent;
+                } else {
+                    // Service connected while activity is actually in background - bail out.
+                    finishActivityIfNotFinishing();
+                }
             }
         } else {
             // If termux was started from launcher "New session" shortcut and activity is recreated,
@@ -629,6 +632,23 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         }
         // Update the {@link TerminalSession} and {@link TerminalEmulator} clients.
         mTermuxService.setTermuxTerminalSessionClient(mTermuxTerminalSessionActivityClient);
+    }
+
+    private void startBootstrapAndSession(@Nullable Intent intent) {
+        TermuxInstaller.setupBootstrapIfNeeded(TermuxActivity.this, () -> {
+            // Activity might have been destroyed.
+            if (mTermuxService == null)
+                return;
+            try {
+                boolean launchFailsafe = false;
+                if (intent != null && intent.getExtras() != null) {
+                    launchFailsafe = intent.getExtras().getBoolean(TERMUX_ACTIVITY.EXTRA_FAILSAFE_SESSION, false);
+                }
+                mTermuxTerminalSessionActivityClient.addNewSession(launchFailsafe, null);
+            } catch (WindowManager.BadTokenException e) {
+                // Activity finished - ignore.
+            }
+        });
     }
 
     @Override
@@ -669,8 +689,18 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
 
     private void setSuggestionBarView() {
         final ViewPager viewPager = findViewById(R.id.apps_bar_viewpager);
+        mAzScrubRowView = findViewById(R.id.apps_bar_az_row);
         if (viewPager == null) {
             return;
+        }
+
+        if (mPreferences != null) {
+            if (mLauncherAppDataProvider == null) {
+                mLauncherAppDataProvider = new LauncherAppDataProvider(this);
+            }
+            if (mLauncherConfigRepository == null) {
+                mLauncherConfigRepository = new LauncherConfigRepository(mPreferences);
+            }
         }
 
         // Set height based on preferences
@@ -697,6 +727,8 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
             public Object instantiateItem(@NonNull ViewGroup collection, int position) {
                 LayoutInflater inflater = LayoutInflater.from(TermuxActivity.this);
                 mSuggestionBarView = (SuggestionBarView) inflater.inflate(R.layout.suggestion_bar, collection, false);
+                mSuggestionBarView.setAppDataProvider(mLauncherAppDataProvider);
+                mSuggestionBarView.setConfigRepository(mLauncherConfigRepository);
                 applySuggestionBarPreferences();
                 mSuggestionBarView.reload();
                 mTermuxTerminalViewClient.setSuggestionBarCallback(suggestionBarCallback);
@@ -716,6 +748,24 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
                 mTerminalView.requestFocus();
             }
         });
+
+        if (mAzScrubRowView != null) {
+            mAzScrubRowView.setScrubCallback(new AzScrubRowView.ScrubCallback() {
+                @Override
+                public void onScrub(char letter, int selectionIndex, boolean commit) {
+                    if (mSuggestionBarView != null) {
+                        mSuggestionBarView.persistAzPreview(letter, selectionIndex);
+                    }
+                }
+
+                @Override
+                public void onCancel() {
+                    if (mSuggestionBarView != null) {
+                        mSuggestionBarView.clearAzPreview();
+                    }
+                }
+            });
+        }
     }
 
     static int calculateSuggestionBarMaxButtons(DisplayMetrics displayMetrics) {
@@ -731,18 +781,49 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         if (mSuggestionBarView == null || mPreferences == null) {
             return;
         }
+        if (mLauncherAppDataProvider == null) {
+            mLauncherAppDataProvider = new LauncherAppDataProvider(this);
+        }
+        if (mLauncherConfigRepository == null) {
+            mLauncherConfigRepository = new LauncherConfigRepository(mPreferences);
+        }
         int maxButtons = mPreferences.getAppLauncherButtonCount();
         if (maxButtons <= 0) {
             DisplayMetrics displayMetrics = getResources().getDisplayMetrics();
             maxButtons = calculateSuggestionBarMaxButtons(displayMetrics);
         }
         mSuggestionBarView.setMaxButtonCount(maxButtons);
-        mSuggestionBarView.setDefaultButtons(getDefaultAppLauncherButtons());
+        mSuggestionBarView.setDefaultButtons(new ArrayList<>());
         mSuggestionBarView.setTextSize(10f);
         mSuggestionBarView.setSearchTolerance(mPreferences.getAppLauncherSearchTolerance());
         mSuggestionBarView.setShowIcons(mPreferences.isAppLauncherShowIconsEnabled());
         mSuggestionBarView.setBandW(mPreferences.isAppLauncherBwIconsEnabled());
+        mSuggestionBarView.setIconScale(mPreferences.getAppLauncherIconScale());
+        mSuggestionBarView.setAppBarOpacity(mPreferences.getAppBarOpacity());
+        mSuggestionBarView.setBlurConfig(mPreferences.isExtraKeysBlurEnabled(), mPreferences.getExtraKeysBlurRadius());
+        mSuggestionBarView.setInheritedTintColor(ContextCompat.getColor(this, R.color.background_accent));
+        mSuggestionBarView.setAppDataProvider(mLauncherAppDataProvider);
+        mSuggestionBarView.setConfigRepository(mLauncherConfigRepository);
         mSuggestionBarView.reloadAllApps();
+        syncAzScrubLettersAndTint();
+    }
+
+    private void syncAzScrubLettersAndTint() {
+        if (mAzScrubRowView == null || mSuggestionBarView == null) return;
+        Set<Character> letters = new LinkedHashSet<>(mSuggestionBarView.getAvailableAzLetters());
+        mAzScrubRowView.setVisibleLetters(letters);
+        int base = ContextCompat.getColor(this, R.color.menu_accent);
+        int muted = mutedMonetShade(base);
+        mAzScrubRowView.setTextColor(muted);
+        mAzScrubRowView.setBackgroundColor(Color.TRANSPARENT);
+    }
+
+    private int mutedMonetShade(int color) {
+        float[] hsv = new float[3];
+        Color.colorToHSV(color, hsv);
+        hsv[1] = Math.max(0f, Math.min(1f, hsv[1] * 0.78f));
+        hsv[2] = Math.max(0f, Math.min(1f, hsv[2] * 0.68f));
+        return Color.HSVToColor(0xE6, hsv);
     }
 
     private void applySuggestionBarInputChar() {
@@ -757,25 +838,6 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
             }
         }
         mTerminalView.setSplitChar(splitChar);
-    }
-
-    private List<String> getDefaultAppLauncherButtons() {
-        if (mPreferences == null) {
-            return new ArrayList<>();
-        }
-        String defaultButtons = mPreferences.getAppLauncherDefaultButtons();
-        if (defaultButtons == null || defaultButtons.trim().isEmpty()) {
-            return new ArrayList<>();
-        }
-        String[] buttons = defaultButtons.split(",");
-        List<String> cleanedButtons = new ArrayList<>();
-        for (String button : buttons) {
-            String trimmed = button.trim();
-            if (!trimmed.isEmpty()) {
-                cleanedButtons.add(trimmed);
-            }
-        }
-        return cleanedButtons;
     }
 
     public void addTermuxActivityRootViewGlobalLayoutListener() {
@@ -834,7 +896,10 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         if (barHeightPx < 0) {
             barHeightPx = 0;
         }
+        int azRowHeightPx = mPreferences.isAppLauncherAzRowEnabled() ?
+            Math.round(28f * getResources().getDisplayMetrics().density) : 0;
         updateViewHeight(R.id.apps_bar_viewpager, barHeightPx);
+        updateViewHeight(R.id.apps_bar_az_row, azRowHeightPx);
         updateViewHeight(R.id.apps_bar_background, barHeightPx);
         updateViewHeight(R.id.apps_bar_backgroundblur, barHeightPx);
     }
@@ -872,11 +937,16 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
                 }
             }
         }
+        View azRow = findViewById(R.id.apps_bar_az_row);
+        int azRowHeightPx = 0;
+        if (azRow != null && azRow.getLayoutParams() != null) {
+            azRowHeightPx = Math.max(0, azRow.getLayoutParams().height);
+        }
 
         if (extraKeysBackground == null || extraKeysBackgroundBlur == null)
             return;
 
-        int combinedHeight = toolbarHeightPx + appsBarHeightPx;
+        int combinedHeight = toolbarHeightPx + appsBarHeightPx + azRowHeightPx;
         updateExtraKeysBackgroundHeight(extraKeysBackground, combinedHeight);
         updateExtraKeysBackgroundHeight(extraKeysBackgroundBlur, combinedHeight);
     }
@@ -1310,6 +1380,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         if (mSuggestionBarView == null || mTerminalView == null) {
             return;
         }
+        mSuggestionBarView.onTerminalInteraction();
         String input = mTerminalView.getCurrentInput(inputChar);
         if (input == null) {
             input = "";
@@ -1322,6 +1393,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         if (mSuggestionBarView == null || mTerminalView == null) {
             return;
         }
+        mSuggestionBarView.onTerminalInteraction();
         if (enter) {
             mSuggestionBarView.reloadWithInput("", mTerminalView);
         } else {
@@ -1445,6 +1517,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
                 Intent.ACTION_PACKAGE_CHANGED.equals(action)) {
                 mSuggestionBarView.clearAppCache();
                 mSuggestionBarView.reloadAllApps();
+                syncAzScrubLettersAndTint();
             }
         }
     }

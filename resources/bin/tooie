@@ -1,0 +1,160 @@
+#!/data/data/com.termux/files/usr/bin/sh
+set -eu
+
+print_help() {
+  cat <<'EOF'
+Tooie CLI - local API client for Termux:Launcher Shizuku integration
+
+Usage:
+  tooie [command] [args]
+  tooie help [command]
+
+Commands:
+  status                    Get backend/API status.
+  apps                      List installed apps.
+  resources                 Get system resource snapshot.
+  media                     Get now-playing media info.
+  art                       Get current media artwork metadata.
+  notifications             Get active notifications snapshot.
+  brightness [value]        Set or query screen brightness endpoint.
+  volume [value] [stream]   Set or query volume endpoint.
+  exec <command>            Run policy-allowed command via /v1/exec.
+  permission                Request privileged backend permission.
+  lock                      Lock screen.
+  token rotate              Rotate Tooie API auth token.
+
+Examples:
+  tooie status
+  tooie apps
+  tooie exec "id"
+  tooie volume 8 3
+  tooie brightness 120
+  tooie permission
+
+Config files:
+  ~/.tooie/endpoint   Base URL (for example http://127.0.0.1:40851)
+  ~/.tooie/token      Bearer token used by this client
+  ~/.tooie/config.json
+    - execEnabled: true/false
+    - allowedCommandPrefixes: prefix allowlist for 'tooie exec'
+
+Notes:
+  - 'tooie exec' returns HTTP 403 if disabled by policy or prefix is not allowed.
+  - Use: tooie help exec
+EOF
+}
+
+print_exec_help() {
+  cat <<'EOF'
+Usage:
+  tooie exec "<command>"
+
+Description:
+  Sends POST /v1/exec with JSON body {"command":"..."}.
+  The command must match an allowed prefix in ~/.tooie/config.json.
+
+Examples:
+  tooie exec "id"
+  tooie exec "pm list packages"
+EOF
+}
+
+cmd="${1:-status}"
+
+case "$cmd" in
+  -h|--help|help)
+    sub="${2:-}"
+    case "$sub" in
+      ""|all)
+        print_help
+        ;;
+      exec)
+        print_exec_help
+        ;;
+      *)
+        echo "tooie: unknown help topic: $sub" >&2
+        print_help >&2
+        exit 2
+        ;;
+    esac
+    exit 0
+    ;;
+esac
+
+TOOIE_DIR="$HOME/.tooie"
+TOKEN_FILE="$TOOIE_DIR/token"
+ENDPOINT_FILE="$TOOIE_DIR/endpoint"
+if [ ! -r "$TOKEN_FILE" ] || [ ! -r "$ENDPOINT_FILE" ]; then
+  echo "tooie: missing $TOKEN_FILE or $ENDPOINT_FILE" >&2
+  echo "run: tooie --help" >&2
+  exit 1
+fi
+
+TOKEN=$(cat "$TOKEN_FILE")
+BASE=$(cat "$ENDPOINT_FILE")
+CURL_COMMON="-fsS --connect-timeout 2 --max-time 10"
+shift || true
+
+json_escape() { printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'; }
+
+case "$cmd" in
+  status)
+    curl $CURL_COMMON -H "Authorization: Bearer $TOKEN" "$BASE/v1/status"
+    ;;
+  apps)
+    curl $CURL_COMMON -H "Authorization: Bearer $TOKEN" "$BASE/v1/apps"
+    ;;
+  resources)
+    curl $CURL_COMMON -H "Authorization: Bearer $TOKEN" "$BASE/v1/system/resources"
+    ;;
+  media)
+    curl $CURL_COMMON -H "Authorization: Bearer $TOKEN" "$BASE/v1/media/now-playing"
+    ;;
+  art)
+    curl $CURL_COMMON -H "Authorization: Bearer $TOKEN" "$BASE/v1/media/art"
+    ;;
+  notifications)
+    curl $CURL_COMMON -H "Authorization: Bearer $TOKEN" "$BASE/v1/notifications"
+    ;;
+  brightness)
+    if [ "$#" -gt 0 ]; then
+      curl $CURL_COMMON -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+        --data "{\"brightness\":$1}" "$BASE/v1/system/brightness"
+    else
+      curl $CURL_COMMON -X POST -H "Authorization: Bearer $TOKEN" "$BASE/v1/system/brightness"
+    fi
+    ;;
+  volume)
+    if [ "$#" -gt 1 ]; then
+      curl $CURL_COMMON -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+        --data "{\"volume\":$1,\"stream\":$2}" "$BASE/v1/system/volume"
+    elif [ "$#" -gt 0 ]; then
+      curl $CURL_COMMON -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+        --data "{\"volume\":$1}" "$BASE/v1/system/volume"
+    else
+      curl $CURL_COMMON -X POST -H "Authorization: Bearer $TOKEN" "$BASE/v1/system/volume"
+    fi
+    ;;
+  exec)
+    [ "$#" -gt 0 ] || { print_exec_help >&2; exit 2; }
+    CMD_ESCAPED=$(json_escape "$*")
+    curl $CURL_COMMON -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+      --data "{\"command\":\"$CMD_ESCAPED\"}" "$BASE/v1/exec"
+    ;;
+  permission)
+    curl $CURL_COMMON -X POST -H "Authorization: Bearer $TOKEN" "$BASE/v1/privileged/request-permission"
+    ;;
+  lock)
+    curl $CURL_COMMON -X POST -H "Authorization: Bearer $TOKEN" "$BASE/v1/screen/lock"
+    ;;
+  token)
+    sub="${1:-}"; shift || true
+    [ "$sub" = "rotate" ] || { echo "usage: tooie token rotate" >&2; exit 2; }
+    curl $CURL_COMMON -X POST -H "Authorization: Bearer $TOKEN" "$BASE/v1/auth/rotate"
+    ;;
+  *)
+    echo "tooie: unknown command: $cmd" >&2
+    echo "run: tooie --help" >&2
+    exit 2
+    ;;
+esac
