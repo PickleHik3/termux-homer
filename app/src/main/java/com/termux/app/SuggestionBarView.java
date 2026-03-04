@@ -25,6 +25,7 @@ import android.text.TextWatcher;
 import android.text.TextUtils;
 import android.view.DragEvent;
 import android.util.AttributeSet;
+import android.util.Log;
 import android.view.VelocityTracker;
 import android.view.Gravity;
 import android.view.MotionEvent;
@@ -77,6 +78,7 @@ import java.util.UUID;
 
 public final class SuggestionBarView extends GridLayout {
 
+    private static final String LOG_TAG = "SuggestionBarView";
     private static final int TEXT_COLOR = 0xFFC0B18B;
     private static final char[] AZ_ORDER = "ABCDEFGHIJKLMNOPQRSTUVWXYZ#".toCharArray();
 
@@ -517,8 +519,10 @@ public final class SuggestionBarView extends GridLayout {
                 if (pinnedItem instanceof PinnedFolderItem) {
                     view = createFolderPreviewButton((PinnedFolderItem) pinnedItem);
                     view.setLayoutParams(param);
-                    view.setOnClickListener(v -> showFolderPopup((PinnedFolderItem) pinnedItem, v));
+                    View.OnClickListener openFolder = v -> showFolderPopup((PinnedFolderItem) pinnedItem, v);
+                    view.setOnClickListener(openFolder);
                     View pressTarget = resolvePrimaryPressTarget(view);
+                    pressTarget.setOnClickListener(openFolder);
                     pressTarget.setLongClickable(true);
                     pressTarget.setOnLongClickListener(v -> startPinnedDrag(v, pinnedIndex));
                 } else {
@@ -674,31 +678,65 @@ public final class SuggestionBarView extends GridLayout {
             return;
         }
         Context context = getContext();
+        PackageManager packageManager = context.getPackageManager();
         String activityName = entry.appRef.activityName;
         if (!TextUtils.isEmpty(activityName) && activityName.startsWith(".")) {
             activityName = entry.appRef.packageName + activityName;
         }
-        Intent explicit = new Intent(Intent.ACTION_MAIN);
-        explicit.addCategory(Intent.CATEGORY_LAUNCHER);
-        explicit.setComponent(new ComponentName(entry.appRef.packageName, activityName));
+        Intent pkgDefault = packageManager.getLaunchIntentForPackage(entry.appRef.packageName);
 
-        Intent explicitNoCategory = new Intent(Intent.ACTION_MAIN);
-        explicitNoCategory.setComponent(new ComponentName(entry.appRef.packageName, activityName));
+        Intent explicit = null;
+        Intent explicitNoCategory = null;
+        if (!TextUtils.isEmpty(activityName)) {
+            explicit = new Intent(Intent.ACTION_MAIN);
+            explicit.addCategory(Intent.CATEGORY_LAUNCHER);
+            explicit.setComponent(new ComponentName(entry.appRef.packageName, activityName));
 
-        Intent pkgDefault = context.getPackageManager().getLaunchIntentForPackage(entry.appRef.packageName);
+            explicitNoCategory = new Intent(Intent.ACTION_MAIN);
+            explicitNoCategory.setComponent(new ComponentName(entry.appRef.packageName, activityName));
+        }
 
         Intent resolveFallback = new Intent(Intent.ACTION_MAIN);
         resolveFallback.addCategory(Intent.CATEGORY_LAUNCHER);
         resolveFallback.setPackage(entry.appRef.packageName);
-        ComponentName resolved = resolveFallback.resolveActivity(context.getPackageManager());
+        ComponentName resolved = resolveFallback.resolveActivity(packageManager);
         if (resolved != null) {
             resolveFallback.setComponent(resolved);
         }
 
-        if (!tryStartActivity(context, explicit)
-            && !tryStartActivity(context, explicitNoCategory)
-            && !tryStartActivity(context, pkgDefault)
-            && !(resolved != null && tryStartActivity(context, resolveFallback))) {
+        boolean launched = false;
+        if (tryStartActivity(context, pkgDefault)) {
+            launched = true;
+        } else if (tryStartActivity(context, explicit)) {
+            launched = true;
+        } else if (tryStartActivity(context, explicitNoCategory)) {
+            launched = true;
+        } else if (resolved != null && tryStartActivity(context, resolveFallback)) {
+            launched = true;
+        }
+        if (!launched) {
+            Intent packageMain = new Intent(Intent.ACTION_MAIN);
+            packageMain.addCategory(Intent.CATEGORY_LAUNCHER);
+            packageMain.setPackage(entry.appRef.packageName);
+            List<android.content.pm.ResolveInfo> matches = packageManager.queryIntentActivities(packageMain, 0);
+            for (android.content.pm.ResolveInfo match : matches) {
+                if (match == null || match.activityInfo == null) continue;
+                String pkg = match.activityInfo.packageName;
+                String cls = match.activityInfo.name;
+                if (TextUtils.isEmpty(pkg) || TextUtils.isEmpty(cls)) continue;
+                Intent fallbackExplicit = new Intent(Intent.ACTION_MAIN);
+                fallbackExplicit.addCategory(Intent.CATEGORY_LAUNCHER);
+                fallbackExplicit.setComponent(new ComponentName(pkg, cls));
+                if (tryStartActivity(context, fallbackExplicit)) {
+                    launched = true;
+                    break;
+                }
+            }
+        }
+
+        if (!launched) {
+            Log.w(LOG_TAG, "Failed to launch package " + entry.appRef.packageName
+                + " activity=" + entry.appRef.activityName);
             return;
         }
 
@@ -776,14 +814,15 @@ public final class SuggestionBarView extends GridLayout {
     private boolean tryStartActivity(@NonNull Context context, @Nullable Intent intent) {
         if (intent == null) return false;
         try {
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
             if (context instanceof Activity) {
                 ((Activity) context).startActivity(intent);
             } else {
-                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                 context.startActivity(intent);
             }
             return true;
-        } catch (Exception ignored) {
+        } catch (Exception e) {
+            Log.d(LOG_TAG, "launch failed for intent " + intent + ": " + e.getMessage());
             return false;
         }
     }
