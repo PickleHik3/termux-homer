@@ -191,8 +191,9 @@
     <com.termux.app.AzScrubRowView
         android:id="@+id/apps_bar_az_row"
         android:layout_width="match_parent"
-        android:layout_height="24dp"
+        android:layout_height="28dp"
         android:layout_above="@+id/terminal_toolbar_view_pager"
+        android:layout_marginBottom="2dp"
         android:gravity="center_vertical"
         android:textColor="@color/menu_accent"
         android:visibility="gone" />

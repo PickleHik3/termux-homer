@@ -816,9 +816,9 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
     private int mutedMonetShade(int color) {
         float[] hsv = new float[3];
         Color.colorToHSV(color, hsv);
-        hsv[1] = Math.max(0f, Math.min(1f, hsv[1] * 0.92f));
-        hsv[2] = Math.max(0f, Math.min(1f, hsv[2] * 0.88f));
-        return Color.HSVToColor(hsv);
+        hsv[1] = Math.max(0f, Math.min(1f, hsv[1] * 0.78f));
+        hsv[2] = Math.max(0f, Math.min(1f, hsv[2] * 0.68f));
+        return Color.HSVToColor(0xE6, hsv);
     }
 
     private void applySuggestionBarInputChar() {
@@ -892,7 +892,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
             barHeightPx = 0;
         }
         int azRowHeightPx = mPreferences.isAppLauncherAzRowEnabled() ?
-            Math.round(24f * getResources().getDisplayMetrics().density) : 0;
+            Math.round(30f * getResources().getDisplayMetrics().density) : 0;
         updateViewHeight(R.id.apps_bar_viewpager, barHeightPx);
         updateViewHeight(R.id.apps_bar_az_row, azRowHeightPx);
         updateViewHeight(R.id.apps_bar_background, barHeightPx);

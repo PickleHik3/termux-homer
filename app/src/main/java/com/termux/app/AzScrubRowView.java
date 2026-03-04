@@ -47,7 +47,7 @@ public final class AzScrubRowView extends AppCompatTextView {
         setText("");
         setSingleLine(true);
         setTextSize(11f);
-        setPadding(0, dp(6), 0, dp(6));
+        setPadding(0, dp(4), 0, dp(4));
         setClickable(true);
         letterPaint.setTextAlign(Paint.Align.CENTER);
         letterPaint.setTextSize(getTextSize());
@@ -68,7 +68,10 @@ public final class AzScrubRowView extends AppCompatTextView {
         letterPaint.setColor(getCurrentTextColor());
         letterPaint.setTextSize(getTextSize());
         letterPaint.getTextBounds("A", 0, 1, textBounds);
-        float baseline = (height * 0.5f) + (textBounds.height() * 0.35f);
+        float contentTop = getPaddingTop();
+        float contentBottom = height - getPaddingBottom();
+        float contentCenterY = (contentTop + contentBottom) * 0.5f;
+        float baseline = contentCenterY + (textBounds.height() * 0.35f);
         float slot = width / Math.max(1, visibleLetters.length);
 
         for (int i = 0; i < visibleLetters.length; i++) {
