@@ -228,3 +228,10 @@ Files changed: termux-shared/src/main/java/com/termux/shared/shell/command/runne
 Build result: fail (local build blocked by missing accepted Android NDK license for ndk;29.0.14206865)
 Manual validation case(s): pending device validation: fresh data install should complete bootstrap second stage and open interactive login shell without Permission denied.
 Next step: Build/install APK from CI (or local after SDK license acceptance) and re-test first-launch bootstrap + `ls` execution.
+Cycle: 25
+Task: Accept bootstrap second-stage success when stderr contains warnings
+Root cause: Installer treated any non-empty stderr as bootstrap failure even with exit code 0; current bootstrap scripts emit benign warnings (e.g., makewhatis/mandoc) on stderr.
+Files changed: app/src/main/java/com/termux/app/TermuxInstaller.java
+Build result: not run locally (environment NDK license blocker)
+Manual validation case(s): pending device validation: bootstrap should continue past second stage and open session despite warning-only stderr.
+Next step: push fix and trigger nightly APK build for verification.

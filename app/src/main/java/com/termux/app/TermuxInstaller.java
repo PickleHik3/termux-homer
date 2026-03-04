@@ -219,8 +219,7 @@ final class TermuxInstaller {
                         executionCommand.commandLabel = "Termux Bootstrap Second Stage Command";
                         executionCommand.backgroundCustomLogLevel = Logger.LOG_LEVEL_NORMAL;
                         AppShell appShell = AppShell.execute(activity, executionCommand, null, new TermuxShellEnvironment(), null, true);
-                        boolean stderrSet = !executionCommand.resultData.stderr.toString().isEmpty();
-                        if (appShell == null || !executionCommand.isSuccessful() || executionCommand.resultData.exitCode != 0 || stderrSet) {
+                        if (appShell == null || !executionCommand.isSuccessful() || executionCommand.resultData.exitCode != 0) {
                             // Delete prefix directory as otherwise when app is restarted, the broken prefix directory would be used and logged into
                             error = FileUtils.deleteFile("termux prefix directory", TERMUX_PREFIX_DIR_PATH, true);
                             if (error != null)
