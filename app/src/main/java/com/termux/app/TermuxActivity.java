@@ -807,11 +807,10 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         if (mAzScrubRowView == null || mSuggestionBarView == null) return;
         Set<Character> letters = new LinkedHashSet<>(mSuggestionBarView.getAvailableAzLetters());
         mAzScrubRowView.setVisibleLetters(letters);
-        int base = ContextCompat.getColor(this, R.color.background_accent);
+        int base = ContextCompat.getColor(this, R.color.menu_accent);
         int muted = mutedMonetShade(base);
-        int alpha = Math.max(0, Math.min(100, mPreferences != null ? mPreferences.getAppBarOpacity() : 80));
-        int color = ((int) (255f * (alpha / 100f)) << 24) | (muted & 0x00FFFFFF);
-        mAzScrubRowView.setBackgroundColor(color);
+        mAzScrubRowView.setTextColor(muted);
+        mAzScrubRowView.setBackgroundColor(Color.TRANSPARENT);
     }
 
     private int mutedMonetShade(int color) {
