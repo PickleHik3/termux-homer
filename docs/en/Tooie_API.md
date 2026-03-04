@@ -101,6 +101,8 @@ Rotates API token and rewrites `~/.tooie/token` and `~/.tooie/endpoint`.
 ## CLI Usage
 
 ```sh
+tooie --help
+tooie help exec
 tooie status
 tooie apps
 tooie resources

@@ -51,7 +51,7 @@ Current Tooie endpoints include:
 - `/v1/screen/lock`
 - `/v1/auth/rotate`
 
-Developer/security notes:
+Docs and policy notes:
 - `docs/en/Tooie_API.md`
 
 ## Build (local)
