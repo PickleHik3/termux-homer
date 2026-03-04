@@ -193,3 +193,10 @@ Files changed: app/src/main/java/com/termux/app/AzScrubRowView.java, app/src/mai
 Build result: pass (:app:compileDebugJavaWithJavac)
 Manual validation case(s): Pending device QA for evenly spaced letters, touch-release retaining filtered list, upward-slide launch, filtered paging via swipe, and fade reset after timeout/terminal input.
 Next step: Commit/push and run nightly after user confirmation.
+Cycle: 20
+Task: Long-press editor and folder UI consistency pass (labels/icons/swipe-delete/settings popup)
+Root cause: Editor mixed legacy labels/layout, folder objects leaked into apps source list, and folder settings/popup visuals diverged from requested material-style behavior.
+Files changed: app/src/main/java/com/termux/app/SuggestionBarView.java
+Build result: pass (:app:compileDebugJavaWithJavac)
+Manual validation case(s): Pending device QA for pinned-row drag/delete glyph alignment, swipe-to-delete in pinned list, create icon bottom-left alignment, folder mini-icon sizing/padding, no blur shift on folder popup open, and folder settings rename/stepper controls.
+Next step: Run on-device validation, then commit/push to appsbar-dev and trigger nightly if approved.

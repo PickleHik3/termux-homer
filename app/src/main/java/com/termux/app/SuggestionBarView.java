@@ -4,6 +4,7 @@ import android.annotation.SuppressLint;
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.app.AlertDialog;
+import android.app.Dialog;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ChangedPackages;
@@ -23,6 +24,7 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewParent;
+import android.view.Window;
 import android.view.WindowManager;
 import android.view.animation.DecelerateInterpolator;
 import android.widget.ArrayAdapter;
@@ -43,7 +45,6 @@ import androidx.recyclerview.widget.ItemTouchHelper;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
-import com.github.mmin18.widget.RealtimeBlurView;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.termux.R;
 import com.termux.app.launcher.data.LauncherAppDataProvider;
@@ -666,7 +667,7 @@ public final class SuggestionBarView extends GridLayout {
         }
 
         TextView selectedTitle = new TextView(getContext());
-        selectedTitle.setText("Pinned Order (drag to reorder)");
+        selectedTitle.setText("Pinned Apps");
         selectedTitle.setTextColor(TEXT_COLOR);
         selectedTitle.setPadding(0, 0, 0, 8);
 
@@ -688,7 +689,8 @@ public final class SuggestionBarView extends GridLayout {
         orderedRecycler.setOverScrollMode(OVER_SCROLL_NEVER);
 
         ItemTouchHelper touchHelper = new ItemTouchHelper(new ItemTouchHelper.SimpleCallback(
-            ItemTouchHelper.UP | ItemTouchHelper.DOWN, 0) {
+            ItemTouchHelper.UP | ItemTouchHelper.DOWN,
+            ItemTouchHelper.LEFT | ItemTouchHelper.RIGHT) {
             @Override
             public boolean onMove(@NonNull RecyclerView recyclerView, @NonNull RecyclerView.ViewHolder viewHolder, @NonNull RecyclerView.ViewHolder target) {
                 int from = viewHolder.getAdapterPosition();
@@ -706,12 +708,21 @@ public final class SuggestionBarView extends GridLayout {
 
             @Override
             public void onSwiped(@NonNull RecyclerView.ViewHolder viewHolder, int direction) {
+                int pos = viewHolder.getAdapterPosition();
+                if (pos == RecyclerView.NO_POSITION) return;
+                if (pos < 0 || pos >= orderedSelected.size()) return;
+                String stable = stableIdForPinnedItem(orderedSelected.get(pos));
+                orderedSelected.remove(pos);
+                if (stable != null) selectedIds.remove(stable);
+                orderedAdapter.notifyItemRemoved(pos);
+                ListView lv = listViewHolder[0];
+                if (lv != null) syncListChecks(lv, options, selectedIds);
             }
         });
         touchHelper.attachToRecyclerView(orderedRecycler);
 
         TextView allAppsTitle = new TextView(getContext());
-        allAppsTitle.setText("Apps and Folders");
+        allAppsTitle.setText("Apps");
         allAppsTitle.setTextColor(TEXT_COLOR);
         allAppsTitle.setPadding(0, 16, 0, 8);
 
@@ -747,7 +758,12 @@ public final class SuggestionBarView extends GridLayout {
 
         LinearLayout buttons = new LinearLayout(getContext());
         buttons.setOrientation(LinearLayout.HORIZONTAL);
-        buttons.setGravity(Gravity.END);
+        buttons.setGravity(Gravity.CENTER_VERTICAL);
+
+        ImageButton folderAction = new ImageButton(getContext());
+        folderAction.setImageResource(R.drawable.ic_create_new_folder_24);
+        folderAction.setContentDescription("Create folder at this slot");
+        styleIconButton(folderAction, dp(4));
 
         Button cancel = new Button(getContext());
         cancel.setText("Cancel");
@@ -755,19 +771,12 @@ public final class SuggestionBarView extends GridLayout {
         cancel.setOnClickListener(v -> dialog.dismiss());
 
         Button save = new Button(getContext());
-        save.setText("Save Pins");
+        save.setText("Save");
         styleGhostButton(save);
-
-        ImageButton folderAction = new ImageButton(getContext());
-        folderAction.setImageResource(R.drawable.ic_create_new_folder_24);
-        folderAction.setContentDescription("Create folder at this slot");
-        styleIconButton(folderAction, dp(4));
-        LinearLayout.LayoutParams folderActionParams = new LinearLayout.LayoutParams(dp(30), dp(30));
-        folderActionParams.setMargins(dp(8), 0, 0, 0);
 
         final boolean[] folderMode = new boolean[] {false};
         final Runnable refreshFolderModeUi = () -> {
-            save.setText(folderMode[0] ? "Create Folder" : "Save Pins");
+            save.setText(folderMode[0] ? "Create" : "Save");
             folderAction.setAlpha(folderMode[0] ? 1f : 0.6f);
         };
         folderAction.setOnClickListener(v -> {
@@ -792,9 +801,12 @@ public final class SuggestionBarView extends GridLayout {
             reloadWithInput("", lastTerminalView);
         });
 
+        LinearLayout.LayoutParams folderActionParams = new LinearLayout.LayoutParams(dp(30), dp(30));
+        folderActionParams.setMargins(0, 0, dp(12), 0);
+        buttons.addView(folderAction, folderActionParams);
+        buttons.addView(new View(getContext()), new LinearLayout.LayoutParams(0, 0, 1f));
         buttons.addView(cancel);
         buttons.addView(save);
-        buttons.addView(folderAction, folderActionParams);
 
         orderedRecycler.setOnTouchListener((v, event) -> {
             v.getParent().requestDisallowInterceptTouchEvent(true);
@@ -860,7 +872,7 @@ public final class SuggestionBarView extends GridLayout {
         topActions.setGravity(Gravity.END);
 
         ImageButton settings = new ImageButton(getContext());
-        settings.setImageResource(android.R.drawable.ic_menu_manage);
+        settings.setImageResource(R.drawable.ic_settings);
         settings.setContentDescription("Folder settings");
         styleIconButton(settings, dp(4));
         settings.setOnClickListener(v -> {
@@ -870,14 +882,16 @@ public final class SuggestionBarView extends GridLayout {
         topActions.addView(settings, new LinearLayout.LayoutParams(dp(28), dp(28)));
 
         ImageButton delete = new ImageButton(getContext());
-        delete.setImageResource(android.R.drawable.ic_menu_close_clear_cancel);
+        delete.setImageResource(R.drawable.ic_delete_sweep_24);
         delete.setContentDescription("Delete folder");
         styleIconButton(delete, dp(4));
         delete.setOnClickListener(v -> {
             removePinnedAt(folderIndex);
             dialog.dismiss();
         });
-        topActions.addView(delete, new LinearLayout.LayoutParams(dp(28), dp(28)));
+        LinearLayout.LayoutParams deleteParams = new LinearLayout.LayoutParams(dp(28), dp(28));
+        deleteParams.setMargins(dp(10), 0, 0, 0);
+        topActions.addView(delete, deleteParams);
 
         LinearLayout buttons = new LinearLayout(getContext());
         buttons.setOrientation(LinearLayout.HORIZONTAL);
@@ -929,7 +943,7 @@ public final class SuggestionBarView extends GridLayout {
         root.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 
         FrameLayout iconShell = new FrameLayout(getContext());
-        int shellSize = iconSizePx() + dp(2);
+        int shellSize = iconSizePx();
         GradientDrawable bg = new GradientDrawable();
         bg.setShape(GradientDrawable.OVAL);
         bg.setColor(0x26FFFFFF);
@@ -947,7 +961,7 @@ public final class SuggestionBarView extends GridLayout {
         miniGrid.setUseDefaultMargins(false);
         miniGrid.setAlignmentMode(GridLayout.ALIGN_BOUNDS);
 
-        int miniSize = Math.max(dp(10), Math.round(shellSize * 0.48f));
+        int miniSize = Math.max(dp(9), Math.round(shellSize * 0.42f));
         int placed = 0;
         for (AppRef ref : folder.apps) {
             if (placed >= 4) break;
@@ -959,7 +973,7 @@ public final class SuggestionBarView extends GridLayout {
             GridLayout.LayoutParams params = new GridLayout.LayoutParams();
             params.width = miniSize;
             params.height = miniSize;
-            params.setMargins(dp(-1), dp(-1), dp(-1), dp(-1));
+            params.setMargins(dp(1), dp(1), dp(1), dp(1));
             mini.setLayoutParams(params);
             miniGrid.addView(mini);
             placed++;
@@ -1130,22 +1144,17 @@ public final class SuggestionBarView extends GridLayout {
     }
 
     private void showFolderSettings(PinnedFolderItem folder) {
-        BottomSheetDialog dialog = new BottomSheetDialog(getContext());
+        Dialog dialog = new Dialog(getContext());
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+
         LinearLayout layout = new LinearLayout(getContext());
         layout.setOrientation(LinearLayout.VERTICAL);
         layout.setPadding(dp(16), dp(12), dp(16), dp(12));
-
-        EditText rowsInput = new EditText(getContext());
-        rowsInput.setHint("Rows (1-6)");
-        rowsInput.setText(Integer.toString(folder.rows));
-
-        EditText colsInput = new EditText(getContext());
-        colsInput.setHint("Columns (1-6)");
-        colsInput.setText(Integer.toString(folder.cols));
-
-        EditText colorInput = new EditText(getContext());
-        colorInput.setHint("Tint override (hex, optional)");
-        colorInput.setText(folder.tintOverrideEnabled ? String.format(Locale.US, "#%08X", folder.tintColor) : "");
+        GradientDrawable panel = new GradientDrawable();
+        panel.setCornerRadius(dp(14));
+        panel.setColor(0xEE1E1E1E);
+        panel.setStroke(dp(1), 0x33FFFFFF);
+        layout.setBackground(panel);
 
         TextView title = new TextView(getContext());
         title.setText("Folder settings");
@@ -1153,6 +1162,21 @@ public final class SuggestionBarView extends GridLayout {
         title.setTypeface(Typeface.DEFAULT_BOLD);
         title.setTextSize(14f);
         title.setPadding(0, 0, 0, dp(8));
+
+        EditText nameInput = new EditText(getContext());
+        nameInput.setHint("Folder name");
+        nameInput.setText(TextUtils.isEmpty(folder.title) ? "Folder" : folder.title);
+
+        final int[] rowsValue = new int[] {clamp(folder.rows, 1, PinnedFolderItem.MAX_GRID)};
+        final int[] colsValue = new int[] {clamp(folder.cols, 1, PinnedFolderItem.MAX_GRID)};
+        LinearLayout rowsControl = buildStepperRow("Rows", rowsValue, 1, PinnedFolderItem.MAX_GRID);
+        LinearLayout colsControl = buildStepperRow("Columns", colsValue, 1, PinnedFolderItem.MAX_GRID);
+
+        EditText colorInput = new EditText(getContext());
+        colorInput.setHint("Tint color");
+        colorInput.setText(folder.tintOverrideEnabled ? String.format(Locale.US, "#%08X", folder.tintColor) : "");
+        colorInput.setSingleLine(true);
+        colorInput.setHint("#AARRGGBB or #RRGGBB");
 
         LinearLayout buttons = new LinearLayout(getContext());
         buttons.setOrientation(LinearLayout.HORIZONTAL);
@@ -1167,8 +1191,10 @@ public final class SuggestionBarView extends GridLayout {
         save.setText("Save");
         styleGhostButton(save);
         save.setOnClickListener(v -> {
-            folder.rows = clamp(parseInt(rowsInput.getText(), folder.rows), 1, PinnedFolderItem.MAX_GRID);
-            folder.cols = clamp(parseInt(colsInput.getText(), folder.cols), 1, PinnedFolderItem.MAX_GRID);
+            String newName = stringValue(nameInput.getText()).trim();
+            folder.title = newName.isEmpty() ? "Folder" : newName;
+            folder.rows = rowsValue[0];
+            folder.cols = colsValue[0];
             String color = stringValue(colorInput.getText()).trim();
             if (color.isEmpty()) {
                 folder.tintOverrideEnabled = false;
@@ -1187,12 +1213,20 @@ public final class SuggestionBarView extends GridLayout {
         buttons.addView(save);
 
         layout.addView(title);
-        layout.addView(rowsInput);
-        layout.addView(colsInput);
-        layout.addView(colorInput);
-        layout.addView(buttons);
+        layout.addView(nameInput, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        layout.addView(rowsControl, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        layout.addView(colsControl, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        layout.addView(colorInput, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        layout.addView(buttons, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
         dialog.setContentView(layout);
+        Window window = dialog.getWindow();
+        if (window != null) {
+            window.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE | WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE);
+            window.setGravity(Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
+            window.getAttributes().y = dp(48);
+        }
         dialog.show();
     }
 
@@ -1251,11 +1285,9 @@ public final class SuggestionBarView extends GridLayout {
         title.setTypeface(Typeface.DEFAULT_BOLD);
         title.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
 
-        TextView gear = new TextView(getContext());
-        gear.setText("\u2699");
-        gear.setTextColor(TEXT_COLOR);
-        gear.setTextSize(16f);
-        gear.setGravity(Gravity.CENTER);
+        ImageButton gear = new ImageButton(getContext());
+        gear.setImageResource(R.drawable.ic_settings);
+        styleIconButton(gear, dp(3));
         int gearSize = dp(24);
         gear.setOnClickListener(v -> {
             dismissFolderPopup();
@@ -1279,15 +1311,6 @@ public final class SuggestionBarView extends GridLayout {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             popupRoot.setClipToOutline(true);
         }
-        FrameLayout.LayoutParams fillParams = new FrameLayout.LayoutParams(contentW, contentH);
-
-        if (blurEnabled) {
-            RealtimeBlurView blurView = new RealtimeBlurView(getContext(), null);
-            blurView.setBlurRadius(blurRadiusDp * getResources().getDisplayMetrics().density);
-            blurView.setOverlayColor(0x00000000);
-            popupRoot.addView(blurView, fillParams);
-        }
-
         int alpha = clamp(appBarOpacity, 0, 100);
         int overlayBase = folder.tintOverrideEnabled ? (folder.tintColor & 0x00FFFFFF) : (inheritedTintColor & 0x00FFFFFF);
         int overlayColor = (((int) (255f * (alpha / 100f))) << 24) | overlayBase;
@@ -1410,35 +1433,46 @@ public final class SuggestionBarView extends GridLayout {
         public RowHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
             LinearLayout row = new LinearLayout(parent.getContext());
             row.setOrientation(LinearLayout.HORIZONTAL);
-            row.setPadding(12, 12, 12, 12);
+            row.setGravity(Gravity.CENTER_VERTICAL);
+            row.setPadding(dpStatic(parent, 6), dpStatic(parent, 8), dpStatic(parent, 4), dpStatic(parent, 8));
+
+            ImageView drag = new ImageView(parent.getContext());
+            drag.setImageResource(R.drawable.ic_drag_indicator_24);
+            drag.setColorFilter(TEXT_COLOR);
+            LinearLayout.LayoutParams dragParams = new LinearLayout.LayoutParams(dpStatic(parent, 20), dpStatic(parent, 20));
+            dragParams.setMargins(0, 0, dpStatic(parent, 8), 0);
+            row.addView(drag, dragParams);
+
+            ImageView folder = new ImageView(parent.getContext());
+            folder.setImageResource(R.drawable.ic_folder_24);
+            folder.setColorFilter(TEXT_COLOR);
+            LinearLayout.LayoutParams folderParams = new LinearLayout.LayoutParams(dpStatic(parent, 18), dpStatic(parent, 18));
+            folderParams.setMargins(0, 0, dpStatic(parent, 6), 0);
+            row.addView(folder, folderParams);
 
             TextView label = new TextView(parent.getContext());
             label.setTextColor(TEXT_COLOR);
+            label.setSingleLine(true);
             label.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
 
-            TextView handle = new TextView(parent.getContext());
-            handle.setText("\u2630");
-            handle.setTextColor(TEXT_COLOR);
-            handle.setTextSize(16f);
-            handle.setGravity(Gravity.CENTER);
-            handle.setLayoutParams(new LinearLayout.LayoutParams(dpStatic(parent, 28), dpStatic(parent, 28)));
-
-            TextView delete = new TextView(parent.getContext());
-            delete.setText("\u2715");
-            delete.setTextColor(TEXT_COLOR);
-            delete.setTextSize(16f);
-            delete.setGravity(Gravity.CENTER);
-            delete.setLayoutParams(new LinearLayout.LayoutParams(dpStatic(parent, 28), dpStatic(parent, 28)));
+            ImageButton delete = new ImageButton(parent.getContext());
+            delete.setImageResource(R.drawable.ic_delete_sweep_24);
+            delete.setColorFilter(TEXT_COLOR);
+            delete.setBackgroundColor(0x00000000);
+            delete.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+            delete.setPadding(dpStatic(parent, 2), dpStatic(parent, 2), dpStatic(parent, 2), dpStatic(parent, 2));
+            delete.setLayoutParams(new LinearLayout.LayoutParams(dpStatic(parent, 24), dpStatic(parent, 24)));
 
             row.addView(label);
-            row.addView(handle);
             row.addView(delete);
-            return new RowHolder(row, label, delete);
+            return new RowHolder(row, label, folder, delete);
         }
 
         @Override
         public void onBindViewHolder(@NonNull RowHolder holder, int position) {
-            holder.label.setText(resolveLabel(source, ordered.get(position)));
+            PinnedItem item = ordered.get(position);
+            holder.label.setText(resolveLabel(source, item));
+            holder.folder.setVisibility(item instanceof PinnedFolderItem ? View.VISIBLE : View.GONE);
             holder.delete.setOnClickListener(v -> {
                 if (deleteCallback != null) {
                     deleteCallback.onDelete(holder.getAdapterPosition());
@@ -1454,7 +1488,7 @@ public final class SuggestionBarView extends GridLayout {
         private static String resolveLabel(List<LauncherAppEntry> source, PinnedItem item) {
             if (item instanceof PinnedFolderItem) {
                 String title = ((PinnedFolderItem) item).title;
-                return "[Folder] " + (TextUtils.isEmpty(title) ? "Folder" : title);
+                return TextUtils.isEmpty(title) ? "Folder" : title;
             }
             if (item instanceof PinnedAppItem) {
                 AppRef ref = ((PinnedAppItem) item).appRef;
@@ -1471,11 +1505,13 @@ public final class SuggestionBarView extends GridLayout {
 
         static final class RowHolder extends RecyclerView.ViewHolder {
             final TextView label;
-            final TextView delete;
+            final ImageView folder;
+            final ImageButton delete;
 
-            RowHolder(@NonNull View itemView, TextView label, TextView delete) {
+            RowHolder(@NonNull View itemView, TextView label, ImageView folder, ImageButton delete) {
                 super(itemView);
                 this.label = label;
+                this.folder = folder;
                 this.delete = delete;
             }
         }
@@ -1502,13 +1538,6 @@ public final class SuggestionBarView extends GridLayout {
         for (LauncherAppEntry app : apps) {
             AppRef ref = resolveForSelectionRef(app.appRef);
             out.add(new PinOption(ref.stableId(), app.label, new PinnedAppItem(ref)));
-        }
-        for (PinnedItem item : currentPinned) {
-            if (!(item instanceof PinnedFolderItem)) continue;
-            PinnedFolderItem folder = (PinnedFolderItem) item;
-            String id = "folder:" + folder.id;
-            String label = "[Folder] " + (TextUtils.isEmpty(folder.title) ? "Folder" : folder.title);
-            out.add(new PinOption(id, label, clonePinnedItem(folder)));
         }
         return out;
     }
@@ -1571,6 +1600,47 @@ public final class SuggestionBarView extends GridLayout {
         if (!TextUtils.isEmpty(ref.activityName)) return ref;
         LauncherAppEntry resolved = resolveRef(ref);
         return resolved != null ? resolved.appRef : ref;
+    }
+
+    private LinearLayout buildStepperRow(@NonNull String label, @NonNull int[] valueRef, int min, int max) {
+        LinearLayout row = new LinearLayout(getContext());
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(0, dp(6), 0, dp(6));
+
+        TextView title = new TextView(getContext());
+        title.setText(label);
+        title.setTextColor(TEXT_COLOR);
+        row.addView(title, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+
+        ImageButton minus = new ImageButton(getContext());
+        minus.setImageResource(android.R.drawable.ic_media_previous);
+        styleIconButton(minus, dp(2));
+        row.addView(minus, new LinearLayout.LayoutParams(dp(24), dp(24)));
+
+        TextView valueText = new TextView(getContext());
+        valueText.setTextColor(TEXT_COLOR);
+        valueText.setTypeface(Typeface.DEFAULT_BOLD);
+        valueText.setText(Integer.toString(valueRef[0]));
+        valueText.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams valueParams = new LinearLayout.LayoutParams(dp(32), ViewGroup.LayoutParams.WRAP_CONTENT);
+        valueParams.setMargins(dp(6), 0, dp(6), 0);
+        row.addView(valueText, valueParams);
+
+        ImageButton plus = new ImageButton(getContext());
+        plus.setImageResource(android.R.drawable.ic_input_add);
+        styleIconButton(plus, dp(2));
+        row.addView(plus, new LinearLayout.LayoutParams(dp(24), dp(24)));
+
+        minus.setOnClickListener(v -> {
+            valueRef[0] = clamp(valueRef[0] - 1, min, max);
+            valueText.setText(Integer.toString(valueRef[0]));
+        });
+        plus.setOnClickListener(v -> {
+            valueRef[0] = clamp(valueRef[0] + 1, min, max);
+            valueText.setText(Integer.toString(valueRef[0]));
+        });
+        return row;
     }
 
     private static int parseInt(CharSequence value, int fallback) {
