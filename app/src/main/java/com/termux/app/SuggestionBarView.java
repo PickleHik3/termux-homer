@@ -80,7 +80,7 @@ public final class SuggestionBarView extends GridLayout {
     private List<LauncherAppEntry> allApps = new ArrayList<>();
     private int applicationSequenceNumber = 0;
 
-    private int maxButtonCount = 5;
+    private int maxButtonCount = 7;
     private float textSize = 12f;
     private boolean showIcons = true;
     private boolean bandW = false;
@@ -475,8 +475,8 @@ public final class SuggestionBarView extends GridLayout {
             pinnedItemsPerPage = 1;
             pinnedPageIndex = 0;
             if (azTotalMatches <= perPage && !entries.isEmpty() && activeAzLetter != null) {
-                int anchor = computeAzAnchorSlot(activeAzLetter, perPage);
-                int centeredStart = anchor - (entries.size() / 2);
+                float anchor = computeAzAnchorPosition(activeAzLetter, perPage);
+                int centeredStart = Math.round(anchor - ((entries.size() - 1) / 2f));
                 renderStartCol = clamp(centeredStart, 0, Math.max(0, perPage - entries.size()));
             }
         }
@@ -2190,8 +2190,8 @@ public final class SuggestionBarView extends GridLayout {
         return Math.max(min, Math.min(max, value));
     }
 
-    private int computeAzAnchorSlot(char letter, int slots) {
-        if (slots <= 1) return 0;
+    private float computeAzAnchorPosition(char letter, int slots) {
+        if (slots <= 1) return 0f;
         Set<Character> available = getAvailableAzLetters();
         List<Character> ordered = new ArrayList<>();
         for (char c : AZ_ORDER) {
@@ -2199,13 +2199,13 @@ public final class SuggestionBarView extends GridLayout {
                 ordered.add(c);
             }
         }
-        if (ordered.isEmpty()) return slots / 2;
+        if (ordered.isEmpty()) return (slots - 1) / 2f;
         char target = Character.toUpperCase(letter);
         int index = ordered.indexOf(target);
         if (index < 0) index = 0;
-        if (ordered.size() == 1) return slots / 2;
+        if (ordered.size() == 1) return (slots - 1) / 2f;
         float normalized = (float) index / (float) (ordered.size() - 1);
-        return clamp(Math.round(normalized * (slots - 1)), 0, slots - 1);
+        return Math.max(0f, Math.min(slots - 1, normalized * (slots - 1)));
     }
 
     private void animatePageSwitch(int pageDelta, float velocityPxPerSec) {

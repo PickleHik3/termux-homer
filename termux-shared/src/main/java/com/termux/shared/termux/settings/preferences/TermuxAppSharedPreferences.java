@@ -159,11 +159,12 @@ public class TermuxAppSharedPreferences extends AppSharedPreferences {
 
     public float getAppLauncherIconScale() {
         float iconScale = SharedPreferenceUtils.getFloat(mSharedPreferences, TERMUX_APP.KEY_APP_LAUNCHER_ICON_SCALE, TERMUX_APP.DEFAULT_APP_LAUNCHER_ICON_SCALE);
-        return DataUtils.rangedOrDefault(iconScale, TERMUX_APP.DEFAULT_APP_LAUNCHER_ICON_SCALE, 0.4f, 3.0f);
+        return DataUtils.rangedOrDefault(iconScale, TERMUX_APP.DEFAULT_APP_LAUNCHER_ICON_SCALE, 1.0f, 1.8f);
     }
 
     public void setAppLauncherIconScale(float value) {
-        SharedPreferenceUtils.setFloat(mSharedPreferences, TERMUX_APP.KEY_APP_LAUNCHER_ICON_SCALE, value, false);
+        float clamped = Math.max(1.0f, Math.min(1.8f, value));
+        SharedPreferenceUtils.setFloat(mSharedPreferences, TERMUX_APP.KEY_APP_LAUNCHER_ICON_SCALE, clamped, false);
     }
 
     public String getAppLauncherPinnedItemsV2() {

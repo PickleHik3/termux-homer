@@ -182,7 +182,7 @@ class TermuxStylePreferencesDataStore extends PreferenceDataStore {
                 mPreferences.setAppLauncherButtonCount(value);
                 break;
             case "app_launcher_icon_scale_percent":
-                mPreferences.setAppLauncherIconScale(value / 100f);
+                mPreferences.setAppLauncherIconScale(DataUtils.clamp(value, 100, 180) / 100f);
                 break;
             case "app_launcher_bar_height_percent":
                 mPreferences.setAppLauncherBarHeightScale(value / 100f);
@@ -243,7 +243,9 @@ class TermuxStylePreferencesDataStore extends PreferenceDataStore {
                 mPreferences.setAppLauncherBarHeightScale(DataUtils.getFloatFromString(value, mPreferences.getAppLauncherBarHeightScale()));
                 break;
             case "app_launcher_icon_scale":
-                mPreferences.setAppLauncherIconScale(DataUtils.getFloatFromString(value, mPreferences.getAppLauncherIconScale()));
+                mPreferences.setAppLauncherIconScale(
+                    Math.max(1.0f, Math.min(1.8f, DataUtils.getFloatFromString(value, mPreferences.getAppLauncherIconScale())))
+                );
                 break;
             default:
                 break;

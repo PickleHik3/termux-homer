@@ -7,7 +7,7 @@
         app:summary="@string/termux_app_launcher_button_count_summary"
         app:min="1"
         android:max="20"
-        android:defaultValue="5"
+        android:defaultValue="7"
         app:showSeekBarValue="true" />
 
     <androidx.preference.SeekBarPreference
@@ -23,8 +23,8 @@
         app:key="app_launcher_icon_scale_percent"
         app:title="@string/termux_app_launcher_icon_scale_title"
         app:summary="@string/termux_app_launcher_icon_scale_summary"
-        app:min="40"
-        android:max="220"
+        app:min="100"
+        android:max="180"
         android:defaultValue="100"
         app:showSeekBarValue="true" />
 

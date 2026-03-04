@@ -113,7 +113,7 @@ public final class TermuxPreferenceConstants {
          */
         public static final String KEY_APP_LAUNCHER_BUTTON_COUNT = "app_launcher_button_count";
 
-        public static final int DEFAULT_APP_LAUNCHER_BUTTON_COUNT = 5;
+        public static final int DEFAULT_APP_LAUNCHER_BUTTON_COUNT = 7;
 
         /**
          * Defines the key for app launcher search tolerance (0-100).
