@@ -194,6 +194,13 @@ public final class TermuxPreferenceConstants {
         public static final boolean DEFAULT_APP_LAUNCHER_AZ_ROW_ENABLED = false;
 
         /**
+         * Defines the key for enabling double-tap on A-Z row to lock screen.
+         */
+        public static final String KEY_APP_LAUNCHER_AZ_DOUBLE_TAP_LOCK = "app_launcher_az_double_tap_lock";
+
+        public static final boolean DEFAULT_APP_LAUNCHER_AZ_DOUBLE_TAP_LOCK = false;
+
+        /**
          * Defines the key for whether the soft keyboard will be enabled, for cases where users want
          * to use a hardware keyboard instead.
          */

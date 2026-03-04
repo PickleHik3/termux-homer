@@ -121,6 +121,9 @@ class TermuxStylePreferencesDataStore extends PreferenceDataStore {
             case "app_launcher_az_row_enabled":
                 mPreferences.setAppLauncherAzRowEnabled(value);
                 break;
+            case "app_launcher_az_double_tap_lock":
+                mPreferences.setAppLauncherAzDoubleTapLockEnabled(value);
+                break;
             default:
                 break;
         }
@@ -149,6 +152,8 @@ class TermuxStylePreferencesDataStore extends PreferenceDataStore {
                 return mPreferences.isAppLauncherBwIconsEnabled();
             case "app_launcher_az_row_enabled":
                 return mPreferences.isAppLauncherAzRowEnabled();
+            case "app_launcher_az_double_tap_lock":
+                return mPreferences.isAppLauncherAzDoubleTapLockEnabled();
             default:
                 return defValue;
         }

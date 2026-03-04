@@ -42,6 +42,9 @@ import com.termux.R;
 import com.termux.app.api.file.FileReceiverActivity;
 import com.termux.app.launcher.data.LauncherAppDataProvider;
 import com.termux.app.launcher.data.LauncherConfigRepository;
+import com.termux.privileged.PrivilegedBackendManager;
+import com.termux.privileged.PrivilegedPolicyStore;
+import com.termux.privileged.ShizukuBackend;
 import com.termux.app.style.TermuxBackgroundManager;
 import com.termux.app.style.TermuxSystemWallpaperManager;
 import com.termux.app.terminal.TermuxActivityRootView;
@@ -769,6 +772,11 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
                         mSuggestionBarView.clearAzPreview();
                     }
                 }
+
+                @Override
+                public void onDoubleTap() {
+                    lockScreenFromAzDoubleTap();
+                }
             });
         }
     }
@@ -849,6 +857,51 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         hsv[1] = Math.max(0f, Math.min(1f, hsv[1] * 0.78f));
         hsv[2] = Math.max(0f, Math.min(1f, hsv[2] * 0.68f));
         return Color.HSVToColor(0xE6, hsv);
+    }
+
+    private void lockScreenFromAzDoubleTap() {
+        if (mPreferences == null || !mPreferences.isAppLauncherAzDoubleTapLockEnabled()) {
+            return;
+        }
+        if (!PrivilegedPolicyStore.isEndpointEnabled(this, PrivilegedPolicyStore.Endpoint.LOCK_SCREEN)) {
+            return;
+        }
+        PrivilegedBackendManager manager = PrivilegedBackendManager.getInstance();
+        if (!manager.isPrivilegedAvailable()) {
+            manager.requestPrivilegedPermission(ShizukuBackend.PERMISSION_REQUEST_CODE);
+            return;
+        }
+        manager.executeCommand("input keyevent 223")
+            .thenAccept(output -> {
+                if (isSuccessfulPrivilegedCommandOutput(output)) {
+                    return;
+                }
+                manager.executeCommand("input keyevent 26")
+                    .thenAccept(fallback -> {
+                        if (!isSuccessfulPrivilegedCommandOutput(fallback)) {
+                            Logger.logWarn(LOG_TAG, "A-Z double tap lock failed: " + fallback);
+                        }
+                    })
+                    .exceptionally(throwable -> {
+                        Logger.logWarn(LOG_TAG, "A-Z double tap lock fallback failed: " + throwable.getMessage());
+                        return null;
+                    });
+            })
+            .exceptionally(throwable -> {
+                Logger.logWarn(LOG_TAG, "A-Z double tap lock command failed: " + throwable.getMessage());
+                return null;
+            });
+    }
+
+    private boolean isSuccessfulPrivilegedCommandOutput(String output) {
+        if (output == null) return false;
+        String trimmed = output.trim();
+        if (trimmed.isEmpty()) return true;
+        String lower = trimmed.toLowerCase();
+        if (lower.startsWith("error")) return false;
+        if (lower.contains("permission required")) return false;
+        if (lower.contains("no privileged backend")) return false;
+        return true;
     }
 
     private void applySuggestionBarInputChar() {

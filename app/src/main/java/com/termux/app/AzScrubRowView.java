@@ -9,6 +9,7 @@ import android.graphics.Typeface;
 import android.os.Build;
 import android.util.AttributeSet;
 import android.view.MotionEvent;
+import android.view.ViewConfiguration;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -21,6 +22,7 @@ public final class AzScrubRowView extends AppCompatTextView {
     public interface ScrubCallback {
         void onScrub(char letter, int selectionIndex, boolean commit);
         void onCancel();
+        default void onDoubleTap() {}
     }
 
     private static final char[] LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ#".toCharArray();
@@ -33,6 +35,11 @@ public final class AzScrubRowView extends AppCompatTextView {
     private float waveStrength = 0f;
     private int accentColor = Color.WHITE;
     @Nullable private ValueAnimator settleAnimator;
+    private long lastTapUpTimeMs;
+    private float lastTapUpX = Float.NaN;
+    private int doubleTapTimeoutMs;
+    private int doubleTapSlopPx;
+    private boolean suppressUpScrub;
 
     public AzScrubRowView(Context context) {
         super(context);
@@ -62,6 +69,9 @@ public final class AzScrubRowView extends AppCompatTextView {
         letterPaint.setTextAlign(Paint.Align.CENTER);
         letterPaint.setTextSize(getTextSize());
         letterPaint.setColor(getCurrentTextColor());
+        ViewConfiguration viewConfiguration = ViewConfiguration.get(getContext());
+        doubleTapTimeoutMs = ViewConfiguration.getDoubleTapTimeout();
+        doubleTapSlopPx = viewConfiguration.getScaledDoubleTapSlop();
     }
 
     private int dp(int value) {
@@ -175,6 +185,16 @@ public final class AzScrubRowView extends AppCompatTextView {
                 bringToFront();
                 updateInteractionLayerOffset();
                 invalidate();
+                long now = event.getEventTime();
+                boolean isDoubleTap = (now - lastTapUpTimeMs) <= doubleTapTimeoutMs
+                    && !Float.isNaN(lastTapUpX)
+                    && Math.abs(x - lastTapUpX) <= doubleTapSlopPx;
+                if (isDoubleTap) {
+                    suppressUpScrub = true;
+                    callback.onDoubleTap();
+                    return true;
+                }
+                suppressUpScrub = false;
                 callback.onScrub(letter, currentSelectionIndex, false);
                 return true;
             case MotionEvent.ACTION_MOVE:
@@ -185,10 +205,16 @@ public final class AzScrubRowView extends AppCompatTextView {
                 callback.onScrub(letter, currentSelectionIndex, false);
                 return true;
             case MotionEvent.ACTION_UP:
-                callback.onScrub(letter, currentSelectionIndex, false);
+                lastTapUpTimeMs = event.getEventTime();
+                lastTapUpX = x;
+                if (!suppressUpScrub) {
+                    callback.onScrub(letter, currentSelectionIndex, false);
+                }
+                suppressUpScrub = false;
                 animateWaveRelease();
                 return true;
             case MotionEvent.ACTION_CANCEL:
+                suppressUpScrub = false;
                 callback.onCancel();
                 animateWaveRelease();
                 return true;
