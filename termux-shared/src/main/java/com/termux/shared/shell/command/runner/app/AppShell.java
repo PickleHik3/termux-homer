@@ -115,7 +115,7 @@ public final class AppShell {
         Logger.logDebugExtended(LOG_TAG, ExecutionCommand.getExecutionInputLogString(executionCommand, true, Logger.shouldEnableLoggingForCustomLogLevel(executionCommand.backgroundCustomLogLevel)));
         Logger.logVerboseExtended(LOG_TAG, "\"" + executionCommand.getCommandIdAndLabelLogString() + "\" AppShell Environment:\n" + Joiner.on("\n").join(environmentArray));
         // Exec the process
-        final Process process;
+        Process process;
         try {
             process = Runtime.getRuntime().exec(commandArray, environmentArray, new File(executionCommand.workingDirectory));
         } catch (IOException e) {
