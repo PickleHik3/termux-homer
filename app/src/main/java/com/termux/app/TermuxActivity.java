@@ -289,8 +289,6 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
             mIsInvalidState = true;
             return;
         }
-        // Disable terminal margin adjustment to prevent flicker/jitter from layout oscillations.
-        mPreferences.setTerminalMarginAdjustment(false);
         setMargins();
         setSuggestionBarView();
         mTermuxActivityRootView = findViewById(R.id.activity_termux_root_view);
@@ -892,7 +890,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
             barHeightPx = 0;
         }
         int azRowHeightPx = mPreferences.isAppLauncherAzRowEnabled() ?
-            Math.round(30f * getResources().getDisplayMetrics().density) : 0;
+            Math.round(28f * getResources().getDisplayMetrics().density) : 0;
         updateViewHeight(R.id.apps_bar_viewpager, barHeightPx);
         updateViewHeight(R.id.apps_bar_az_row, azRowHeightPx);
         updateViewHeight(R.id.apps_bar_background, barHeightPx);

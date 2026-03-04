@@ -214,3 +214,10 @@ Files changed: app/src/main/java/com/termux/app/SuggestionBarView.java
 Build result: pass (:app:compileDebugJavaWithJavac)
 Manual validation case(s): Pending device QA for checked apps grouped at top in folder editor, and animated empty-state hint text with long-press entry to pin editor when no pins exist.
 Next step: Push to appsbar-dev and trigger nightly workflow after user confirmation.
+Cycle: 23
+Task: Compare appsbar-dev against upstream/master for keyboard/extra-keys boundary gap risk
+Root cause: Potential mismatch in spacer size units, inset dispatch target, and margin-adjustment lifecycle between customized launcher layout/activity and upstream baseline.
+Files changed: work-logs/agent-log.md
+Build result: fail (not run in this analysis-only cycle)
+Manual validation case(s): N/A (static diff analysis against upstream/master refs)
+Next step: Validate on device with keyboard open/close across 3-button and gesture navigation, then decide whether to revert spacer/inset changes or re-enable guarded margin adjustment.

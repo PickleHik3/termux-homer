@@ -47,7 +47,7 @@ public final class AzScrubRowView extends AppCompatTextView {
         setText("");
         setSingleLine(true);
         setTextSize(11f);
-        setPadding(0, dp(3), 0, dp(5));
+        setPadding(0, dp(2), 0, dp(4));
         setClickable(true);
         letterPaint.setTextAlign(Paint.Align.CENTER);
         letterPaint.setTextSize(getTextSize());
@@ -70,8 +70,8 @@ public final class AzScrubRowView extends AppCompatTextView {
         float contentTop = getPaddingTop();
         float contentBottom = height - getPaddingBottom();
         Paint.FontMetrics fm = letterPaint.getFontMetrics();
-        // Center text vertically in padded content, then nudge down slightly for optical balance.
-        float baseline = ((contentTop + contentBottom) - fm.ascent - fm.descent) * 0.5f + dp(1);
+        // Center text vertically in padded content, then nudge down for optical balance.
+        float baseline = ((contentTop + contentBottom) - fm.ascent - fm.descent) * 0.5f + dp(2);
         float slot = width / Math.max(1, visibleLetters.length);
 
         for (int i = 0; i < visibleLetters.length; i++) {
