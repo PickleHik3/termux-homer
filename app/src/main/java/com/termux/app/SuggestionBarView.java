@@ -716,7 +716,7 @@ public final class SuggestionBarView extends GridLayout {
 
     private void launchEntryFromTouch(@NonNull View sourceView, @NonNull LauncherAppEntry entry, @Nullable TerminalView terminalView) {
         applyLaunchBloom(sourceView);
-        sourceView.postDelayed(() -> launchEntry(entry, terminalView), 48L);
+        sourceView.postDelayed(() -> launchEntry(entry, terminalView), 96L);
     }
 
     private List<LauncherAppEntry> entriesForPinnedItems(@NonNull List<PinnedItem> source) {
@@ -2417,12 +2417,11 @@ public final class SuggestionBarView extends GridLayout {
     }
 
     private void applyLaunchBloom(@NonNull View sourceView) {
-        ViewGroup container;
-        if (sourceView.getParent() instanceof ViewGroup) {
-            container = (ViewGroup) sourceView.getParent();
-        } else {
+        ViewGroup container = findBloomHost(sourceView);
+        if (container == null) {
             return;
         }
+        ensureUnclipped(container);
         View bloom = new View(getContext());
         GradientDrawable glow = new GradientDrawable();
         glow.setShape(GradientDrawable.OVAL);
@@ -2449,6 +2448,10 @@ public final class SuggestionBarView extends GridLayout {
         bloom.setScaleX(0.32f);
         bloom.setScaleY(0.32f);
         container.addView(bloom);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            bloom.setElevation(dp(24));
+            bloom.setTranslationZ(dp(24));
+        }
         sourceView.animate()
             .scaleX(0.9f)
             .scaleY(0.9f)
@@ -2476,6 +2479,32 @@ public final class SuggestionBarView extends GridLayout {
                 .withEndAction(() -> container.removeView(bloom))
                 .start())
             .start();
+    }
+
+    @Nullable
+    private ViewGroup findBloomHost(@NonNull View sourceView) {
+        ViewGroup fallback = (sourceView.getParent() instanceof ViewGroup) ? (ViewGroup) sourceView.getParent() : null;
+        ViewParent parent = sourceView.getParent();
+        while (parent instanceof ViewGroup) {
+            ViewGroup group = (ViewGroup) parent;
+            if (group.getWidth() > sourceView.getWidth() * 3 && group.getHeight() > sourceView.getHeight() * 3) {
+                fallback = group;
+            }
+            parent = group.getParent();
+        }
+        return fallback;
+    }
+
+    private void ensureUnclipped(@NonNull ViewGroup container) {
+        ViewParent p = container;
+        int hops = 0;
+        while (p instanceof ViewGroup && hops < 4) {
+            ViewGroup g = (ViewGroup) p;
+            g.setClipChildren(false);
+            g.setClipToPadding(false);
+            p = g.getParent();
+            hops++;
+        }
     }
 
     private int computeFolderPopupIconSize(int rows, int cols, int screenW, int screenH) {

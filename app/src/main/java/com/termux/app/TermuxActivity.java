@@ -933,6 +933,8 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         }
         updateViewHeight(R.id.apps_bar_viewpager, barHeightPx);
         updateViewHeight(R.id.apps_bar_az_row, azRowHeightPx);
+        int interRowGapPx = Math.round(getResources().getDisplayMetrics().density * (2f + (Math.max(0f, mPreferences.getAppLauncherIconScale() - 1f) * 2f)));
+        updateViewBottomMargin(R.id.apps_bar_viewpager, interRowGapPx);
         updateViewHeight(R.id.apps_bar_background, barHeightPx);
         updateViewHeight(R.id.apps_bar_backgroundblur, barHeightPx);
     }
@@ -1000,6 +1002,17 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
             return;
         layoutParams.height = height;
         view.setLayoutParams(layoutParams);
+    }
+
+    private void updateViewBottomMargin(int viewId, int marginBottom) {
+        View view = findViewById(viewId);
+        if (view == null) return;
+        ViewGroup.LayoutParams layoutParams = view.getLayoutParams();
+        if (!(layoutParams instanceof ViewGroup.MarginLayoutParams)) return;
+        ViewGroup.MarginLayoutParams marginParams = (ViewGroup.MarginLayoutParams) layoutParams;
+        if (marginParams.bottomMargin == marginBottom) return;
+        marginParams.bottomMargin = marginBottom;
+        view.setLayoutParams(marginParams);
     }
 
     public void toggleTerminalToolbar() {
