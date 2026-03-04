@@ -304,6 +304,8 @@
                 <string name="termux_monet_background_enabled_title">Use Monet background + overlay (Unstable)</string>
                 <string name="termux_monet_background_enabled_off">Use the regular background and overlay color from termux.properties. (Default)</string>
                 <string name="termux_monet_background_enabled_on">Use wallpaper-based Monet color for both terminal background and opacity overlay.</string>
+                <string name="termux_monet_background_guide_title">Monet background note</string>
+                <string name="termux_monet_background_guide_summary">Monet mode derives terminal background and overlay tint from your current wallpaper palette.</string>
                 <string name="termux_terminal_background_opacity_title">Terminal background opacity</string>
                 <string name="termux_terminal_background_opacity_summary">Adjusts the translucency (alpha) of the terminal background overlay.</string>
                 <string name="termux_monet_overlay_enabled_title">Use Monet overlay color</string>
