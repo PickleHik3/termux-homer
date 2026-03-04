@@ -5,6 +5,8 @@ import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
+import android.graphics.Typeface;
+import android.os.Build;
 import android.util.AttributeSet;
 import android.view.MotionEvent;
 
@@ -81,7 +83,7 @@ public final class AzScrubRowView extends AppCompatTextView {
         float contentBottom = height - getPaddingBottom();
         float slot = width / Math.max(1, visibleLetters.length);
         float anchorX = activeTouchX < 0f ? (width * 0.5f) : activeTouchX;
-        float waveAmplitude = dp(22) * waveStrength;
+        float waveAmplitude = dp(18) * waveStrength;
         int activeIndex = (int) (anchorX / Math.max(1f, slot));
         activeIndex = Math.max(0, Math.min(visibleLetters.length - 1, activeIndex));
 
@@ -95,6 +97,7 @@ public final class AzScrubRowView extends AppCompatTextView {
             }
             float scale = 1f + (0.34f * envelope * waveStrength);
             letterPaint.setTextSize(baseTextSize * scale);
+            applyLetterWeight(envelope, i == activeIndex);
             Paint.FontMetrics letterMetrics = letterPaint.getFontMetrics();
             // Keep baseline closer to bottom so raised crest has enough headroom and avoids clipping.
             float baseline = (contentBottom - dp(2) - letterMetrics.descent) - waveLift;
@@ -221,8 +224,29 @@ public final class AzScrubRowView extends AppCompatTextView {
     }
 
     private void updateInteractionLayerOffset() {
-        float lift = -dp(18) * waveStrength;
+        float lift = -dp(10) * waveStrength;
         setTranslationY(lift);
+    }
+
+    private void applyLetterWeight(float envelope, boolean active) {
+        float influence = Math.max(0f, Math.min(1f, envelope * waveStrength));
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            int weight = (int) (420 + (influence * 380));
+            if (active) weight = 900;
+            weight = Math.max(200, Math.min(900, weight));
+            letterPaint.setTypeface(Typeface.create(Typeface.DEFAULT, weight, false));
+        } else {
+            if (active) {
+                letterPaint.setTypeface(Typeface.DEFAULT_BOLD);
+                letterPaint.setFakeBoldText(true);
+            } else if (influence > 0.55f) {
+                letterPaint.setTypeface(Typeface.DEFAULT_BOLD);
+                letterPaint.setFakeBoldText(false);
+            } else {
+                letterPaint.setTypeface(Typeface.DEFAULT);
+                letterPaint.setFakeBoldText(false);
+            }
+        }
     }
 
     private static int blendColors(int from, int to, float ratio) {

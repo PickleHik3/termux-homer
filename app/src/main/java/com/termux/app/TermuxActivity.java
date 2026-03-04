@@ -912,7 +912,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
             barHeightPx = 0;
         }
         int azRowHeightPx = mPreferences.isAppLauncherAzRowEnabled() ?
-            Math.round(28f * getResources().getDisplayMetrics().density) : 0;
+            Math.round(44f * getResources().getDisplayMetrics().density) : 0;
         updateViewHeight(R.id.apps_bar_viewpager, barHeightPx);
         updateViewHeight(R.id.apps_bar_az_row, azRowHeightPx);
         updateViewHeight(R.id.apps_bar_background, barHeightPx);
