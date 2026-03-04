@@ -23,19 +23,15 @@ Shell dotfiles/config bundles (tmux, fish, nvim) are intentionally not part of t
 
 Use GitHub Actions artifacts.
 
-1. Non-Shizuku build (default)
+1. Recommended install build
 - Download artifact from the latest successful run on `main`.
-- Workflow: `Build nightly` (`.github/workflows/debug_build.yml`).
-
-2. Shizuku integration build
-- Download artifact from the latest successful run on `shizuku-integration`.
 - Workflow: `Build nightly` (`.github/workflows/debug_build.yml`).
 
 Note: action artifacts require a logged-in GitHub account.
 
 ## Shizuku Integration
 
-`shizuku-integration` branch includes privileged backend support and Tooie local API endpoints.
+Shizuku privileged backend support and Tooie local API endpoints are included in `main`.
 
 Current Tooie endpoints include:
 - `/v1/status`
