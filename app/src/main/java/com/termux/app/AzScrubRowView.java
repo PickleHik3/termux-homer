@@ -1,9 +1,10 @@
 package com.termux.app;
 
+import android.animation.ValueAnimator;
 import android.content.Context;
 import android.graphics.Canvas;
+import android.graphics.Color;
 import android.graphics.Paint;
-import android.graphics.Rect;
 import android.util.AttributeSet;
 import android.view.MotionEvent;
 
@@ -26,7 +27,10 @@ public final class AzScrubRowView extends AppCompatTextView {
     @Nullable private ScrubCallback callback;
     private int currentSelectionIndex = 0;
     private final Paint letterPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private final Rect textBounds = new Rect();
+    private float activeTouchX = -1f;
+    private float waveStrength = 0f;
+    private int accentColor = Color.WHITE;
+    @Nullable private ValueAnimator settleAnimator;
 
     public AzScrubRowView(Context context) {
         super(context);
@@ -65,17 +69,33 @@ public final class AzScrubRowView extends AppCompatTextView {
         float height = getHeight();
         if (width <= 0 || height <= 0) return;
 
-        letterPaint.setColor(getCurrentTextColor());
-        letterPaint.setTextSize(getTextSize());
+        int baseColor = getCurrentTextColor();
+        letterPaint.setColor(baseColor);
+        float baseTextSize = getTextSize();
+        letterPaint.setTextSize(baseTextSize);
         float contentTop = getPaddingTop();
         float contentBottom = height - getPaddingBottom();
-        Paint.FontMetrics fm = letterPaint.getFontMetrics();
-        // Center text vertically in padded content, then nudge down for optical balance.
-        float baseline = ((contentTop + contentBottom) - fm.ascent - fm.descent) * 0.5f + dp(2);
         float slot = width / Math.max(1, visibleLetters.length);
+        float anchorX = activeTouchX < 0f ? (width * 0.5f) : activeTouchX;
+        float waveAmplitude = dp(11) * waveStrength;
+        int activeIndex = (int) (anchorX / Math.max(1f, slot));
+        activeIndex = Math.max(0, Math.min(visibleLetters.length - 1, activeIndex));
 
         for (int i = 0; i < visibleLetters.length; i++) {
             float x = (slot * i) + (slot * 0.5f);
+            float distance = Math.abs(x - anchorX) / Math.max(1f, slot);
+            float envelope = (float) Math.exp(-(distance * distance) * 0.85f);
+            float waveLift = (float) Math.sin(Math.min(1f, envelope) * (Math.PI * 0.5f)) * waveAmplitude;
+            float scale = 1f + (0.22f * envelope * waveStrength);
+            letterPaint.setTextSize(baseTextSize * scale);
+            Paint.FontMetrics letterMetrics = letterPaint.getFontMetrics();
+            float baseline = ((contentTop + contentBottom) - letterMetrics.ascent - letterMetrics.descent) * 0.5f + dp(2) - waveLift;
+            if (i == activeIndex && waveStrength > 0.01f) {
+                int bright = blendColors(baseColor, accentColor, 0.68f);
+                letterPaint.setColor(bright);
+            } else {
+                letterPaint.setColor(baseColor);
+            }
             canvas.drawText(String.valueOf(visibleLetters[i]), x, baseline, letterPaint);
         }
     }
@@ -122,26 +142,61 @@ public final class AzScrubRowView extends AppCompatTextView {
         invalidate();
     }
 
+    public void setInteractionAccentColor(int color) {
+        accentColor = color;
+        invalidate();
+    }
+
     @Override
     public boolean onTouchEvent(MotionEvent event) {
         if (callback == null) return super.onTouchEvent(event);
+        float x = Math.max(0f, Math.min(getWidth(), event.getX()));
         char letter = pickLetter(event.getX());
         int selectionIndex = Math.max(0, (int) ((-event.getY()) / Math.max(12f, getHeight() / 2f)));
         currentSelectionIndex = selectionIndex;
 
         switch (event.getActionMasked()) {
             case MotionEvent.ACTION_DOWN:
+                stopSettleAnimation();
+                activeTouchX = x;
+                waveStrength = 1f;
+                invalidate();
+                callback.onScrub(letter, currentSelectionIndex, false);
+                return true;
             case MotionEvent.ACTION_MOVE:
+                activeTouchX = x;
+                waveStrength = 1f;
+                invalidate();
                 callback.onScrub(letter, currentSelectionIndex, false);
                 return true;
             case MotionEvent.ACTION_UP:
                 callback.onScrub(letter, currentSelectionIndex, false);
+                animateWaveRelease();
                 return true;
             case MotionEvent.ACTION_CANCEL:
                 callback.onCancel();
+                animateWaveRelease();
                 return true;
             default:
                 return super.onTouchEvent(event);
+        }
+    }
+
+    private void animateWaveRelease() {
+        stopSettleAnimation();
+        settleAnimator = ValueAnimator.ofFloat(waveStrength, 0f);
+        settleAnimator.setDuration(165L);
+        settleAnimator.addUpdateListener(animation -> {
+            waveStrength = (float) animation.getAnimatedValue();
+            invalidate();
+        });
+        settleAnimator.start();
+    }
+
+    private void stopSettleAnimation() {
+        if (settleAnimator != null) {
+            settleAnimator.cancel();
+            settleAnimator = null;
         }
     }
 
@@ -151,5 +206,14 @@ public final class AzScrubRowView extends AppCompatTextView {
         int index = (int) ((x / width) * len);
         index = Math.max(0, Math.min(len - 1, index));
         return visibleLetters[index];
+    }
+
+    private static int blendColors(int from, int to, float ratio) {
+        float t = Math.max(0f, Math.min(1f, ratio));
+        int a = (int) (Color.alpha(from) + (Color.alpha(to) - Color.alpha(from)) * t);
+        int r = (int) (Color.red(from) + (Color.red(to) - Color.red(from)) * t);
+        int g = (int) (Color.green(from) + (Color.green(to) - Color.green(from)) * t);
+        int b = (int) (Color.blue(from) + (Color.blue(to) - Color.blue(from)) * t);
+        return Color.argb(a, r, g, b);
     }
 }

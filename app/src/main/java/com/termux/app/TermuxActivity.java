@@ -820,6 +820,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         int base = ContextCompat.getColor(this, R.color.menu_accent);
         int muted = mutedMonetShade(base);
         mAzScrubRowView.setTextColor(muted);
+        mAzScrubRowView.setInteractionAccentColor(base);
         mAzScrubRowView.setBackgroundColor(Color.TRANSPARENT);
     }
 
