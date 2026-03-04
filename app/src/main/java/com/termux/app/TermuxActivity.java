@@ -202,6 +202,17 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
     private boolean mIsOnResumeAfterOnCreate = false;
 
     /**
+     * If service connected before activity became visible and bootstrap/session start should be retried onStart().
+     */
+    private boolean mPendingBootstrapOnStart = false;
+
+    /**
+     * Launch intent captured when bootstrap/session start is deferred to onStart().
+     */
+    @Nullable
+    private Intent mPendingLaunchIntent;
+
+    /**
      * If activity was restarted like due to call to {@link #recreate()} after receiving
      * {@link TERMUX_ACTIVITY#ACTION_RELOAD_STYLE}, system dark night mode was changed or activity
      * was killed by android.
@@ -347,6 +358,13 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         if (mIsInvalidState) return;
     
         mIsVisible = true;
+
+        if (mPendingBootstrapOnStart && mTermuxService != null && mTermuxService.isTermuxSessionsEmpty()) {
+            mPendingBootstrapOnStart = false;
+            Intent pendingIntent = mPendingLaunchIntent;
+            mPendingLaunchIntent = null;
+            startBootstrapAndSession(pendingIntent);
+        }
     
         if (mTermuxTerminalSessionActivityClient != null)
             mTermuxTerminalSessionActivityClient.onStart();
@@ -589,23 +607,16 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         setIntent(null);
         if (mTermuxService.isTermuxSessionsEmpty()) {
             if (mIsVisible) {
-                TermuxInstaller.setupBootstrapIfNeeded(TermuxActivity.this, () -> {
-                    // Activity might have been destroyed.
-                    if (mTermuxService == null)
-                        return;
-                    try {
-                        boolean launchFailsafe = false;
-                        if (intent != null && intent.getExtras() != null) {
-                            launchFailsafe = intent.getExtras().getBoolean(TERMUX_ACTIVITY.EXTRA_FAILSAFE_SESSION, false);
-                        }
-                        mTermuxTerminalSessionActivityClient.addNewSession(launchFailsafe, null);
-                    } catch (WindowManager.BadTokenException e) {
-                        // Activity finished - ignore.
-                    }
-                });
+                startBootstrapAndSession(intent);
             } else {
-                // The service connected while not in foreground - just bail out.
-                finishActivityIfNotFinishing();
+                // Service can connect before onStart() on some devices. Defer bootstrap/session creation.
+                if (mIsOnResumeAfterOnCreate) {
+                    mPendingBootstrapOnStart = true;
+                    mPendingLaunchIntent = intent;
+                } else {
+                    // Service connected while activity is actually in background - bail out.
+                    finishActivityIfNotFinishing();
+                }
             }
         } else {
             // If termux was started from launcher "New session" shortcut and activity is recreated,
@@ -621,6 +632,23 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         }
         // Update the {@link TerminalSession} and {@link TerminalEmulator} clients.
         mTermuxService.setTermuxTerminalSessionClient(mTermuxTerminalSessionActivityClient);
+    }
+
+    private void startBootstrapAndSession(@Nullable Intent intent) {
+        TermuxInstaller.setupBootstrapIfNeeded(TermuxActivity.this, () -> {
+            // Activity might have been destroyed.
+            if (mTermuxService == null)
+                return;
+            try {
+                boolean launchFailsafe = false;
+                if (intent != null && intent.getExtras() != null) {
+                    launchFailsafe = intent.getExtras().getBoolean(TERMUX_ACTIVITY.EXTRA_FAILSAFE_SESSION, false);
+                }
+                mTermuxTerminalSessionActivityClient.addNewSession(launchFailsafe, null);
+            } catch (WindowManager.BadTokenException e) {
+                // Activity finished - ignore.
+            }
+        });
     }
 
     @Override
