@@ -10,6 +10,7 @@ import android.app.AlertDialog;
 import android.content.ClipData;
 import android.content.Context;
 import android.content.Intent;
+import android.content.ComponentName;
 import android.content.pm.ChangedPackages;
 import android.content.pm.PackageManager;
 import android.graphics.ColorFilter;
@@ -674,38 +675,24 @@ public final class SuggestionBarView extends GridLayout {
             return;
         }
         Context context = getContext();
-        Intent launchIntent = new Intent(Intent.ACTION_MAIN);
-        launchIntent.addCategory(Intent.CATEGORY_LAUNCHER);
-        launchIntent.setClassName(entry.appRef.packageName, entry.appRef.activityName);
-        try {
-            if (context instanceof Activity) {
-                Activity activity = (Activity) context;
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                    ActivityOptions options = ActivityOptions.makeSceneTransitionAnimation(activity);
-                    activity.startActivity(launchIntent, options.toBundle());
-                } else {
-                    activity.startActivity(launchIntent);
-                }
-            } else {
-                launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                context.startActivity(launchIntent);
-            }
-        } catch (Exception ignored) {
-            Intent fallback = context.getPackageManager().getLaunchIntentForPackage(entry.appRef.packageName);
-            if (fallback != null) {
-                if (context instanceof Activity) {
-                    Activity activity = (Activity) context;
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                        ActivityOptions options = ActivityOptions.makeSceneTransitionAnimation(activity);
-                        activity.startActivity(fallback, options.toBundle());
-                    } else {
-                        activity.startActivity(fallback);
-                    }
-                } else {
-                    fallback.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                    context.startActivity(fallback);
-                }
-            }
+        Intent explicit = new Intent(Intent.ACTION_MAIN);
+        explicit.addCategory(Intent.CATEGORY_LAUNCHER);
+        explicit.setComponent(new ComponentName(entry.appRef.packageName, entry.appRef.activityName));
+
+        Intent pkgDefault = context.getPackageManager().getLaunchIntentForPackage(entry.appRef.packageName);
+
+        Intent resolveFallback = new Intent(Intent.ACTION_MAIN);
+        resolveFallback.addCategory(Intent.CATEGORY_LAUNCHER);
+        resolveFallback.setPackage(entry.appRef.packageName);
+        ComponentName resolved = resolveFallback.resolveActivity(context.getPackageManager());
+        if (resolved != null) {
+            resolveFallback.setComponent(resolved);
+        }
+
+        if (!tryStartActivity(context, explicit)
+            && !tryStartActivity(context, pkgDefault)
+            && !(resolved != null && tryStartActivity(context, resolveFallback))) {
+            return;
         }
 
         if (terminalView != null) {
@@ -757,12 +744,47 @@ public final class SuggestionBarView extends GridLayout {
             LauncherAppEntry exact = appDataProvider.findByRef(ref);
             if (exact != null) return exact;
         }
+        ComponentName defaultComponent = null;
+        Intent pkgDefault = getContext().getPackageManager().getLaunchIntentForPackage(ref.packageName);
+        if (pkgDefault != null) {
+            defaultComponent = pkgDefault.getComponent();
+        }
+        if (defaultComponent != null) {
+            String defaultClassName = defaultComponent.getClassName();
+            for (LauncherAppEntry entry : allApps) {
+                if (entry.appRef.packageName.equals(ref.packageName)
+                    && defaultClassName.equals(entry.appRef.activityName)) {
+                    return entry;
+                }
+            }
+        }
         for (LauncherAppEntry entry : allApps) {
             if (entry.appRef.packageName.equals(ref.packageName)) {
                 return entry;
             }
         }
         return null;
+    }
+
+    private boolean tryStartActivity(@NonNull Context context, @Nullable Intent intent) {
+        if (intent == null) return false;
+        try {
+            if (context instanceof Activity) {
+                Activity activity = (Activity) context;
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                    ActivityOptions options = ActivityOptions.makeSceneTransitionAnimation(activity);
+                    activity.startActivity(intent, options.toBundle());
+                } else {
+                    activity.startActivity(intent);
+                }
+            } else {
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                context.startActivity(intent);
+            }
+            return true;
+        } catch (Exception ignored) {
+            return false;
+        }
     }
 
     private void showUnifiedPinEditor(final int slotIndex, @Nullable final PinnedItem pinnedAtSlot) {
