@@ -15,21 +15,9 @@ If you want to recreate the broader shell/TUI environment shown in some screensh
   <img src="resources/assets/tooie.png" width="180" alt="Tooie mascot"/>
 </p>
 
-| Home | Search | Settings |
+| Home | Apps Bar | Settings |
 | --- | --- | --- |
-| ![Home](screenshots/home-screen.png) | ![Search](screenshots/app-search.png) | ![Settings](screenshots/app-settings.png) |
-
-## Download APK
-
-Use GitHub Actions artifacts.
-
-1. Recommended install build
-- Download artifact from the latest successful run on `main`.
-- Workflow: `Build nightly` (`.github/workflows/debug_build.yml`).
-
-Note: action artifacts require a logged-in GitHub account.
-
-For a tagged APK release build, use a GitHub release backed by the `Attach Debug APKs To Release` workflow.
+| ![Home](screenshots/home-screen.png) | ![Apps Bar](screenshots/app-search.png) | ![Settings](screenshots/app-settings.png) |
 
 ## Shizuku Integration
 

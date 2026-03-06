@@ -17,7 +17,7 @@
             app:key="app_launcher_input_char"
             app:title="@string/termux_app_launcher_input_char_title"
             app:summary="@string/termux_app_launcher_input_char_summary"
-            android:defaultValue=""
+            android:defaultValue="/"
             android:inputType="text" />
     </PreferenceCategory>
 
