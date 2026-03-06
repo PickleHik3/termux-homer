@@ -19,10 +19,6 @@ If you want to recreate the broader shell/TUI environment shown in some screensh
 | --- | --- | --- |
 | ![Home](screenshots/home-screen.png) | ![Search](screenshots/app-search.png) | ![Settings](screenshots/app-settings.png) |
 
-| Blur Home | Shelf | Terminal Environment |
-| --- | --- | --- |
-| ![Blur Home](screenshots/home-screen-blur.png) | ![Tooie Shelf](screenshots/TUI-tooie-shelf.png) | ![Shell Env](screenshots/shell-env.png) |
-
 ## Download APK
 
 Use GitHub Actions artifacts.
@@ -68,6 +64,15 @@ COMPILE_SDK_OVERRIDE=34 ./gradlew \
 ## Upstream Base
 
 - Upstream Termux app: https://github.com/termux/termux-app
+
+## Acknowledgements
+
+- `TEL`: launcher direction and launcher-focused Termux experimentation
+  https://github.com/t-e-l/tel
+- `termux-monet`: wallpaper-driven theming direction and related customization ideas
+  https://github.com/Termux-Monet/termux-monet
+- `termux-app`: upstream Android app base this fork builds on
+  https://github.com/termux/termux-app
 
 ## Companion Apps (Forks)
 
