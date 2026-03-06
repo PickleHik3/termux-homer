@@ -4,9 +4,15 @@ import android.app.ActivityManager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.pm.ActivityInfo;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
+import android.content.pm.ResolveInfo;
+import android.graphics.Bitmap;
+import android.graphics.Canvas;
+import android.graphics.drawable.BitmapDrawable;
+import android.graphics.drawable.Drawable;
 import android.media.AudioManager;
 import android.os.BatteryManager;
 import android.os.StatFs;
@@ -32,6 +38,7 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.net.InetAddress;
 import java.net.ServerSocket;
@@ -158,76 +165,97 @@ public class TooieApiServer {
     private void handleClient(Socket socket, Context context) {
         try (Socket client = socket;
              BufferedInputStream input = new BufferedInputStream(client.getInputStream());
-             BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(client.getOutputStream(), StandardCharsets.UTF_8))) {
+             OutputStream output = client.getOutputStream()) {
             client.setSoTimeout(CLIENT_SOCKET_TIMEOUT_MS);
 
             HttpRequest request;
             try {
                 request = parseRequest(input);
             } catch (HttpParseException e) {
-                writeResponse(writer, e.statusCode, jsonError(e.errorCode, e.getMessage()).toString());
+                writeJsonResponse(output, e.statusCode, jsonError(e.errorCode, e.getMessage()).toString());
                 return;
             }
 
             if (!isAuthorized(request.headers)) {
-                writeResponse(writer, 401, jsonError("unauthorized", "Missing or invalid token").toString());
+                writeJsonResponse(output, 401, jsonError("unauthorized", "Missing or invalid token").toString());
                 return;
             }
 
             if (!allowRequest(request)) {
-                writeResponse(writer, 429, jsonError("rate_limited", "Too many requests; retry later").toString());
+                writeJsonResponse(output, 429, jsonError("rate_limited", "Too many requests; retry later").toString());
                 return;
             }
 
-            JSONObject response = routeRequest(context, request);
-            int statusCode = response.optInt("_statusCode", 200);
-            response.remove("_statusCode");
-            writeResponse(writer, statusCode, response.toString());
+            HttpResponse response = routeRequest(context, request);
+            writeResponse(output, response);
 
         } catch (Exception e) {
             Logger.logErrorExtended(LOG_TAG, "Request handling failed: " + e.getMessage());
         }
     }
 
-    private JSONObject routeRequest(Context context, HttpRequest request) {
+    private HttpResponse routeRequest(Context context, HttpRequest request) {
         try {
             if ("GET".equals(request.method) && "/v1/status".equals(request.path)) {
-                return buildStatus();
+                return jsonResponse(buildStatus());
             } else if ("GET".equals(request.method) && "/v1/apps".equals(request.path)) {
-                return buildApps(context);
+                return jsonResponse(buildApps(context));
+            } else if ("GET".equals(request.method) && isAppIconPath(request.path)) {
+                return buildAppIconResponse(context, extractPackageNameFromIconPath(request.path));
             } else if ("GET".equals(request.method) && "/v1/system/resources".equals(request.path)) {
-                return buildSystemResources(context);
+                return jsonResponse(buildSystemResources(context));
             } else if ("GET".equals(request.method) && "/v1/media/now-playing".equals(request.path)) {
-                return buildNowPlaying();
+                return jsonResponse(buildNowPlaying());
             } else if ("GET".equals(request.method) && "/v1/media/art".equals(request.path)) {
-                return buildNowPlayingArt();
+                return jsonResponse(buildNowPlayingArt());
             } else if ("GET".equals(request.method) && "/v1/notifications".equals(request.path)) {
-                return buildNotifications();
+                return jsonResponse(buildNotifications());
             } else if ("POST".equals(request.method) && "/v1/exec".equals(request.path)) {
-                return runExec(context, request.body);
+                return jsonResponse(runExec(context, request.body));
             } else if ("POST".equals(request.method) && "/v1/system/brightness".equals(request.path)) {
-                return runBrightness(context, request.body);
+                return jsonResponse(runBrightness(context, request.body));
             } else if ("POST".equals(request.method) && "/v1/system/volume".equals(request.path)) {
-                return runVolume(context, request.body);
+                return jsonResponse(runVolume(context, request.body));
             } else if ("POST".equals(request.method) && "/v1/privileged/request-permission".equals(request.path)) {
-                return requestPrivilegedPermission(context);
+                return jsonResponse(requestPrivilegedPermission(context));
             } else if ("POST".equals(request.method) && "/v1/screen/lock".equals(request.path)) {
-                return runLockScreen(context);
+                return jsonResponse(runLockScreen(context));
             } else if ("POST".equals(request.method) && "/v1/auth/rotate".equals(request.path)) {
-                return rotateAuthToken();
+                return jsonResponse(rotateAuthToken());
             }
 
             JSONObject notFound = jsonError("not_found", "Unknown endpoint");
             notFound.put("_statusCode", 404);
-            return notFound;
+            return jsonResponse(notFound);
         } catch (Exception e) {
             JSONObject error = jsonError("internal_error", e.getMessage());
             try {
                 error.put("_statusCode", 500);
             } catch (JSONException ignored) {
             }
-            return error;
+            return jsonResponse(error);
         }
+    }
+
+    private HttpResponse buildAppIconResponse(Context context, String packageName) throws JSONException {
+        if (packageName == null || packageName.trim().isEmpty()) {
+            JSONObject error = jsonError("bad_request", "Missing package name");
+            error.put("_statusCode", 400);
+            return jsonResponse(error);
+        }
+
+        byte[] pngBytes = findLauncherIconPng(context, packageName.trim());
+        if (pngBytes == null || pngBytes.length == 0) {
+            JSONObject error = jsonError("not_found", "No launcher icon found for package");
+            error.put("_statusCode", 404);
+            error.put("packageName", packageName);
+            return jsonResponse(error);
+        }
+
+        Map<String, String> headers = new HashMap<>();
+        headers.put("Cache-Control", "private, max-age=300");
+        headers.put("X-Package-Name", packageName);
+        return new HttpResponse(200, "image/png", pngBytes, headers);
     }
 
     private JSONObject buildStatus() throws JSONException {
@@ -664,6 +692,9 @@ public class TooieApiServer {
 
     private boolean allowRequest(HttpRequest request) {
         SimpleRateLimiter limiter = rateLimiters.get(request.method + ":" + request.path);
+        if (limiter == null && "GET".equals(request.method) && isAppIconPath(request.path)) {
+            limiter = rateLimiters.get("GET:/v1/apps/icon/*");
+        }
         return limiter == null || limiter.allow();
     }
 
@@ -761,15 +792,27 @@ public class TooieApiServer {
         return trimmed;
     }
 
-    private void writeResponse(BufferedWriter writer, int statusCode, String body) throws IOException {
+    private void writeJsonResponse(OutputStream output, int statusCode, String body) throws IOException {
         byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
-        writer.write("HTTP/1.1 " + statusCode + " " + statusMessage(statusCode) + "\r\n");
-        writer.write("Content-Type: application/json; charset=utf-8\r\n");
+        writeResponse(output, new HttpResponse(statusCode, "application/json; charset=utf-8", bytes, null));
+    }
+
+    private void writeResponse(OutputStream output, HttpResponse response) throws IOException {
+        BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(output, StandardCharsets.UTF_8));
+        byte[] bytes = response.body;
+        writer.write("HTTP/1.1 " + response.statusCode + " " + statusMessage(response.statusCode) + "\r\n");
+        writer.write("Content-Type: " + response.contentType + "\r\n");
         writer.write("Connection: close\r\n");
         writer.write("Content-Length: " + bytes.length + "\r\n");
+        if (response.headers != null) {
+            for (Map.Entry<String, String> entry : response.headers.entrySet()) {
+                writer.write(entry.getKey() + ": " + entry.getValue() + "\r\n");
+            }
+        }
         writer.write("\r\n");
-        writer.write(body);
         writer.flush();
+        output.write(bytes);
+        output.flush();
     }
 
     private String statusMessage(int code) {
@@ -810,6 +853,7 @@ public class TooieApiServer {
         rateLimiters.clear();
         rateLimiters.put("GET:/v1/status", new SimpleRateLimiter(120, 60_000));
         rateLimiters.put("GET:/v1/apps", new SimpleRateLimiter(60, 60_000));
+        rateLimiters.put("GET:/v1/apps/icon/*", new SimpleRateLimiter(120, 60_000));
         rateLimiters.put("GET:/v1/system/resources", new SimpleRateLimiter(120, 60_000));
         rateLimiters.put("GET:/v1/media/now-playing", new SimpleRateLimiter(120, 60_000));
         rateLimiters.put("GET:/v1/media/art", new SimpleRateLimiter(60, 60_000));
@@ -1019,6 +1063,84 @@ public class TooieApiServer {
             }
             return output.toByteArray();
         }
+    }
+
+    private HttpResponse jsonResponse(JSONObject response) {
+        int statusCode = response.optInt("_statusCode", 200);
+        response.remove("_statusCode");
+        return new HttpResponse(statusCode, "application/json; charset=utf-8",
+            response.toString().getBytes(StandardCharsets.UTF_8), null);
+    }
+
+    private boolean isAppIconPath(String path) {
+        if (path == null || path.isEmpty()) return false;
+        if (path.startsWith("/v1/apps/icon/")) {
+            return path.length() > "/v1/apps/icon/".length();
+        }
+        if (!path.startsWith("/v1/apps/") || !path.endsWith("/icon")) {
+            return false;
+        }
+        return path.length() > "/v1/apps/".length() + "/icon".length();
+    }
+
+    private String extractPackageNameFromIconPath(String path) {
+        if (path == null) return "";
+        if (path.startsWith("/v1/apps/icon/")) {
+            return path.substring("/v1/apps/icon/".length());
+        }
+        if (path.startsWith("/v1/apps/") && path.endsWith("/icon")) {
+            return path.substring("/v1/apps/".length(), path.length() - "/icon".length());
+        }
+        return "";
+    }
+
+    private byte[] findLauncherIconPng(Context context, String packageName) {
+        if (context == null || packageName == null || packageName.isEmpty()) {
+            return null;
+        }
+
+        PackageManager packageManager = context.getPackageManager();
+        Intent launcherIntent = new Intent(Intent.ACTION_MAIN, null);
+        launcherIntent.addCategory(Intent.CATEGORY_LAUNCHER);
+        List<ResolveInfo> launchables = packageManager.queryIntentActivities(launcherIntent, 0);
+
+        for (ResolveInfo resolveInfo : launchables) {
+            ActivityInfo activityInfo = resolveInfo.activityInfo;
+            if (activityInfo == null || activityInfo.packageName == null) continue;
+            if (!packageName.equals(activityInfo.packageName)) continue;
+            Drawable icon = activityInfo.loadIcon(packageManager);
+            if (icon == null) continue;
+            return drawableToPngBytes(icon);
+        }
+
+        try {
+            Drawable icon = packageManager.getApplicationIcon(packageName);
+            return drawableToPngBytes(icon);
+        } catch (PackageManager.NameNotFoundException ignored) {
+            return null;
+        }
+    }
+
+    private byte[] drawableToPngBytes(Drawable drawable) {
+        if (drawable == null) return null;
+
+        Bitmap bitmap;
+        if (drawable instanceof BitmapDrawable && ((BitmapDrawable) drawable).getBitmap() != null) {
+            bitmap = ((BitmapDrawable) drawable).getBitmap();
+        } else {
+            int width = Math.max(1, drawable.getIntrinsicWidth());
+            int height = Math.max(1, drawable.getIntrinsicHeight());
+            bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+            Canvas canvas = new Canvas(bitmap);
+            drawable.setBounds(0, 0, canvas.getWidth(), canvas.getHeight());
+            drawable.draw(canvas);
+        }
+
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        if (!bitmap.compress(Bitmap.CompressFormat.PNG, 100, output)) {
+            return null;
+        }
+        return output.toByteArray();
     }
 
     private Map<String, Long> readMemInfoKb() {
@@ -1494,6 +1616,20 @@ public class TooieApiServer {
         String path;
         Map<String, String> headers;
         String body;
+    }
+
+    private static class HttpResponse {
+        final int statusCode;
+        final String contentType;
+        final byte[] body;
+        final Map<String, String> headers;
+
+        HttpResponse(int statusCode, String contentType, byte[] body, Map<String, String> headers) {
+            this.statusCode = statusCode;
+            this.contentType = contentType;
+            this.body = body != null ? body : new byte[0];
+            this.headers = headers;
+        }
     }
 
     private static class HttpParseException extends Exception {
