@@ -117,10 +117,23 @@ public class TermuxAppSharedPreferences extends AppSharedPreferences {
     }
 
     public String getAppLauncherInputChar() {
-        return SharedPreferenceUtils.getString(mSharedPreferences, TERMUX_APP.KEY_APP_LAUNCHER_INPUT_CHAR, TERMUX_APP.DEFAULT_APP_LAUNCHER_INPUT_CHAR, true);
+        String value = SharedPreferenceUtils.getString(
+            mSharedPreferences,
+            TERMUX_APP.KEY_APP_LAUNCHER_INPUT_CHAR,
+            TERMUX_APP.DEFAULT_APP_LAUNCHER_INPUT_CHAR,
+            true
+        );
+        if (value == null || value.trim().isEmpty()) {
+            value = TERMUX_APP.DEFAULT_APP_LAUNCHER_INPUT_CHAR;
+            SharedPreferenceUtils.setString(mSharedPreferences, TERMUX_APP.KEY_APP_LAUNCHER_INPUT_CHAR, value, false);
+        }
+        return value;
     }
 
     public void setAppLauncherInputChar(String value) {
+        if (value == null || value.trim().isEmpty()) {
+            value = TERMUX_APP.DEFAULT_APP_LAUNCHER_INPUT_CHAR;
+        }
         SharedPreferenceUtils.setString(mSharedPreferences, TERMUX_APP.KEY_APP_LAUNCHER_INPUT_CHAR, value, false);
     }
 
