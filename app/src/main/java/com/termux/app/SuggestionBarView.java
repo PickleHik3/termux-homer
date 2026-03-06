@@ -3,7 +3,9 @@ package com.termux.app;
 import android.annotation.SuppressLint;
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
+import android.animation.ArgbEvaluator;
 import android.animation.ObjectAnimator;
+import android.animation.ValueAnimator;
 import android.app.Activity;
 import android.app.ActivityOptions;
 import android.app.AlertDialog;
@@ -35,7 +37,6 @@ import android.view.ViewParent;
 import android.view.WindowManager;
 import android.view.animation.AccelerateInterpolator;
 import android.view.animation.DecelerateInterpolator;
-import android.view.animation.LinearInterpolator;
 import android.view.animation.OvershootInterpolator;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
@@ -551,13 +552,15 @@ public final class SuggestionBarView extends GridLayout {
 
         if (showEmptyPinnedHint) {
             TextView hint = new TextView(getContext());
-            hint.setText("Long-press here to pin your favorite apps");
-            hint.setTextColor(0x99B8B8B8);
+            hint.setText(R.string.termux_app_launcher_empty_pinned_hint);
+            hint.setTextColor(resolvePinnedHintBaseColor());
             hint.setTextSize(11f);
-            hint.setTypeface(Typeface.create(Typeface.DEFAULT, Typeface.ITALIC));
+            hint.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
+            hint.setLetterSpacing(0.03f);
             hint.setGravity(Gravity.CENTER);
             hint.setSingleLine(true);
             hint.setPadding(dp(6), 0, dp(6), 0);
+            hint.setAlpha(0.92f);
             GridLayout.LayoutParams hintParams = createSlotParams(0);
             hintParams.columnSpec = GridLayout.spec(0, Math.max(1, buttonCount), 1f);
             hintParams.width = 0;
@@ -566,7 +569,7 @@ public final class SuggestionBarView extends GridLayout {
                 showUnifiedPinEditor(0, null);
                 return true;
             });
-            applyPinnedHintAnimation(hint);
+            applyPinnedHintShimmer(hint);
             addView(hint);
             for (int i = 1; i < buttonCount; i++) {
                 ImageButton filler = new ImageButton(getContext(), null, android.R.attr.buttonBarButtonStyle);
@@ -605,21 +608,49 @@ public final class SuggestionBarView extends GridLayout {
         }
     }
 
-    private void applyPinnedHintAnimation(@NonNull TextView hintView) {
-        ObjectAnimator shimmerX = ObjectAnimator.ofFloat(hintView, View.TRANSLATION_X, -dp(10), dp(10));
-        shimmerX.setDuration(1700L);
-        shimmerX.setRepeatCount(ObjectAnimator.INFINITE);
-        shimmerX.setRepeatMode(ObjectAnimator.REVERSE);
-        shimmerX.setInterpolator(new LinearInterpolator());
+    private void applyPinnedHintShimmer(@NonNull TextView hintView) {
+        final int baseColor = resolvePinnedHintBaseColor();
+        final int shimmerColor = blendColors(baseColor, TEXT_COLOR, 0.24f);
+        ValueAnimator shimmer = ValueAnimator.ofObject(new ArgbEvaluator(), baseColor, shimmerColor, baseColor);
+        shimmer.setDuration(3200L);
+        shimmer.setRepeatCount(ValueAnimator.INFINITE);
+        shimmer.setRepeatMode(ValueAnimator.RESTART);
+        shimmer.addUpdateListener(animation -> hintView.setTextColor((Integer) animation.getAnimatedValue()));
+        hintView.addOnAttachStateChangeListener(new OnAttachStateChangeListener() {
+            @Override
+            public void onViewAttachedToWindow(View v) {
+                if (!shimmer.isStarted()) {
+                    shimmer.start();
+                }
+            }
 
-        ObjectAnimator shimmerAlpha = ObjectAnimator.ofFloat(hintView, View.ALPHA, 0.45f, 0.8f, 0.45f);
-        shimmerAlpha.setDuration(1700L);
-        shimmerAlpha.setRepeatCount(ObjectAnimator.INFINITE);
-        shimmerAlpha.setRepeatMode(ObjectAnimator.RESTART);
-        shimmerAlpha.setInterpolator(new LinearInterpolator());
+            @Override
+            public void onViewDetachedFromWindow(View v) {
+                shimmer.cancel();
+            }
+        });
+        shimmer.start();
+    }
 
-        shimmerX.start();
-        shimmerAlpha.start();
+    private int resolvePinnedHintBaseColor() {
+        return blendColors(inheritedTintColor, 0xFFE1DED5, 0.58f);
+    }
+
+    private static int blendColors(int from, int to, float ratio) {
+        float clamped = Math.max(0f, Math.min(1f, ratio));
+        int fromA = (from >> 24) & 0xFF;
+        int fromR = (from >> 16) & 0xFF;
+        int fromG = (from >> 8) & 0xFF;
+        int fromB = from & 0xFF;
+        int toA = (to >> 24) & 0xFF;
+        int toR = (to >> 16) & 0xFF;
+        int toG = (to >> 8) & 0xFF;
+        int toB = to & 0xFF;
+        int outA = Math.round(fromA + ((toA - fromA) * clamped));
+        int outR = Math.round(fromR + ((toR - fromR) * clamped));
+        int outG = Math.round(fromG + ((toG - fromG) * clamped));
+        int outB = Math.round(fromB + ((toB - fromB) * clamped));
+        return (outA << 24) | (outR << 16) | (outG << 8) | outB;
     }
 
     private View createEntryButton(@NonNull LauncherAppEntry entry) {

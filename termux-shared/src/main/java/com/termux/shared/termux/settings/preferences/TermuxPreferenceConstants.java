@@ -149,7 +149,7 @@ public final class TermuxPreferenceConstants {
          */
         public static final String KEY_APP_LAUNCHER_BAR_HEIGHT = "app_launcher_bar_height";
 
-        public static final float DEFAULT_APP_LAUNCHER_BAR_HEIGHT = 1.2f;
+        public static final float DEFAULT_APP_LAUNCHER_BAR_HEIGHT = 1.45f;
 
         /**
          * Defines the key for app launcher show icons.
@@ -170,7 +170,7 @@ public final class TermuxPreferenceConstants {
          */
         public static final String KEY_APP_LAUNCHER_ICON_SCALE = "app_launcher_icon_scale";
 
-        public static final float DEFAULT_APP_LAUNCHER_ICON_SCALE = 1.0f;
+        public static final float DEFAULT_APP_LAUNCHER_ICON_SCALE = 1.55f;
 
         /**
          * Defines the key for typed pinned apps/folders launcher configuration.

@@ -170,6 +170,7 @@
 
     <string name="termux_launcher_preferences_title">Apps Bar</string>
     <string name="termux_launcher_preferences_summary">Search, icons, and visual settings for the apps bar</string>
+    <string name="termux_app_launcher_empty_pinned_hint">Long press to pin Apps</string>
     <string name="termux_launcher_search_preferences_summary">Configure launcher search behavior and default pinned apps</string>
     <string name="termux_launcher_layout_preferences_summary">Configure launcher bar layout and sizing</string>
     <string name="termux_launcher_icons_header">Launcher: Icons</string>

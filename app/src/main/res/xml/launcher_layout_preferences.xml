@@ -16,7 +16,7 @@
         app:summary="@string/termux_app_launcher_bar_height_summary"
         app:min="60"
         android:max="220"
-        android:defaultValue="120"
+        android:defaultValue="145"
         app:showSeekBarValue="true" />
 
     <androidx.preference.SeekBarPreference
@@ -25,7 +25,7 @@
         app:summary="@string/termux_app_launcher_icon_scale_summary"
         app:min="100"
         android:max="180"
-        android:defaultValue="100"
+        android:defaultValue="155"
         app:showSeekBarValue="true" />
 
 </PreferenceScreen>
