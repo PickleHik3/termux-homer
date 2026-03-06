@@ -5,6 +5,10 @@ Android launcher and terminal app fork based on Termux, focused on launcher UX a
 This repository now contains only Android app source and related app assets.
 Shell dotfiles/config bundles (tmux, fish, nvim) are intentionally not part of this repo.
 
+If you want to recreate the broader shell/TUI environment shown in some screenshots, use the optional Tooie companion repo:
+
+- https://github.com/PickleHik3/tooie
+
 ## Screenshots
 
 <p align="center">
@@ -28,6 +32,8 @@ Use GitHub Actions artifacts.
 - Workflow: `Build nightly` (`.github/workflows/debug_build.yml`).
 
 Note: action artifacts require a logged-in GitHub account.
+
+For a tagged APK release build, use a GitHub release backed by the `Attach Debug APKs To Release` workflow.
 
 ## Shizuku Integration
 
