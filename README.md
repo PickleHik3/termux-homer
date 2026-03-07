@@ -1,13 +1,17 @@
 # Termux Launcher
 
-Android launcher and terminal app fork based on Termux, focused on launcher UX and privileged integrations.
+Personal proof of concept Termux as an Android launcher which i vibe coded for myself. Heavily inspired by [TEL](https://github.com/t-e-l/tel), forked from [termux-monet](https://github.com/Termux-Monet/termux-monet). If you like the idea and you are a real developer, please i urge you to take this idea to make a real android launcher. :)
 
-This repository now contains only Android app source and related app assets.
-Shell dotfiles/config bundles (tmux, fish, nvim) are intentionally not part of this repo.
+Download it from [releases](https://github.com/PickleHik3/termux-launcher/releases). The companion apps are available at [termux-styling](https://github.com/PickleHik3/termux-styling/releases) and [termux-api](https://github.com/PickleHik3/termux-api/releases/tag/v0.53.0).
 
-If you want to recreate the broader shell/TUI environment shown in some screenshots, use the optional Tooie companion repo:
+It will work OOB with just with above apk's, if you want to take advantage of the shizuku backend for various stuff, run the bootstrap script from [tooie](https://github.com/PickleHik3/tooie). 
 
-- https://github.com/PickleHik3/tooie
+## Some Quirks
+- if you exit out of the shell by typing "exit" while the app is set as the home launcher, it will become stuttery and unusable, to fix: either force stop termux:launcher from the android apps settings page or if you installed the [tooie](https://github.com/PickleHik3/tooie) then you can do 'tooie --restart' which does the same thing.
+- Recommended to install [shizuku](https://github.com/rikkaapps/shizuku) to get the live system stats and other features (such as launching android apps from within the shell) from [tooie](https://github.com/PickleHik3/tooie).
+- Recommeded to install [unexpected-keyboard](https://github.com/Julow/Unexpected-Keyboard) if you want to make your life easier working with tmux.
+- for launching apps from the apps bar, shizuku is NOT required.
+- by default, typing '/' into the shell will start the android apps search in the apps bar. you can change the specific character from settings > Appsbar > Input split character
 
 ## Screenshots
 
@@ -64,9 +68,7 @@ COMPILE_SDK_OVERRIDE=34 ./gradlew \
 
 ## Companion Apps (Forks)
 
-Use companion apps from this project owner to match launcher signing/source:
+Use below companion apps to avoid shared UID/signature incompatibility.
 
 - Termux:API fork: https://github.com/PickleHik3/termux-api
 - Termux:Styling fork: https://github.com/PickleHik3/termux-styling
-
-Install launcher + companion apps from the same source set to avoid shared UID/signature incompatibility.
