@@ -36,9 +36,7 @@ jobs:
         run: |
           exit_on_error() {
               echo "$1"
-              echo "Deleting '$RELEASE_VERSION_NAME' release and '$GITHUB_REF' tag"
-              hub release delete "$RELEASE_VERSION_NAME"
-              git push --delete origin "$GITHUB_REF"
+              echo "Release workflow aborted. Existing release/tag (if any) were left unchanged."
               exit 1
           }
 
@@ -52,11 +50,15 @@ jobs:
             exit_on_error "Release tag '$RELEASE_VERSION_PLAIN' does not match app/build.gradle versionName '$CURRENT_VERSION_NAME'."
           fi
 
+          HAS_RELEASE_SIGNING=1
           for env_var in TERMUX_RELEASE_STORE_FILE TERMUX_RELEASE_STORE_PASSWORD TERMUX_RELEASE_KEY_ALIAS TERMUX_RELEASE_KEY_PASSWORD; do
             if [ -z "${!env_var}" ]; then
-              exit_on_error "Missing required release signing environment variable: $env_var"
+              HAS_RELEASE_SIGNING=0
             fi
           done
+          if [ "$HAS_RELEASE_SIGNING" -eq 0 ]; then
+            echo "Release signing secrets not set; continuing with debug APK attachment flow only."
+          fi
 
           RELEASE_BODY="$(gh release view "$RELEASE_VERSION_NAME" --json body --jq '.body' | tr -d '[:space:]')"
           if [ -z "$RELEASE_BODY" ]; then
