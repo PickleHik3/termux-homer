@@ -44,8 +44,8 @@
 
     <application
         android:name=".app.TermuxApplication"
-        android:allowBackup="true"
-        android:fullBackupContent="true"
+        android:allowBackup="${TERMUX_APP_ALLOW_BACKUP}"
+        android:fullBackupContent="${TERMUX_APP_FULL_BACKUP_CONTENT}"
         android:banner="@drawable/banner"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/application_name"
@@ -54,8 +54,7 @@
         android:requestLegacyExternalStorage="true"
         android:hasFragileUserData="true"
         android:roundIcon="@mipmap/ic_launcher_round"
-        android:usesCleartextTraffic="true"
-        android:debuggable="true"
+        android:usesCleartextTraffic="${TERMUX_APP_USES_CLEARTEXT_TRAFFIC}"
         android:supportsRtl="false"
         android:theme="@style/Theme.TermuxApp.DayNight.DarkActionBar"
         tools:targetApi="o">

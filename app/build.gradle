@@ -20,6 +20,11 @@ android {
     def apkVersionTag = System.getenv("TERMUX_APK_VERSION_TAG") ?: ""
     def splitAPKsForDebugBuilds = System.getenv("TERMUX_SPLIT_APKS_FOR_DEBUG_BUILDS") ?: "1"
     def splitAPKsForReleaseBuilds = System.getenv("TERMUX_SPLIT_APKS_FOR_RELEASE_BUILDS") ?: "0" // F-Droid does not support split APKs #1904
+    def releaseStoreFilePath = System.getenv("TERMUX_RELEASE_STORE_FILE")
+    def releaseStorePassword = System.getenv("TERMUX_RELEASE_STORE_PASSWORD")
+    def releaseKeyAlias = System.getenv("TERMUX_RELEASE_KEY_ALIAS")
+    def releaseKeyPassword = System.getenv("TERMUX_RELEASE_KEY_PASSWORD")
+    def hasReleaseSigningConfig = releaseStoreFilePath && releaseStorePassword && releaseKeyAlias && releaseKeyPassword
 
     defaultConfig {
         minSdkVersion project.properties.minSdkVersion.toInteger()
@@ -42,7 +47,10 @@ android {
             TERMUX_FLOAT_APP_NAME  : "Termux:Float",
             TERMUX_STYLING_APP_NAME: "Termux:Styling",
             TERMUX_TASKER_APP_NAME : "Termux:Tasker",
-            TERMUX_WIDGET_APP_NAME : "Termux:Widget"
+            TERMUX_WIDGET_APP_NAME : "Termux:Widget",
+            TERMUX_APP_ALLOW_BACKUP: "false",
+            TERMUX_APP_FULL_BACKUP_CONTENT: "false",
+            TERMUX_APP_USES_CLEARTEXT_TRAFFIC: "false"
         ]
 
         splits {
@@ -63,6 +71,14 @@ android {
             storePassword 'xrj45yWGLbsO7W0v'
             keyPassword 'xrj45yWGLbsO7W0v'
         }
+        if (hasReleaseSigningConfig) {
+            release {
+                storeFile file(releaseStoreFilePath)
+                storePassword releaseStorePassword
+                keyAlias releaseKeyAlias
+                keyPassword releaseKeyPassword
+            }
+        }
     }
 
     buildTypes {
@@ -70,11 +86,25 @@ android {
             minifyEnabled true
             shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-            signingConfig signingConfigs.debug
+            debuggable false
+            if (hasReleaseSigningConfig) {
+                signingConfig signingConfigs.release
+            }
+            manifestPlaceholders = [
+                TERMUX_APP_ALLOW_BACKUP: "false",
+                TERMUX_APP_FULL_BACKUP_CONTENT: "false",
+                TERMUX_APP_USES_CLEARTEXT_TRAFFIC: "false"
+            ]
         }
 
         debug {
             signingConfig signingConfigs.debug
+            debuggable true
+            manifestPlaceholders = [
+                TERMUX_APP_ALLOW_BACKUP: "true",
+                TERMUX_APP_FULL_BACKUP_CONTENT: "true",
+                TERMUX_APP_USES_CLEARTEXT_TRAFFIC: "true"
+            ]
         }
     }
 
@@ -149,6 +179,18 @@ tasks.withType(JavaCompile) {
 task versionName {
     doLast {
         print android.defaultConfig.versionName
+    }
+}
+
+tasks.register("verifyReleaseHardening") {
+    doLast {
+        def releaseBuildType = android.buildTypes.getByName("release")
+        if (releaseBuildType.debuggable) {
+            throw new GradleException("Release build type must not be debuggable.")
+        }
+        if (releaseBuildType.signingConfig != null && releaseBuildType.signingConfig.name == "debug") {
+            throw new GradleException("Release build type must not use debug signing config.")
+        }
     }
 }
 

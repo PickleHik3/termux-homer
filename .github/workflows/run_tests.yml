@@ -28,7 +28,7 @@ jobs:
         attempts=0
         max_attempts=3
         until [ "$attempts" -ge "$max_attempts" ]; do
-          if ./gradlew :app:testDebugUnitTest :terminal-emulator:test; then
+          if ./gradlew :app:verifyReleaseHardening :app:testDebugUnitTest :terminal-emulator:test; then
             exit 0
           fi
           attempts=$((attempts + 1))
