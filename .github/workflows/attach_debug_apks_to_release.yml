@@ -84,7 +84,7 @@ jobs:
           if ! ./gradlew :app:verifyReleaseHardening :app:processReleaseMainManifest; then
             exit_on_error "Release hardening checks failed."
           fi
-          RELEASE_MANIFEST_PATH="$(find ./app/build/intermediates/merged_manifests -path '*/release/AndroidManifest.xml' | head -n 1)"
+          RELEASE_MANIFEST_PATH="$(find ./app/build/intermediates -name AndroidManifest.xml | grep -E '/release(/|$)' | head -n 1)"
           if [ -z "$RELEASE_MANIFEST_PATH" ] || ! test -f "$RELEASE_MANIFEST_PATH"; then
             exit_on_error "Could not locate merged release manifest for non-debuggable validation."
           fi
