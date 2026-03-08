@@ -8,6 +8,7 @@ import android.os.Build;
 import android.view.View;
 import android.view.WindowInsets;
 import android.view.WindowManager;
+import android.view.WindowInsetsController;
 import android.view.inputmethod.InputMethodManager;
 import androidx.annotation.NonNull;
 import androidx.annotation.RequiresApi;
@@ -66,9 +67,20 @@ public class KeyboardUtils {
     public static void showSoftKeyboard(final Context context, final View view) {
         if (context == null || view == null)
             return;
+        view.requestFocus();
         InputMethodManager inputMethodManager = (InputMethodManager) context.getSystemService(Context.INPUT_METHOD_SERVICE);
-        if (inputMethodManager != null)
+        if (inputMethodManager != null) {
             inputMethodManager.showSoftInput(view, 0);
+        }
+        if (context instanceof Activity && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            Activity activity = (Activity) context;
+            if (activity.getWindow() != null) {
+                WindowInsetsController insetsController = activity.getWindow().getInsetsController();
+                if (insetsController != null) {
+                    insetsController.show(WindowInsets.Type.ime());
+                }
+            }
+        }
     }
 
     public static void hideSoftKeyboard(final Context context, final View view) {

@@ -299,6 +299,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
             mIsInvalidState = true;
             return;
         }
+        mPreferences.migrateTerminalMarginAdjustmentDefaultIfNeeded();
         setMargins();
         setSuggestionBarView();
         mTermuxActivityRootView = findViewById(R.id.activity_termux_root_view);

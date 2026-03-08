@@ -32,6 +32,10 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
+      - name: Execute tests
+        run: |
+          ./gradlew :app:testDebugUnitTest :terminal-emulator:test
+
       - name: Build APKs
         shell: bash {0}
         env:

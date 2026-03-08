@@ -224,6 +224,31 @@ public class TermuxAppSharedPreferences extends AppSharedPreferences {
         SharedPreferenceUtils.setBoolean(mSharedPreferences, TERMUX_APP.KEY_TERMINAL_MARGIN_ADJUSTMENT, value, false);
     }
 
+    public void migrateTerminalMarginAdjustmentDefaultIfNeeded() {
+        if (mSharedPreferences == null)
+            return;
+
+        boolean migrationDone = SharedPreferenceUtils.getBoolean(
+            mSharedPreferences,
+            TERMUX_APP.KEY_TERMINAL_MARGIN_ADJUSTMENT_DEFAULT_MIGRATION_DONE,
+            TERMUX_APP.DEFAULT_TERMINAL_MARGIN_ADJUSTMENT_DEFAULT_MIGRATION_DONE
+        );
+        if (migrationDone)
+            return;
+
+        boolean hasStoredValue = mSharedPreferences.contains(TERMUX_APP.KEY_TERMINAL_MARGIN_ADJUSTMENT);
+        if (!hasStoredValue || !isTerminalMarginAdjustmentEnabled()) {
+            setTerminalMarginAdjustment(true);
+        }
+
+        SharedPreferenceUtils.setBoolean(
+            mSharedPreferences,
+            TERMUX_APP.KEY_TERMINAL_MARGIN_ADJUSTMENT_DEFAULT_MIGRATION_DONE,
+            true,
+            false
+        );
+    }
+
     public boolean isSoftKeyboardEnabled() {
         return SharedPreferenceUtils.getBoolean(mSharedPreferences, TERMUX_APP.KEY_SOFT_KEYBOARD_ENABLED, TERMUX_APP.DEFAULT_VALUE_KEY_SOFT_KEYBOARD_ENABLED);
     }
