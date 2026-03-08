@@ -29,6 +29,10 @@ jobs:
         shell: bash {0}
         env:
           PACKAGE_VARIANT: ${{ matrix.package_variant }}
+          TERMUX_RELEASE_STORE_FILE: ${{ secrets.TERMUX_RELEASE_STORE_FILE }}
+          TERMUX_RELEASE_STORE_PASSWORD: ${{ secrets.TERMUX_RELEASE_STORE_PASSWORD }}
+          TERMUX_RELEASE_KEY_ALIAS: ${{ secrets.TERMUX_RELEASE_KEY_ALIAS }}
+          TERMUX_RELEASE_KEY_PASSWORD: ${{ secrets.TERMUX_RELEASE_KEY_PASSWORD }}
         run: |
           exit_on_error() {
               echo "$1"
@@ -40,17 +44,51 @@ jobs:
 
           echo "Setting vars"
           RELEASE_VERSION_NAME="${GITHUB_REF/refs\/tags\//}"
+          RELEASE_VERSION_PLAIN="${RELEASE_VERSION_NAME/v/}"
+          CURRENT_VERSION_NAME_REGEX='\s+versionName "([^"]+)"$'
+          CURRENT_VERSION_NAME="$(grep -m 1 -E "$CURRENT_VERSION_NAME_REGEX" ./app/build.gradle | sed -r "s/$CURRENT_VERSION_NAME_REGEX/\1/")"
+
+          if [ "$RELEASE_VERSION_PLAIN" != "$CURRENT_VERSION_NAME" ]; then
+            exit_on_error "Release tag '$RELEASE_VERSION_PLAIN' does not match app/build.gradle versionName '$CURRENT_VERSION_NAME'."
+          fi
+
+          for env_var in TERMUX_RELEASE_STORE_FILE TERMUX_RELEASE_STORE_PASSWORD TERMUX_RELEASE_KEY_ALIAS TERMUX_RELEASE_KEY_PASSWORD; do
+            if [ -z "${!env_var}" ]; then
+              exit_on_error "Missing required release signing environment variable: $env_var"
+            fi
+          done
+
+          RELEASE_BODY="$(gh release view "$RELEASE_VERSION_NAME" --json body --jq '.body' | tr -d '[:space:]')"
+          if [ -z "$RELEASE_BODY" ]; then
+            exit_on_error "Release notes are empty for '$RELEASE_VERSION_NAME'. Add changelog/release notes before attaching APKs."
+          fi
+
           if ! printf "%s" "${RELEASE_VERSION_NAME/v/}" | grep -qP '^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$'; then
            exit_on_error "The versionName '${RELEASE_VERSION_NAME/v/}' is not a valid version as per semantic version '2.0.0' spec in the format 'major.minor.patch(-prerelease)(+buildmetadata)'. https://semver.org/spec/v2.0.0.html."
           fi
 
           APK_DIR_PATH="./app/build/outputs/apk/debug"
-          APK_VERSION_TAG="$RELEASE_VERSION_NAME+${{ env.PACKAGE_VARIANT }}-github-debug"
+          APK_VERSION_TAG="$RELEASE_VERSION_NAME+$PACKAGE_VARIANT-github-debug"
           APK_BASENAME_PREFIX="termux-app_$APK_VERSION_TAG"
+
+          export TERMUX_RELEASE_STORE_FILE="${TERMUX_RELEASE_STORE_FILE}"
+          export TERMUX_RELEASE_STORE_PASSWORD="${TERMUX_RELEASE_STORE_PASSWORD}"
+          export TERMUX_RELEASE_KEY_ALIAS="${TERMUX_RELEASE_KEY_ALIAS}"
+          export TERMUX_RELEASE_KEY_PASSWORD="${TERMUX_RELEASE_KEY_PASSWORD}"
 
           echo "Building APKs for 'APK_VERSION_TAG' release"
           export TERMUX_APK_VERSION_TAG="$APK_VERSION_TAG" # Used by app/build.gradle
-          export TERMUX_PACKAGE_VARIANT="${{ env.PACKAGE_VARIANT }}" # Used by app/build.gradle
+          export TERMUX_PACKAGE_VARIANT="$PACKAGE_VARIANT" # Used by app/build.gradle
+          if ! ./gradlew :app:verifyReleaseHardening :app:processReleaseMainManifest; then
+            exit_on_error "Release hardening checks failed."
+          fi
+          RELEASE_MANIFEST_PATH="$(find ./app/build/intermediates/merged_manifests -path '*/release/AndroidManifest.xml' | head -n 1)"
+          if [ -z "$RELEASE_MANIFEST_PATH" ] || ! test -f "$RELEASE_MANIFEST_PATH"; then
+            exit_on_error "Could not locate merged release manifest for non-debuggable validation."
+          fi
+          if grep -q 'android:debuggable="true"' "$RELEASE_MANIFEST_PATH"; then
+            exit_on_error "Merged release manifest is debuggable: $RELEASE_MANIFEST_PATH"
+          fi
           if ! ./gradlew assembleDebug; then
             exit_on_error "Build failed for '$APK_VERSION_TAG' release."
           fi
