@@ -99,7 +99,16 @@ public final class TermuxPreferenceConstants {
          */
         public static final String KEY_TERMINAL_MARGIN_ADJUSTMENT = "terminal_margin_adjustment";
 
-        public static final boolean DEFAULT_TERMINAL_MARGIN_ADJUSTMENT = false;
+        public static final boolean DEFAULT_TERMINAL_MARGIN_ADJUSTMENT = true;
+
+        /**
+         * Defines a one-time migration marker for restoring terminal margin adjustment default after
+         * temporary workaround builds forced it off.
+         */
+        public static final String KEY_TERMINAL_MARGIN_ADJUSTMENT_DEFAULT_MIGRATION_DONE =
+            "terminal_margin_adjustment_default_migration_done";
+
+        public static final boolean DEFAULT_TERMINAL_MARGIN_ADJUSTMENT_DEFAULT_MIGRATION_DONE = false;
 
         /**
          * Defines the key for whether to show terminal toolbar containing extra keys and text input field.

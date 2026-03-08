@@ -1,6 +1,7 @@
 package com.termux.shared.termux.settings.preferences;
 
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.util.TypedValue;
 import android.os.Build;
 import android.view.Display;
@@ -27,7 +28,15 @@ public class TermuxAppSharedPreferences extends AppSharedPreferences {
     private static final String LOG_TAG = "TermuxAppSharedPreferences";
 
     private TermuxAppSharedPreferences(@NonNull Context context) {
-        super(context, SharedPreferenceUtils.getPrivateSharedPreferences(context, TermuxConstants.TERMUX_DEFAULT_PREFERENCES_FILE_BASENAME_WITHOUT_EXTENSION), SharedPreferenceUtils.getPrivateAndMultiProcessSharedPreferences(context, TermuxConstants.TERMUX_DEFAULT_PREFERENCES_FILE_BASENAME_WITHOUT_EXTENSION));
+        this(
+            context,
+            SharedPreferenceUtils.getPrivateSharedPreferences(context, TermuxConstants.TERMUX_DEFAULT_PREFERENCES_FILE_BASENAME_WITHOUT_EXTENSION),
+            SharedPreferenceUtils.getPrivateAndMultiProcessSharedPreferences(context, TermuxConstants.TERMUX_DEFAULT_PREFERENCES_FILE_BASENAME_WITHOUT_EXTENSION)
+        );
+    }
+
+    public TermuxAppSharedPreferences(@NonNull Context context, @NonNull SharedPreferences sharedPreferences, @Nullable SharedPreferences multiProcessSharedPreferences) {
+        super(context, sharedPreferences, multiProcessSharedPreferences);
         setFontVariables(context);
     }
 
@@ -123,17 +132,16 @@ public class TermuxAppSharedPreferences extends AppSharedPreferences {
             TERMUX_APP.DEFAULT_APP_LAUNCHER_INPUT_CHAR,
             true
         );
-        if (value == null || value.trim().isEmpty()) {
-            value = TERMUX_APP.DEFAULT_APP_LAUNCHER_INPUT_CHAR;
-            SharedPreferenceUtils.setString(mSharedPreferences, TERMUX_APP.KEY_APP_LAUNCHER_INPUT_CHAR, value, false);
+        String normalized = normalizeAppLauncherInputChar(value);
+        if (!normalized.equals(value)) {
+            value = normalized;
+            SharedPreferenceUtils.setString(mSharedPreferences, TERMUX_APP.KEY_APP_LAUNCHER_INPUT_CHAR, value, true);
         }
         return value;
     }
 
     public void setAppLauncherInputChar(String value) {
-        if (value == null || value.trim().isEmpty()) {
-            value = TERMUX_APP.DEFAULT_APP_LAUNCHER_INPUT_CHAR;
-        }
+        value = normalizeAppLauncherInputChar(value);
         SharedPreferenceUtils.setString(mSharedPreferences, TERMUX_APP.KEY_APP_LAUNCHER_INPUT_CHAR, value, false);
     }
 
@@ -186,7 +194,7 @@ public class TermuxAppSharedPreferences extends AppSharedPreferences {
     }
 
     public void setAppLauncherPinnedItemsV2(String value) {
-        SharedPreferenceUtils.setString(mSharedPreferences, TERMUX_APP.KEY_APP_LAUNCHER_PINNED_ITEMS_V2, value, false);
+        SharedPreferenceUtils.setString(mSharedPreferences, TERMUX_APP.KEY_APP_LAUNCHER_PINNED_ITEMS_V2, value, true);
     }
 
     public int getAppLauncherPinnedItemsSchemaVersion() {
@@ -195,7 +203,7 @@ public class TermuxAppSharedPreferences extends AppSharedPreferences {
     }
 
     public void setAppLauncherPinnedItemsSchemaVersion(int version) {
-        SharedPreferenceUtils.setInt(mSharedPreferences, TERMUX_APP.KEY_APP_LAUNCHER_PINNED_ITEMS_SCHEMA_VERSION, version, false);
+        SharedPreferenceUtils.setInt(mSharedPreferences, TERMUX_APP.KEY_APP_LAUNCHER_PINNED_ITEMS_SCHEMA_VERSION, version, true);
     }
 
     public boolean isAppLauncherAzRowEnabled() {
@@ -222,6 +230,48 @@ public class TermuxAppSharedPreferences extends AppSharedPreferences {
 
     public void setTerminalMarginAdjustment(boolean value) {
         SharedPreferenceUtils.setBoolean(mSharedPreferences, TERMUX_APP.KEY_TERMINAL_MARGIN_ADJUSTMENT, value, false);
+    }
+
+    public void migrateTerminalMarginAdjustmentDefaultIfNeeded() {
+        if (mSharedPreferences == null)
+            return;
+
+        boolean migrationDone = SharedPreferenceUtils.getBoolean(
+            mSharedPreferences,
+            TERMUX_APP.KEY_TERMINAL_MARGIN_ADJUSTMENT_DEFAULT_MIGRATION_DONE,
+            TERMUX_APP.DEFAULT_TERMINAL_MARGIN_ADJUSTMENT_DEFAULT_MIGRATION_DONE
+        );
+        if (migrationDone)
+            return;
+
+        boolean hasStoredValue = mSharedPreferences.contains(TERMUX_APP.KEY_TERMINAL_MARGIN_ADJUSTMENT);
+        boolean currentEnabled = isTerminalMarginAdjustmentEnabled();
+        if (shouldEnableTerminalMarginAdjustmentOnMigration(migrationDone, hasStoredValue, currentEnabled)) {
+            SharedPreferenceUtils.setBoolean(
+                mSharedPreferences,
+                TERMUX_APP.KEY_TERMINAL_MARGIN_ADJUSTMENT,
+                true,
+                true
+            );
+        }
+
+        SharedPreferenceUtils.setBoolean(
+            mSharedPreferences,
+            TERMUX_APP.KEY_TERMINAL_MARGIN_ADJUSTMENT_DEFAULT_MIGRATION_DONE,
+            true,
+            true
+        );
+    }
+
+    public static String normalizeAppLauncherInputChar(@Nullable String value) {
+        if (value == null || value.trim().isEmpty()) {
+            return TERMUX_APP.DEFAULT_APP_LAUNCHER_INPUT_CHAR;
+        }
+        return value;
+    }
+
+    public static boolean shouldEnableTerminalMarginAdjustmentOnMigration(boolean migrationDone, boolean hasStoredValue, boolean currentlyEnabled) {
+        return !migrationDone && (!hasStoredValue || !currentlyEnabled);
     }
 
     public boolean isSoftKeyboardEnabled() {

@@ -10,14 +10,15 @@ public class ApcTest extends TerminalTestCase {
         // silently just as xterm does. See https://sw.kovidgoyal.net/kitty/graphics-protocol/.
         withTerminalSized(2, 2)
             .enterString("\033_Gi=31,s=1,v=1,a=q,t=d,f=24;AAAA\033\\");
-        assertTrue(mTerminal.getScreen().getTranscriptText().contains("AA"));
+        assertFalse(mTerminal.getScreen().getTranscriptText().contains("AA"));
 
         // It is ok for the APC content to be non printable characters:
         withTerminalSized(12, 2)
             .enterString("hello \033_some\023\033_\\apc#end\033\\ world");
         String transcript = mTerminal.getScreen().getTranscriptText();
         assertTrue(transcript.contains("hello"));
-        assertTrue(transcript.contains("apc"));
+        assertTrue(transcript.contains("world"));
+        assertFalse(transcript.contains("apc"));
     }
 
 }

@@ -1,22 +1,13 @@
 package com.termux.app.launcher;
 
-import android.content.Context;
-import android.os.Build;
-
 import com.termux.app.launcher.data.LauncherConfigRepository;
 import com.termux.app.launcher.model.AppRef;
 import com.termux.app.launcher.model.PinnedAppItem;
 import com.termux.app.launcher.model.PinnedFolderItem;
 import com.termux.app.launcher.model.PinnedItem;
-import com.termux.shared.termux.settings.preferences.TermuxAppSharedPreferences;
 
 import org.junit.Before;
 import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.robolectric.RobolectricTestRunner;
-import org.robolectric.RuntimeEnvironment;
-import org.robolectric.annotation.Config;
-import org.robolectric.util.ReflectionHelpers;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -24,20 +15,38 @@ import java.util.List;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
-@RunWith(RobolectricTestRunner.class)
-@Config(sdk = {Build.VERSION_CODES.P})
 public class LauncherConfigRepositoryTest {
     private LauncherConfigRepository repository;
 
+    private static final class FakePreferencesStore implements LauncherConfigRepository.PreferencesStore {
+        private String pinnedItemsV2 = "";
+        private int schemaVersion = 0;
+        private String legacyDefaultButtons = "";
+
+        @Override
+        public String getPinnedItemsV2() {
+            return pinnedItemsV2;
+        }
+
+        @Override
+        public void setPinnedItemsV2(String value) {
+            pinnedItemsV2 = value;
+        }
+
+        @Override
+        public void setPinnedItemsSchemaVersion(int version) {
+            schemaVersion = version;
+        }
+
+        @Override
+        public String getLegacyDefaultButtons() {
+            return legacyDefaultButtons;
+        }
+    }
+
     @Before
     public void setUp() {
-        Context context = RuntimeEnvironment.application;
-        TermuxAppSharedPreferences preferences = ReflectionHelpers.callConstructor(
-            TermuxAppSharedPreferences.class,
-            ReflectionHelpers.ClassParameter.from(Context.class, context)
-        );
-        preferences.setAppLauncherPinnedItemsV2("");
-        preferences.setAppLauncherPinnedItemsSchemaVersion(0);
+        FakePreferencesStore preferences = new FakePreferencesStore();
         repository = new LauncherConfigRepository(preferences);
     }
 
@@ -83,4 +92,3 @@ public class LauncherConfigRepositoryTest {
         assertEquals(2, loadedFolder.apps.size());
     }
 }
-

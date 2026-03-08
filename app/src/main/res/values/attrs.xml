@@ -2,4 +2,9 @@
 <resources>
     <attr name="termuxActivityDrawerBackground" format="reference" />
     <attr name="termuxActivityDrawerImageTint" format="reference" />
+
+    <declare-styleable name="RealtimeBlurView">
+        <attr name="realtimeBlurRadius" format="dimension" />
+        <attr name="realtimeOverlayColor" format="color" />
+    </declare-styleable>
 </resources>

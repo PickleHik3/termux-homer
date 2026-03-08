@@ -32,6 +32,27 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
+      - name: Execute tests
+        env:
+          GRADLE_OPTS: >-
+            -Dorg.gradle.internal.http.connectionTimeout=120000
+            -Dorg.gradle.internal.http.socketTimeout=120000
+        run: |
+          attempts=0
+          max_attempts=3
+          until [ "$attempts" -ge "$max_attempts" ]; do
+            if ./gradlew :app:testDebugUnitTest :terminal-emulator:test; then
+              exit 0
+            fi
+            attempts=$((attempts + 1))
+            if [ "$attempts" -ge "$max_attempts" ]; then
+              echo "Gradle test run failed after ${max_attempts} attempts."
+              exit 1
+            fi
+            echo "Gradle test run failed, retrying in 20 seconds... (${attempts}/${max_attempts})"
+            sleep 20
+          done
+
       - name: Build APKs
         shell: bash {0}
         env:
@@ -66,9 +87,19 @@ jobs:
           export TERMUX_APP_VERSION_NAME="${RELEASE_VERSION_NAME/v/}" # Used by app/build.gradle
           export TERMUX_APK_VERSION_TAG="$APK_VERSION_TAG" # Used by app/build.gradle
           export TERMUX_PACKAGE_VARIANT="${{ env.PACKAGE_VARIANT }}" # Used by app/build.gradle
-          if ! ./gradlew assembleDebug; then
-            exit_on_error "Build failed for '$APK_VERSION_TAG' build."
-          fi
+          build_attempts=0
+          max_build_attempts=3
+          until [ "$build_attempts" -ge "$max_build_attempts" ]; do
+            if ./gradlew assembleDebug; then
+              break
+            fi
+            build_attempts=$((build_attempts + 1))
+            if [ "$build_attempts" -ge "$max_build_attempts" ]; then
+              exit_on_error "Build failed for '$APK_VERSION_TAG' build after ${max_build_attempts} attempts."
+            fi
+            echo "assembleDebug failed, retrying in 20 seconds... (${build_attempts}/${max_build_attempts})"
+            sleep 20
+          done
 
           echo "Validating APKs"
           for abi in universal arm64-v8a armeabi-v7a x86_64 x86; do

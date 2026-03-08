@@ -9,9 +9,11 @@ import android.view.View;
 import android.view.WindowInsets;
 import android.view.WindowManager;
 import android.view.inputmethod.InputMethodManager;
+
 import androidx.annotation.NonNull;
 import androidx.annotation.RequiresApi;
 import androidx.core.view.WindowInsetsCompat;
+
 import com.termux.shared.logger.Logger;
 
 public class KeyboardUtils {
@@ -40,8 +42,7 @@ public class KeyboardUtils {
      * {@code true}.
      */
     public static void toggleSoftKeyboard(final Context context) {
-        if (context == null)
-            return;
+        if (context == null) return;
         InputMethodManager inputMethodManager = (InputMethodManager) context.getSystemService(Context.INPUT_METHOD_SERVICE);
         if (inputMethodManager != null)
             inputMethodManager.toggleSoftInput(InputMethodManager.SHOW_FORCED, 0);
@@ -64,24 +65,21 @@ public class KeyboardUtils {
      * https://cs.android.com/android/platform/superproject/+/android-11.0.0_r3:frameworks/base/core/java/android/inputmethodservice/InputMethodService.java;l=2022
      */
     public static void showSoftKeyboard(final Context context, final View view) {
-        if (context == null || view == null)
-            return;
+        if (context == null || view == null) return;
         InputMethodManager inputMethodManager = (InputMethodManager) context.getSystemService(Context.INPUT_METHOD_SERVICE);
         if (inputMethodManager != null)
             inputMethodManager.showSoftInput(view, 0);
     }
 
     public static void hideSoftKeyboard(final Context context, final View view) {
-        if (context == null || view == null)
-            return;
+        if (context == null || view == null) return;
         InputMethodManager inputMethodManager = (InputMethodManager) context.getSystemService(Context.INPUT_METHOD_SERVICE);
         if (inputMethodManager != null)
             inputMethodManager.hideSoftInputFromWindow(view.getWindowToken(), 0);
     }
 
     public static void disableSoftKeyboard(final Activity activity, final View view) {
-        if (activity == null || view == null)
-            return;
+        if (activity == null || view == null) return;
         hideSoftKeyboard(activity, view);
         setDisableSoftKeyboardFlags(activity);
     }
@@ -97,8 +95,7 @@ public class KeyboardUtils {
     }
 
     public static boolean areDisableSoftKeyboardFlagsSet(final Activity activity) {
-        if (activity == null || activity.getWindow() == null)
-            return false;
+        if (activity == null ||  activity.getWindow() == null) return false;
         return (activity.getWindow().getAttributes().flags & WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM) != 0;
     }
 
@@ -113,11 +110,7 @@ public class KeyboardUtils {
         // https://medium.com/androiddevelopers/animating-your-keyboard-fb776a8fb66d
         // https://stackoverflow.com/a/65194077/14686958
         if (activity != null && activity.getWindow() != null)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                activity.getWindow().setDecorFitsSystemWindows(false);
-            } else {
-                activity.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
-            }
+            activity.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
     }
 
     /**
@@ -139,6 +132,7 @@ public class KeyboardUtils {
                 }
             }
         }
+
         Logger.logVerbose(LOG_TAG, "Soft keyboard not visible");
         return false;
     }
@@ -154,10 +148,11 @@ public class KeyboardUtils {
      * keyboard is connected, otherwise {@code false}.
      */
     public static boolean isHardKeyboardConnected(final Context context) {
-        if (context == null)
-            return false;
+        if (context == null) return false;
+
         Configuration config = context.getResources().getConfiguration();
-        return config.keyboard != Configuration.KEYBOARD_NOKEYS || config.hardKeyboardHidden == Configuration.HARDKEYBOARDHIDDEN_NO;
+        return config.keyboard != Configuration.KEYBOARD_NOKEYS
+            || config.hardKeyboardHidden == Configuration.HARDKEYBOARDHIDDEN_NO;
     }
 
     /**
@@ -190,7 +185,7 @@ public class KeyboardUtils {
              * https://github.com/termux/termux-app/issues/1995#issuecomment-837080079
              */
             // If soft keyboard is disabled by user only if hardware keyboard is connected
-            if (isSoftKeyboardEnabledOnlyIfNoHardware) {
+            if(isSoftKeyboardEnabledOnlyIfNoHardware) {
                 boolean isHardKeyboardConnected = KeyboardUtils.isHardKeyboardConnected(context);
                 Logger.logVerbose(LOG_TAG, "Hardware keyboard connected=" + isHardKeyboardConnected);
                 return isHardKeyboardConnected;
@@ -199,4 +194,5 @@ public class KeyboardUtils {
             }
         }
     }
+
 }

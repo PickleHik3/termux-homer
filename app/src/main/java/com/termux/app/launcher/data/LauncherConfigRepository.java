@@ -19,14 +19,45 @@ import java.util.UUID;
 public final class LauncherConfigRepository {
     public static final int SCHEMA_VERSION = 1;
 
-    private final TermuxAppSharedPreferences preferences;
+    public interface PreferencesStore {
+        String getPinnedItemsV2();
+        void setPinnedItemsV2(String value);
+        void setPinnedItemsSchemaVersion(int version);
+        String getLegacyDefaultButtons();
+    }
+
+    private final PreferencesStore preferences;
 
     public LauncherConfigRepository(@NonNull TermuxAppSharedPreferences preferences) {
+        this(new PreferencesStore() {
+            @Override
+            public String getPinnedItemsV2() {
+                return preferences.getAppLauncherPinnedItemsV2();
+            }
+
+            @Override
+            public void setPinnedItemsV2(String value) {
+                preferences.setAppLauncherPinnedItemsV2(value);
+            }
+
+            @Override
+            public void setPinnedItemsSchemaVersion(int version) {
+                preferences.setAppLauncherPinnedItemsSchemaVersion(version);
+            }
+
+            @Override
+            public String getLegacyDefaultButtons() {
+                return preferences.getAppLauncherDefaultButtons();
+            }
+        });
+    }
+
+    public LauncherConfigRepository(@NonNull PreferencesStore preferences) {
         this.preferences = preferences;
     }
 
     public List<PinnedItem> loadPinnedItems() {
-        String raw = preferences.getAppLauncherPinnedItemsV2();
+        String raw = preferences.getPinnedItemsV2();
         if (raw == null || raw.trim().isEmpty()) {
             return migrateFromLegacyIfNeeded();
         }
@@ -122,15 +153,15 @@ public final class LauncherConfigRepository {
         try {
             root.put("schemaVersion", SCHEMA_VERSION);
             root.put("items", items);
-            preferences.setAppLauncherPinnedItemsV2(root.toString());
-            preferences.setAppLauncherPinnedItemsSchemaVersion(SCHEMA_VERSION);
+            preferences.setPinnedItemsV2(root.toString());
+            preferences.setPinnedItemsSchemaVersion(SCHEMA_VERSION);
         } catch (JSONException ignored) {
         }
     }
 
     public List<PinnedItem> migrateFromLegacyIfNeeded() {
         List<PinnedItem> out = new ArrayList<>();
-        String legacy = preferences.getAppLauncherDefaultButtons();
+        String legacy = preferences.getLegacyDefaultButtons();
         if ("phone,bromite,whatsapp,telegram,spotify".equalsIgnoreCase(legacy == null ? "" : legacy.trim())) {
             legacy = "";
         }

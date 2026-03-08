@@ -47,6 +47,7 @@ import com.termux.privileged.PrivilegedPolicyStore;
 import com.termux.privileged.ShizukuBackend;
 import com.termux.app.style.TermuxBackgroundManager;
 import com.termux.app.style.TermuxSystemWallpaperManager;
+import com.termux.app.terminal.AccessoryStackLayoutPolicy;
 import com.termux.app.terminal.TermuxActivityRootView;
 import com.termux.app.terminal.TermuxTerminalSessionActivityClient;
 import com.termux.app.terminal.io.TermuxTerminalExtraKeys;
@@ -299,6 +300,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
             mIsInvalidState = true;
             return;
         }
+        mPreferences.migrateTerminalMarginAdjustmentDefaultIfNeeded();
         setMargins();
         setSuggestionBarView();
         mTermuxActivityRootView = findViewById(R.id.activity_termux_root_view);
@@ -375,10 +377,6 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
             mTermuxTerminalViewClient.onStart();
     
         if (mPreferences.isTerminalMarginAdjustmentEnabled()) {
-            // Prime the last known IME margin before new layout passes to reduce resume flicker.
-            if (mTermuxActivityRootView != null) {
-                mTermuxActivityRootView.preApplyLastKnownImeMarginIfVisible();
-            }
             addTermuxActivityRootViewGlobalLayoutListener();
         }
 
@@ -470,11 +468,10 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
     }
     
     private void configureExtraKeysBackground() {
+        View accessoryContainer = findViewById(R.id.accessory_stack_container);
         View appsBarViewPager = findViewById(R.id.apps_bar_viewpager);
         View extraKeysBackground = findViewById(R.id.extrakeys_background);
         View extraKeysBackgroundBlur = findViewById(R.id.extrakeys_backgroundblur);
-        View appsBarBackground = findViewById(R.id.apps_bar_background);
-        View appsBarBackgroundBlur = findViewById(R.id.apps_bar_backgroundblur);
         View azRow = findViewById(R.id.apps_bar_az_row);
 
         boolean isToolbarShown = mPreferences.shouldShowTerminalToolbar();
@@ -485,17 +482,14 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         // App bar uses the combined extra-keys background surface.
 
         if (!isToolbarShown) {
+            if (accessoryContainer != null) {
+                accessoryContainer.setVisibility(View.GONE);
+            }
             if (extraKeysBackgroundBlur != null) {
                 extraKeysBackgroundBlur.setVisibility(View.GONE);
             }
             if (extraKeysBackground != null) {
                 extraKeysBackground.setVisibility(View.GONE);
-            }
-            if (appsBarBackgroundBlur != null) {
-                appsBarBackgroundBlur.setVisibility(View.GONE);
-            }
-            if (appsBarBackground != null) {
-                appsBarBackground.setVisibility(View.GONE);
             }
             if (appsBarViewPager != null) {
                 appsBarViewPager.setVisibility(View.GONE);
@@ -506,18 +500,14 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
             return;
         }
 
+        if (accessoryContainer != null) {
+            accessoryContainer.setVisibility(View.VISIBLE);
+        }
         if (appsBarViewPager != null) {
             appsBarViewPager.setVisibility(View.VISIBLE);
         }
         if (azRow != null) {
             azRow.setVisibility(mPreferences.isAppLauncherAzRowEnabled() ? View.VISIBLE : View.GONE);
-        }
-
-        if (appsBarBackground != null) {
-            appsBarBackground.setVisibility(View.GONE);
-        }
-        if (appsBarBackgroundBlur != null) {
-            appsBarBackgroundBlur.setVisibility(View.GONE);
         }
 
         if (extraKeysBackground != null) {
@@ -975,6 +965,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
             barHeightPx = 0;
         }
         int azRowHeightPx = 0;
+        boolean azEnabled = mPreferences.isAppLauncherAzRowEnabled();
         if (mPreferences.isAppLauncherAzRowEnabled()) {
             float density = getResources().getDisplayMetrics().density;
             float iconScale = mPreferences.getAppLauncherIconScale();
@@ -986,18 +977,19 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         }
         updateViewHeight(R.id.apps_bar_viewpager, barHeightPx);
         updateViewHeight(R.id.apps_bar_az_row, azRowHeightPx);
-        int interRowGapPx = Math.round(getResources().getDisplayMetrics().density * (3f + (Math.max(0f, mPreferences.getAppLauncherIconScale() - 1f) * 2f)));
+        int interRowGapPx = AccessoryStackLayoutPolicy.computeAppsBarInterRowGapPx(
+            azEnabled,
+            getResources().getDisplayMetrics().density,
+            mPreferences.getAppLauncherIconScale()
+        );
         updateViewBottomMargin(R.id.apps_bar_viewpager, interRowGapPx);
-        updateViewHeight(R.id.apps_bar_background, barHeightPx);
-        updateViewHeight(R.id.apps_bar_backgroundblur, barHeightPx);
     }
 
     public void setTerminalToolbarHeight() {
         final ViewPager terminalToolbarViewPager = getTerminalToolbarViewPager();
+        View accessoryStackContainer = findViewById(R.id.accessory_stack_container);
         View appsBarViewPager = findViewById(R.id.apps_bar_viewpager);
-        View extraKeysBackgroundBlur = findViewById(R.id.extrakeys_backgroundblur);
-        View extraKeysBackground = findViewById(R.id.extrakeys_background);
-        if (terminalToolbarViewPager == null)
+        if (terminalToolbarViewPager == null || accessoryStackContainer == null)
             return;
         ViewGroup.LayoutParams toolbarLayoutParams = terminalToolbarViewPager.getLayoutParams();
 
@@ -1016,12 +1008,16 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         terminalToolbarViewPager.setLayoutParams(toolbarLayoutParams);
 
         int appsBarHeightPx = 0;
+        int appsBarGapPx = 0;
         if (appsBarViewPager != null) {
             ViewGroup.LayoutParams appsBarLayoutParams = appsBarViewPager.getLayoutParams();
             if (appsBarLayoutParams != null) {
                 appsBarHeightPx = appsBarLayoutParams.height;
                 if (appsBarHeightPx < 0) {
                     appsBarHeightPx = 0;
+                }
+                if (appsBarLayoutParams instanceof ViewGroup.MarginLayoutParams) {
+                    appsBarGapPx = Math.max(0, ((ViewGroup.MarginLayoutParams) appsBarLayoutParams).bottomMargin);
                 }
             }
         }
@@ -1030,20 +1026,26 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         if (azRow != null && azRow.getLayoutParams() != null) {
             azRowHeightPx = Math.max(0, azRow.getLayoutParams().height);
         }
-        if (extraKeysBackground == null || extraKeysBackgroundBlur == null)
-            return;
-
-        int combinedHeight = toolbarHeightPx + appsBarHeightPx + azRowHeightPx;
-        updateExtraKeysBackgroundHeight(extraKeysBackground, combinedHeight);
-        updateExtraKeysBackgroundHeight(extraKeysBackgroundBlur, combinedHeight);
+        int combinedHeight = AccessoryStackLayoutPolicy.computeCombinedHeight(
+            toolbarHeightPx,
+            appsBarHeightPx,
+            azRowHeightPx,
+            appsBarGapPx
+        );
+        updateAccessoryStackContainerHeight(accessoryStackContainer, combinedHeight);
     }
 
-    private void updateExtraKeysBackgroundHeight(View view, int height) {
+    private void updateAccessoryStackContainerHeight(View view, int height) {
         ViewGroup.LayoutParams layoutParams = view.getLayoutParams();
         if (layoutParams == null)
             return;
         layoutParams.height = height;
         view.setLayoutParams(layoutParams);
+    }
+
+    // Kept for test compatibility and to preserve existing RelativeLayout params in-place.
+    private void updateExtraKeysBackgroundHeight(View view, int height) {
+        updateAccessoryStackContainerHeight(view, height);
     }
 
     private void updateViewHeight(int viewId, int height) {
@@ -1374,6 +1376,10 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
 
     public View getTermuxActivityBottomSpaceView() {
         return mTermuxActivityBottomSpaceView;
+    }
+
+    public View getAccessoryStackContainerView() {
+        return findViewById(R.id.accessory_stack_container);
     }
 
     public ExtraKeysView getExtraKeysView(int i) {
