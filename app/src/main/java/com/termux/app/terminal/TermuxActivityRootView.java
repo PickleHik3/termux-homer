@@ -69,12 +69,6 @@ public class TermuxActivityRootView extends LinearLayout implements ViewTreeObse
     public long lastMarginBottomTime;
 
     public long lastMarginBottomExtraTime;
-    private long lastMarginApplyTime;
-    private int mImeOnlyLayoutStreak;
-    private boolean mInsetsInitialized;
-    private boolean mLastImeVisible;
-    private int mLastImeBottomInset;
-    private int mLastSystemBarsBottomInset;
 
     /**
      * Log root view events.
@@ -84,10 +78,6 @@ public class TermuxActivityRootView extends LinearLayout implements ViewTreeObse
     private static final String LOG_TAG = "TermuxActivityRootView";
 
     private static int mStatusBarHeight;
-    private static final int SMALL_MARGIN_THRESHOLD_DP = 16;
-    private static final int MAX_MARGIN_ADJUSTMENT_DP = 420;
-    private static final int JITTER_DELTA_THRESHOLD_DP = 28;
-    private static final long MARGIN_APPLY_DEBOUNCE_MS = 140L;
 
     public TermuxActivityRootView(Context context) {
         super(context);
@@ -103,25 +93,6 @@ public class TermuxActivityRootView extends LinearLayout implements ViewTreeObse
 
     public void setActivity(TermuxActivity activity) {
         mActivity = activity;
-    }
-
-    /**
-     * Re-apply the last known bottom margin before first post-resume layout when IME is already visible.
-     * This reduces one-frame "full terminal then snap" flicker when returning from other apps.
-     */
-    public void preApplyLastKnownImeMarginIfVisible() {
-        if (mActivity == null || lastMarginBottom == null || lastMarginBottom <= 0) {
-            return;
-        }
-        InsetsSnapshot insetsSnapshot = resolveInsetsSnapshot();
-        if (insetsSnapshot == null || !insetsSnapshot.imeVisible) {
-            return;
-        }
-        ViewGroup.MarginLayoutParams params = (ViewGroup.MarginLayoutParams) getLayoutParams();
-        if (params != null && params.bottomMargin != lastMarginBottom) {
-            params.setMargins(0, 0, 0, lastMarginBottom);
-            setLayoutParams(params);
-        }
     }
 
     /**
@@ -158,153 +129,125 @@ public class TermuxActivityRootView extends LinearLayout implements ViewTreeObse
         if (root_view_logging_enabled)
             Logger.logVerbose(LOG_TAG, ":\nonGlobalLayout:");
         FrameLayout.LayoutParams params = (FrameLayout.LayoutParams) getLayoutParams();
-        if (params == null)
-            return;
         // Get the position Rects of the bottom space view and the main window holding it
         Rect[] windowAndViewRects = ViewUtils.getWindowAndViewRects(bottomSpaceView, mStatusBarHeight);
         if (windowAndViewRects == null)
             return;
         Rect windowAvailableRect = windowAndViewRects[0];
         Rect bottomSpaceViewRect = windowAndViewRects[1];
-
-        int pxHidden = bottomSpaceViewRect.bottom - windowAvailableRect.bottom;
-        int smallMarginThresholdPx = (int) ViewUtils.dpToPx(getContext(), SMALL_MARGIN_THRESHOLD_DP);
-        int maxMarginPx = (int) ViewUtils.dpToPx(getContext(), MAX_MARGIN_ADJUSTMENT_DP);
-        InsetsSnapshot insetsSnapshot = resolveInsetsSnapshot();
-        int targetMarginPx;
-        boolean shouldFallbackToLegacyOverlap = insetsSnapshot == null ||
-            (!insetsSnapshot.imeVisible && pxHidden > smallMarginThresholdPx);
-        if (!shouldFallbackToLegacyOverlap) {
-            if (insetsSnapshot.imeVisible && pxHidden <= smallMarginThresholdPx) {
-                mImeOnlyLayoutStreak++;
-            } else {
-                mImeOnlyLayoutStreak = 0;
-            }
-            boolean allowImeFallback = mImeOnlyLayoutStreak >= 2;
-            targetMarginPx = computeImeDrivenBottomMarginPx(
-                insetsSnapshot.imeVisible,
-                insetsSnapshot.imeBottomInsetPx,
-                insetsSnapshot.systemBarsBottomInsetPx,
-                pxHidden,
-                getHeight(),
-                maxMarginPx,
-                smallMarginThresholdPx,
-                allowImeFallback
-            );
-        } else {
-            mImeOnlyLayoutStreak = 0;
-            targetMarginPx = computeLegacyOverlapMarginPx(
-                pxHidden,
-                getHeight(),
-                maxMarginPx,
-                smallMarginThresholdPx
-            );
-        }
-
-        long now = System.currentTimeMillis();
-        int jitterDeltaPx = (int) ViewUtils.dpToPx(getContext(), JITTER_DELTA_THRESHOLD_DP);
-        if (params.bottomMargin > 0 && targetMarginPx > 0 &&
-            Math.abs(targetMarginPx - params.bottomMargin) <= jitterDeltaPx &&
-            (now - lastMarginApplyTime) < MARGIN_APPLY_DEBOUNCE_MS) {
-            targetMarginPx = params.bottomMargin;
-        }
-
-        // Keep the last stable visible position while IME dismiss animation/insets are settling.
-        if (insetsSnapshot != null && !insetsSnapshot.imeVisible && pxHidden > 0 &&
-            params.bottomMargin > 0 && (now - lastMarginApplyTime) < MARGIN_APPLY_DEBOUNCE_MS) {
-            targetMarginPx = params.bottomMargin;
-        }
-
+        // If the bottomSpaceViewRect is inside the windowAvailableRect, then it must be completely visible
+        //boolean isVisible = windowAvailableRect.contains(bottomSpaceViewRect); // rect.right comparison often fails in landscape
+        boolean isVisible = ViewUtils.isRectAbove(windowAvailableRect, bottomSpaceViewRect);
+        boolean isVisibleBecauseMargin = (windowAvailableRect.bottom == bottomSpaceViewRect.bottom) && params.bottomMargin > 0;
+        boolean isVisibleBecauseExtraMargin = ((bottomSpaceViewRect.bottom - windowAvailableRect.bottom) < 0);
         if (root_view_logging_enabled) {
             Logger.logVerbose(LOG_TAG, "windowAvailableRect " + ViewUtils.toRectString(windowAvailableRect) + ", bottomSpaceViewRect " + ViewUtils.toRectString(bottomSpaceViewRect));
-            Logger.logVerbose(LOG_TAG,
-                "imeVisible=" + (insetsSnapshot != null && insetsSnapshot.imeVisible) +
-                ", imeBottomInset=" + (insetsSnapshot != null ? insetsSnapshot.imeBottomInsetPx : -1) +
-                ", systemBottomInset=" + (insetsSnapshot != null ? insetsSnapshot.systemBarsBottomInsetPx : -1) +
-                ", overlap=" + pxHidden + ", currentBottom=" + params.bottomMargin + ", targetBottom=" + targetMarginPx);
+            Logger.logVerbose(LOG_TAG, "windowAvailableRect.bottom " + windowAvailableRect.bottom + ", bottomSpaceViewRect.bottom " + bottomSpaceViewRect.bottom + ", diff " + (bottomSpaceViewRect.bottom - windowAvailableRect.bottom) + ", bottom " + params.bottomMargin + ", isVisible " + windowAvailableRect.contains(bottomSpaceViewRect) + ", isRectAbove " + ViewUtils.isRectAbove(windowAvailableRect, bottomSpaceViewRect) + ", isVisibleBecauseMargin " + isVisibleBecauseMargin + ", isVisibleBecauseExtraMargin " + isVisibleBecauseExtraMargin);
         }
-
-        if (params.bottomMargin != targetMarginPx) {
+        // If the bottomSpaceViewRect is visible, then remove the margin if needed
+        if (isVisible) {
+            // If visible because of margin, i.e the bottom of bottomSpaceViewRect equals that of windowAvailableRect
+            // and a margin has been added
+            // Necessary so that we don't get stuck in an infinite loop since setting margin
+            // will call OnGlobalLayoutListener again and next time bottom space view
+            // will be visible and margin will be set to 0, which again will call
+            // OnGlobalLayoutListener...
+            // Calling addTermuxActivityRootViewGlobalLayoutListener with a delay fails to
+            // set appropriate margins when views are changed quickly since some changes
+            // may be missed.
+            if (isVisibleBecauseMargin) {
+                if (root_view_logging_enabled)
+                    Logger.logVerbose(LOG_TAG, "Visible due to margin");
+                // Once the view has been redrawn with new margin, we set margin back to 0 so that
+                // when next time onMeasure() is called, margin 0 is used. This is necessary for
+                // cases when view has been redrawn with new margin because bottom space view was
+                // hidden by keyboard and then view was redrawn again due to layout change (like
+                // keyboard symbol view is switched to), android will add margin below its new position
+                // if its greater than 0, which was already above the keyboard creating x2x margin.
+                // Adding time check since moving split screen divider in landscape causes jitter
+                // and prevents some infinite loops
+                if ((System.currentTimeMillis() - lastMarginBottomTime) > 40) {
+                    lastMarginBottomTime = System.currentTimeMillis();
+                    marginBottom = 0;
+                } else {
+                    if (root_view_logging_enabled)
+                        Logger.logVerbose(LOG_TAG, "Ignoring restoring marginBottom to 0 since called to quickly");
+                }
+                return;
+            }
+            boolean setMargin = params.bottomMargin != 0;
+            // If visible because of extra margin, i.e the bottom of bottomSpaceViewRect is above that of windowAvailableRect
+            // onGlobalLayout: windowAvailableRect 1408, bottomSpaceViewRect 1232, diff -176, bottom 0, isVisible true, isVisibleBecauseMargin false, isVisibleBecauseExtraMargin false
+            // onGlobalLayout: Bottom margin already equals 0
+            if (isVisibleBecauseExtraMargin) {
+                // Adding time check since prevents infinite loops, like in landscape mode in freeform mode in Taskbar
+                if ((System.currentTimeMillis() - lastMarginBottomExtraTime) > 40) {
+                    if (root_view_logging_enabled)
+                        Logger.logVerbose(LOG_TAG, "Resetting margin since visible due to extra margin");
+                    lastMarginBottomExtraTime = System.currentTimeMillis();
+                    // lastMarginBottom must be invalid. May also happen when keyboards are changed.
+                    lastMarginBottom = null;
+                    setMargin = true;
+                } else {
+                    if (root_view_logging_enabled)
+                        Logger.logVerbose(LOG_TAG, "Ignoring resetting margin since visible due to extra margin since called to quickly");
+                }
+            }
+            if (setMargin) {
+                if (root_view_logging_enabled)
+                    Logger.logVerbose(LOG_TAG, "Setting bottom margin to 0");
+                params.setMargins(0, 0, 0, 0);
+                setLayoutParams(params);
+            } else {
+                if (root_view_logging_enabled)
+                    Logger.logVerbose(LOG_TAG, "Bottom margin already equals 0");
+                // This is done so that when next time onMeasure() is called, lastMarginBottom is used.
+                // This is done since we **expect** the keyboard to have same dimensions next time layout
+                // changes, so best set margin while view is drawn the first time, otherwise it will
+                // cause a jitter when OnGlobalLayoutListener is called with margin 0 and it sets the
+                // likely same lastMarginBottom again and requesting a redraw. Hopefully, this logic
+                // works fine for all cases.
+                marginBottom = lastMarginBottom;
+            }
+        } else // ELse find the part of the extra keys/terminal that is hidden and add a margin accordingly
+        {
+            int pxHidden = bottomSpaceViewRect.bottom - windowAvailableRect.bottom;
             if (root_view_logging_enabled)
-                Logger.logVerbose(LOG_TAG, "Setting bottom margin to " + targetMarginPx);
-            params.setMargins(0, 0, 0, targetMarginPx);
-            setLayoutParams(params);
-            lastMarginBottom = targetMarginPx > 0 ? targetMarginPx : null;
-            lastMarginApplyTime = now;
-        } else if (root_view_logging_enabled) {
-            Logger.logVerbose(LOG_TAG, "Bottom margin already equals " + targetMarginPx);
-        }
-    }
-
-    void updateInsetsCache(WindowInsetsCompat compat) {
-        if (compat == null)
-            return;
-        mLastImeVisible = compat.isVisible(WindowInsetsCompat.Type.ime());
-        mLastImeBottomInset = compat.getInsets(WindowInsetsCompat.Type.ime()).bottom;
-        mLastSystemBarsBottomInset = compat.getInsets(WindowInsetsCompat.Type.systemBars()).bottom;
-        mInsetsInitialized = true;
-    }
-
-    @Nullable
-    private InsetsSnapshot resolveInsetsSnapshot() {
-        WindowInsets insets = getRootWindowInsets();
-        if (insets != null) {
-            WindowInsetsCompat compat = WindowInsetsCompat.toWindowInsetsCompat(insets, this);
-            updateInsetsCache(compat);
-        }
-        if (!mInsetsInitialized) {
-            return null;
-        }
-        return new InsetsSnapshot(mLastImeVisible, mLastImeBottomInset, mLastSystemBarsBottomInset);
-    }
-
-    static int computeImeDrivenBottomMarginPx(boolean imeVisible, int imeBottomInsetPx, int systemBarsBottomInsetPx,
-                                              int overlapPx, int rootHeightPx, int maxMarginPx,
-                                              int smallMarginThresholdPx, boolean allowImeFallback) {
-        if (!imeVisible) {
-            return 0;
-        }
-        int imeMarginPx = Math.max(0, imeBottomInsetPx - Math.max(0, systemBarsBottomInsetPx));
-        int overlapMarginPx = Math.max(0, overlapPx);
-        int targetMarginPx = overlapMarginPx;
-        if (targetMarginPx <= smallMarginThresholdPx && allowImeFallback) {
-            targetMarginPx = imeMarginPx;
-        }
-        if (targetMarginPx > 0 && targetMarginPx <= smallMarginThresholdPx) {
-            targetMarginPx = 0;
-        }
-        return clampMarginPx(targetMarginPx, rootHeightPx, maxMarginPx);
-    }
-
-    static int computeLegacyOverlapMarginPx(int overlapPx, int rootHeightPx, int maxMarginPx,
-                                            int smallMarginThresholdPx) {
-        int targetMarginPx = Math.max(0, overlapPx);
-        if (targetMarginPx > 0 && targetMarginPx <= smallMarginThresholdPx) {
-            targetMarginPx = 0;
-        }
-        return clampMarginPx(targetMarginPx, rootHeightPx, maxMarginPx);
-    }
-
-    private static int clampMarginPx(int targetMarginPx, int rootHeightPx, int maxMarginPx) {
-        int clamped = Math.max(0, targetMarginPx);
-        int rootBasedCapPx = rootHeightPx > 0 ? Math.round(rootHeightPx * 0.70f) : Integer.MAX_VALUE;
-        int hardCapPx = maxMarginPx > 0 ? maxMarginPx : Integer.MAX_VALUE;
-        int effectiveCapPx = Math.min(rootBasedCapPx, hardCapPx);
-        if (clamped > effectiveCapPx) {
-            clamped = effectiveCapPx;
-        }
-        return clamped;
-    }
-
-    private static final class InsetsSnapshot {
-        final boolean imeVisible;
-        final int imeBottomInsetPx;
-        final int systemBarsBottomInsetPx;
-
-        InsetsSnapshot(boolean imeVisible, int imeBottomInsetPx, int systemBarsBottomInsetPx) {
-            this.imeVisible = imeVisible;
-            this.imeBottomInsetPx = imeBottomInsetPx;
-            this.systemBarsBottomInsetPx = systemBarsBottomInsetPx;
+                Logger.logVerbose(LOG_TAG, "pxHidden " + pxHidden + ", bottom " + params.bottomMargin);
+            boolean setMargin = params.bottomMargin != pxHidden;
+            // If invisible despite margin, i.e a margin was added, but the bottom of bottomSpaceViewRect
+            // is still below that of windowAvailableRect, this will trigger OnGlobalLayoutListener
+            // again, so that margins are set properly. May happen when toolbar/extra keys is disabled
+            // and enabled from left drawer, just like case for isVisibleBecauseExtraMargin.
+            // onMeasure: Setting bottom margin to 176
+            // onGlobalLayout: windowAvailableRect 1232, bottomSpaceViewRect 1408, diff 176, bottom 176, isVisible false, isVisibleBecauseMargin false, isVisibleBecauseExtraMargin false
+            // onGlobalLayout: Bottom margin already equals 176
+            if (pxHidden > 0 && params.bottomMargin > 0) {
+                if (pxHidden != params.bottomMargin) {
+                    if (root_view_logging_enabled)
+                        Logger.logVerbose(LOG_TAG, "Force setting margin to 0 since not visible due to wrong margin");
+                    pxHidden = 0;
+                } else {
+                    if (root_view_logging_enabled)
+                        Logger.logVerbose(LOG_TAG, "Force setting margin since not visible despite required margin");
+                }
+                setMargin = true;
+            }
+            if (pxHidden < 0) {
+                if (root_view_logging_enabled)
+                    Logger.logVerbose(LOG_TAG, "Force setting margin to 0 since new margin is negative");
+                pxHidden = 0;
+            }
+            if (setMargin) {
+                if (root_view_logging_enabled)
+                    Logger.logVerbose(LOG_TAG, "Setting bottom margin to " + pxHidden);
+                params.setMargins(0, 0, 0, pxHidden);
+                setLayoutParams(params);
+                lastMarginBottom = pxHidden;
+            } else {
+                if (root_view_logging_enabled)
+                    Logger.logVerbose(LOG_TAG, "Bottom margin already equals " + pxHidden);
+            }
         }
     }
 
@@ -312,11 +255,7 @@ public class TermuxActivityRootView extends LinearLayout implements ViewTreeObse
 
         @Override
         public WindowInsets onApplyWindowInsets(View v, WindowInsets insets) {
-            WindowInsetsCompat compat = WindowInsetsCompat.toWindowInsetsCompat(insets, v);
-            mStatusBarHeight = compat.getInsets(WindowInsetsCompat.Type.statusBars()).top;
-            if (v instanceof TermuxActivityRootView) {
-                ((TermuxActivityRootView) v).updateInsetsCache(compat);
-            }
+            mStatusBarHeight = WindowInsetsCompat.toWindowInsetsCompat(insets).getInsets(WindowInsetsCompat.Type.statusBars()).top;
             // Let view window handle insets however it wants
             return v.onApplyWindowInsets(insets);
         }
