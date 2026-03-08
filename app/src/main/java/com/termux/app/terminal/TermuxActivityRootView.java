@@ -70,6 +70,7 @@ public class TermuxActivityRootView extends LinearLayout implements ViewTreeObse
 
     public long lastMarginBottomExtraTime;
     private long lastMarginApplyTime;
+    private int mImeOnlyLayoutStreak;
     private boolean mInsetsInitialized;
     private boolean mLastImeVisible;
     private int mLastImeBottomInset;
@@ -174,6 +175,12 @@ public class TermuxActivityRootView extends LinearLayout implements ViewTreeObse
         boolean shouldFallbackToLegacyOverlap = insetsSnapshot == null ||
             (!insetsSnapshot.imeVisible && pxHidden > smallMarginThresholdPx);
         if (!shouldFallbackToLegacyOverlap) {
+            if (insetsSnapshot.imeVisible && pxHidden <= smallMarginThresholdPx) {
+                mImeOnlyLayoutStreak++;
+            } else {
+                mImeOnlyLayoutStreak = 0;
+            }
+            boolean allowImeFallback = mImeOnlyLayoutStreak >= 2;
             targetMarginPx = computeImeDrivenBottomMarginPx(
                 insetsSnapshot.imeVisible,
                 insetsSnapshot.imeBottomInsetPx,
@@ -181,9 +188,11 @@ public class TermuxActivityRootView extends LinearLayout implements ViewTreeObse
                 pxHidden,
                 getHeight(),
                 maxMarginPx,
-                smallMarginThresholdPx
+                smallMarginThresholdPx,
+                allowImeFallback
             );
         } else {
+            mImeOnlyLayoutStreak = 0;
             targetMarginPx = computeLegacyOverlapMarginPx(
                 pxHidden,
                 getHeight(),
@@ -251,13 +260,16 @@ public class TermuxActivityRootView extends LinearLayout implements ViewTreeObse
 
     static int computeImeDrivenBottomMarginPx(boolean imeVisible, int imeBottomInsetPx, int systemBarsBottomInsetPx,
                                               int overlapPx, int rootHeightPx, int maxMarginPx,
-                                              int smallMarginThresholdPx) {
+                                              int smallMarginThresholdPx, boolean allowImeFallback) {
         if (!imeVisible) {
             return 0;
         }
         int imeMarginPx = Math.max(0, imeBottomInsetPx - Math.max(0, systemBarsBottomInsetPx));
         int overlapMarginPx = Math.max(0, overlapPx);
-        int targetMarginPx = Math.max(imeMarginPx, overlapMarginPx);
+        int targetMarginPx = overlapMarginPx;
+        if (targetMarginPx <= smallMarginThresholdPx && allowImeFallback) {
+            targetMarginPx = imeMarginPx;
+        }
         if (targetMarginPx > 0 && targetMarginPx <= smallMarginThresholdPx) {
             targetMarginPx = 0;
         }

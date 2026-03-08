@@ -15,14 +15,15 @@ public class TermuxActivityRootViewMarginPolicyTest {
             180,
             2000,
             1200,
-            16
+            16,
+            false
         );
 
         assertEquals(0, margin);
     }
 
     @Test
-    public void imeVisible_prefersLargerOfInsetsAndOverlap() {
+    public void imeVisible_prefersMeasuredOverlapWhenAvailable() {
         int margin = TermuxActivityRootView.computeImeDrivenBottomMarginPx(
             true,
             520,
@@ -30,7 +31,8 @@ public class TermuxActivityRootViewMarginPolicyTest {
             460,
             2000,
             1200,
-            16
+            16,
+            false
         );
 
         assertEquals(460, margin);
@@ -45,7 +47,8 @@ public class TermuxActivityRootViewMarginPolicyTest {
             10,
             2000,
             1200,
-            16
+            16,
+            false
         );
 
         assertEquals(0, margin);
@@ -60,7 +63,8 @@ public class TermuxActivityRootViewMarginPolicyTest {
             0,
             800,
             1200,
-            16
+            16,
+            true
         );
 
         // 70% of root height is 560; this cap should apply before the hard cap.
@@ -77,5 +81,37 @@ public class TermuxActivityRootViewMarginPolicyTest {
         );
 
         assertEquals(700, margin);
+    }
+
+    @Test
+    public void imeFallbackDisabled_ignoresTransientImeInsetSpike() {
+        int margin = TermuxActivityRootView.computeImeDrivenBottomMarginPx(
+            true,
+            520,
+            120,
+            0,
+            2000,
+            1200,
+            16,
+            false
+        );
+
+        assertEquals(0, margin);
+    }
+
+    @Test
+    public void imeFallbackEnabled_usesImeInsetWhenOverlapUnavailable() {
+        int margin = TermuxActivityRootView.computeImeDrivenBottomMarginPx(
+            true,
+            520,
+            120,
+            0,
+            2000,
+            1200,
+            16,
+            true
+        );
+
+        assertEquals(400, margin);
     }
 }
