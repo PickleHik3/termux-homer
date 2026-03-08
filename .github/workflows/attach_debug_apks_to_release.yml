@@ -124,14 +124,30 @@ jobs:
           fi
 
           echo "Attaching APKs to github release"
+          ASSETS_TO_UPLOAD=(
+            "${APK_BASENAME_PREFIX}_universal.apk"
+            "${APK_BASENAME_PREFIX}_arm64-v8a.apk"
+            "${APK_BASENAME_PREFIX}_armeabi-v7a.apk"
+            "${APK_BASENAME_PREFIX}_x86_64.apk"
+            "${APK_BASENAME_PREFIX}_x86.apk"
+            "${APK_BASENAME_PREFIX}_sha256sums"
+          )
+
+          for asset_name in "${ASSETS_TO_UPLOAD[@]}"; do
+            if gh release view "$RELEASE_VERSION_NAME" --json assets --jq '.assets[].name' | grep -Fxq "$asset_name"; then
+              echo "Deleting existing asset: $asset_name"
+              if ! gh release delete-asset "$RELEASE_VERSION_NAME" "$asset_name" --yes; then
+                exit_on_error "Failed to delete existing release asset '$asset_name'."
+              fi
+            fi
+          done
+
           if ! gh release upload "$RELEASE_VERSION_NAME" \
-            --clobber \
             "$APK_DIR_PATH/${APK_BASENAME_PREFIX}_universal.apk" \
             "$APK_DIR_PATH/${APK_BASENAME_PREFIX}_arm64-v8a.apk" \
             "$APK_DIR_PATH/${APK_BASENAME_PREFIX}_armeabi-v7a.apk" \
             "$APK_DIR_PATH/${APK_BASENAME_PREFIX}_x86_64.apk" \
             "$APK_DIR_PATH/${APK_BASENAME_PREFIX}_x86.apk" \
-            "$APK_DIR_PATH/${APK_BASENAME_PREFIX}_sha256sums" \
-          ; then
+            "$APK_DIR_PATH/${APK_BASENAME_PREFIX}_sha256sums"; then
             exit_on_error "Attach APKs to release failed for '$APK_VERSION_TAG' release."
           fi
