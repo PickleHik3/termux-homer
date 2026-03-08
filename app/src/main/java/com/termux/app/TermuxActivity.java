@@ -601,10 +601,29 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         }
 
         applyTerminalStatusBarInset(enable ? mStatusBarInsetTop : 0);
+        resetRootBottomMarginAfterEdgeModeToggle();
         View content = findViewById(android.R.id.content);
         if (content != null) {
             ViewCompat.requestApplyInsets(content);
         }
+    }
+
+    private void resetRootBottomMarginAfterEdgeModeToggle() {
+        if (mTermuxActivityRootView == null) {
+            return;
+        }
+        ViewGroup.LayoutParams layoutParams = mTermuxActivityRootView.getLayoutParams();
+        if (layoutParams instanceof ViewGroup.MarginLayoutParams) {
+            ViewGroup.MarginLayoutParams marginLayoutParams = (ViewGroup.MarginLayoutParams) layoutParams;
+            if (marginLayoutParams.bottomMargin != 0) {
+                marginLayoutParams.bottomMargin = 0;
+                mTermuxActivityRootView.setLayoutParams(marginLayoutParams);
+            }
+        }
+        mTermuxActivityRootView.marginBottom = 0;
+        mTermuxActivityRootView.lastMarginBottom = null;
+        mTermuxActivityRootView.lastMarginBottomTime = 0L;
+        mTermuxActivityRootView.lastMarginBottomExtraTime = 0L;
     }
 
     private void applyBackgroundLayerTopInset(int viewId, int insetTop) {
