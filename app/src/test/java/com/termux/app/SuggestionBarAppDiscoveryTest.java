@@ -14,6 +14,7 @@ import org.robolectric.RobolectricTestRunner;
 import org.robolectric.RuntimeEnvironment;
 import org.robolectric.annotation.ConscryptMode;
 import org.robolectric.annotation.Config;
+import org.robolectric.annotation.LooperMode;
 import org.robolectric.shadows.ShadowPackageManager;
 
 import static org.junit.Assert.assertEquals;
@@ -22,6 +23,7 @@ import static org.robolectric.Shadows.shadowOf;
 @RunWith(RobolectricTestRunner.class)
 @Config(sdk = {Build.VERSION_CODES.P}, application = Application.class)
 @ConscryptMode(ConscryptMode.Mode.OFF)
+@LooperMode(LooperMode.Mode.LEGACY)
 public class SuggestionBarAppDiscoveryTest {
 
     private Context context;

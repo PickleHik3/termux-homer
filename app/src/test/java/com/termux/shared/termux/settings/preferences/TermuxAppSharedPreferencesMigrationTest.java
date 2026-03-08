@@ -12,6 +12,7 @@ import org.junit.runner.RunWith;
 import org.robolectric.RobolectricTestRunner;
 import org.robolectric.RuntimeEnvironment;
 import org.robolectric.annotation.Config;
+import org.robolectric.annotation.LooperMode;
 import org.robolectric.util.ReflectionHelpers;
 
 import static org.junit.Assert.assertFalse;
@@ -19,6 +20,7 @@ import static org.junit.Assert.assertTrue;
 
 @RunWith(RobolectricTestRunner.class)
 @Config(sdk = {Build.VERSION_CODES.P})
+@LooperMode(LooperMode.Mode.LEGACY)
 public class TermuxAppSharedPreferencesMigrationTest {
 
     @Test

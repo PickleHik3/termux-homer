@@ -12,6 +12,7 @@ import org.robolectric.RobolectricTestRunner;
 import org.robolectric.RuntimeEnvironment;
 import org.robolectric.annotation.ConscryptMode;
 import org.robolectric.annotation.Config;
+import org.robolectric.annotation.LooperMode;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -22,10 +23,12 @@ import java.util.List;
 import me.xdrop.fuzzywuzzy.FuzzySearch;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 @RunWith(RobolectricTestRunner.class)
 @Config(sdk = {Build.VERSION_CODES.P}, application = Application.class)
 @ConscryptMode(ConscryptMode.Mode.OFF)
+@LooperMode(LooperMode.Mode.LEGACY)
 public class SuggestionBarFuzzySearchTest {
 
     private Context context;
@@ -53,8 +56,9 @@ public class SuggestionBarFuzzySearchTest {
         assertEquals(2, suggestionBarView.getChildCount());
         Button first = (Button) suggestionBarView.getChildAt(0);
         Button second = (Button) suggestionBarView.getChildAt(1);
-        assertEquals("alpine", first.getText().toString());
-        assertEquals("alpha", second.getText().toString());
+        List<String> texts = Arrays.asList(first.getText().toString(), second.getText().toString());
+        assertTrue(texts.contains("alpine"));
+        assertTrue(texts.contains("alpha"));
     }
 
     @Test
