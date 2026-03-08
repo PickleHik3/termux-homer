@@ -63,15 +63,6 @@ Current Tooie endpoints include:
 Docs and policy notes:
 - `docs/en/Tooie_API.md`
 
-## Build (local)
-
-```sh
-COMPILE_SDK_OVERRIDE=34 ./gradlew \
-  -PcompileSdkVersion=34 \
-  -Pandroid.aapt2FromMavenOverride=/data/data/com.termux/files/usr/bin/aapt2 \
-  :app:compileDebugJavaWithJavac
-```
-
 ## Upstream Base
 
 - Upstream Termux app: https://github.com/termux/termux-app
@@ -85,7 +76,7 @@ COMPILE_SDK_OVERRIDE=34 ./gradlew \
 - `termux-app`: upstream Android app base this fork builds on
   https://github.com/termux/termux-app
 
-## Companion Apps (Forks)
+## Companion Apps
 
 Use below companion apps to avoid shared UID/signature incompatibility.
 
