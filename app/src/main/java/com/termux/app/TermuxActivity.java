@@ -83,6 +83,7 @@ import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
 import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.core.view.WindowInsetsCompat.Type;
 import androidx.drawerlayout.widget.DrawerLayout;
@@ -289,6 +290,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         // Apply wallpaper or normal theme based on preference
         setActivityThemeAndWindow();
         super.onCreate(savedInstanceState);
+        WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
         setContentView(R.layout.activity_termux);
         // Load termux shared preferences
         // This will also fail if TermuxConstants.TERMUX_PACKAGE_NAME does not equal applicationId
@@ -310,9 +312,10 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         View content = findViewById(android.R.id.content);
         content.setOnApplyWindowInsetsListener((v, insets) -> {
             WindowInsetsCompat insetsCompat = WindowInsetsCompat.toWindowInsetsCompat(insets, v);
-            mNavBarHeight = insetsCompat.getInsets(Type.systemBars()).bottom;
+            applySystemBarInsets(insetsCompat);
             return insetsCompat.toWindowInsets();
         });
+        ViewCompat.requestApplyInsets(content);
         if (mProperties.isUsingFullScreen()) {
             WindowInsetsController insetsController = getWindow().getInsetsController();
             if (insetsController != null) {
@@ -389,6 +392,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         configureBackgroundBlur(R.id.sessions_backgroundblur, R.id.sessions_background, mPreferences.isSessionsBlurEnabled(), 0.5f, mPreferences.getSessionsBlurRadius());
         configureExtraKeysBackground();
         applyTerminalBlurBackground();
+        applyTerminalGrainOverlay();
     
         registerTermuxActivityBroadcastReceiver();
         registerPackageChangeReceiver();
@@ -414,6 +418,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         configureBackgroundBlur(R.id.sessions_backgroundblur, R.id.sessions_background, mPreferences.isSessionsBlurEnabled(), 0.5f, mPreferences.getSessionsBlurRadius());
         configureExtraKeysBackground();
         applyTerminalBlurBackground();
+        applyTerminalGrainOverlay();
 
         // Check if a crash happened on last run of the app or if a plugin crashed and show a
         // notification with the crash details if it did
@@ -424,6 +429,23 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
     private void configureViewVisibility(int viewId, boolean isVisible) {
         View view = findViewById(viewId);
         view.setVisibility(isVisible ? View.VISIBLE : View.GONE);
+    }
+
+    private void applySystemBarInsets(@NonNull WindowInsetsCompat insetsCompat) {
+        mNavBarHeight = insetsCompat.getInsets(Type.systemBars()).bottom;
+        int statusBarInsetTop = insetsCompat.getInsets(Type.statusBars()).top;
+        View terminalContentRoot = findViewById(R.id.activity_termux_root_relative_layout);
+        if (terminalContentRoot == null) {
+            return;
+        }
+        if (terminalContentRoot.getPaddingTop() != statusBarInsetTop) {
+            terminalContentRoot.setPadding(
+                terminalContentRoot.getPaddingLeft(),
+                statusBarInsetTop,
+                terminalContentRoot.getPaddingRight(),
+                terminalContentRoot.getPaddingBottom()
+            );
+        }
     }
 
     private void applyTerminalMonetBackgroundOpacity() {
@@ -528,6 +550,13 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         ((RealtimeBlurView) blurView).setBlurRadius(radiusPx);
     }
 
+    private void applyRealtimeBlurDownsampleFactor(View blurView, int downsampleFactor) {
+        if (!(blurView instanceof RealtimeBlurView)) {
+            return;
+        }
+        ((RealtimeBlurView) blurView).setDownsampleFactor(Math.max(1, downsampleFactor));
+    }
+
     private void applyTerminalBlurBackground() {
         if (mPreferences == null) {
             return;
@@ -537,8 +566,20 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
             return;
         }
         int blurRadiusDp = mPreferences.getTerminalBlurRadius();
+        int downsampleFactor = mPreferences.getTerminalBlurDownsampleFactor();
         applyRealtimeBlurRadius(blurView, blurRadiusDp);
+        applyRealtimeBlurDownsampleFactor(blurView, downsampleFactor);
         blurView.setVisibility(blurRadiusDp > 0 ? View.VISIBLE : View.GONE);
+    }
+
+    private void applyTerminalGrainOverlay() {
+        View grainOverlay = findViewById(R.id.terminal_grain_overlay);
+        if (!(grainOverlay instanceof TerminalGrainOverlayView) || mPreferences == null) {
+            return;
+        }
+        int grainIntensity = mPreferences.getTerminalGrainIntensity();
+        ((TerminalGrainOverlayView) grainOverlay).setIntensity(grainIntensity);
+        grainOverlay.setVisibility(grainIntensity > 0 ? View.VISIBLE : View.GONE);
     }
 
     @Override
@@ -1679,6 +1720,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
             }
         }
         applyTerminalBlurBackground();
+        applyTerminalGrainOverlay();
         FileReceiverActivity.updateFileReceiverActivityComponentsState(this);
         if (mTermuxTerminalSessionActivityClient != null)
             mTermuxTerminalSessionActivityClient.onReloadActivityStyling();

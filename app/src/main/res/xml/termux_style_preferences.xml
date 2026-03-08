@@ -44,7 +44,25 @@
             app:title="@string/termux_terminal_blur_radius_title"
             app:summary="@string/termux_terminal_blur_radius_summary"
             android:min="0"
-            android:max="30"
+            android:max="25"
+            android:defaultValue="0"
+            app:showSeekBarValue="true" />
+
+        <androidx.preference.SeekBarPreference
+            app:key="terminal_blur_downsample_factor"
+            app:title="@string/termux_terminal_blur_downsample_factor_title"
+            app:summary="@string/termux_terminal_blur_downsample_factor_summary"
+            android:min="1"
+            android:max="8"
+            android:defaultValue="4"
+            app:showSeekBarValue="true" />
+
+        <androidx.preference.SeekBarPreference
+            app:key="terminal_grain_intensity"
+            app:title="@string/termux_terminal_grain_intensity_title"
+            app:summary="@string/termux_terminal_grain_intensity_summary"
+            android:min="0"
+            android:max="100"
             android:defaultValue="0"
             app:showSeekBarValue="true" />
     </PreferenceCategory>

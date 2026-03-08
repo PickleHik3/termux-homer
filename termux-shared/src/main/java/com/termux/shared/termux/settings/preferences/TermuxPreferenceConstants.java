@@ -319,6 +319,20 @@ public final class TermuxPreferenceConstants {
         public static final int DEFAULT_VALUE_TERMINAL_BLUR_RADIUS = 0;
 
         /**
+         * Defines the key for terminal blur downsample factor. Lower is sharper but heavier.
+         */
+        public static final String KEY_TERMINAL_BLUR_DOWNSAMPLE_FACTOR = "terminal_blur_downsample_factor";
+
+        public static final int DEFAULT_VALUE_TERMINAL_BLUR_DOWNSAMPLE_FACTOR = 4;
+
+        /**
+         * Defines the key for terminal grain overlay intensity (percentage).
+         */
+        public static final String KEY_TERMINAL_GRAIN_INTENSITY = "terminal_grain_intensity";
+
+        public static final int DEFAULT_VALUE_TERMINAL_GRAIN_INTENSITY = 0;
+
+        /**
          * Defines the key for sessions blur radius (dp). 0 disables blur.
          */
         public static final String KEY_SESSIONS_BLUR_RADIUS = "sessions_blur_radius";

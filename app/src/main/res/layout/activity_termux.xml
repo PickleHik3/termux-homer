@@ -6,7 +6,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:fitsSystemWindows="true">
+    android:fitsSystemWindows="false">
 
     <FrameLayout
         android:id="@+id/terminal_root_container"
@@ -27,6 +27,12 @@
             android:visibility="gone"
             app:realtimeBlurRadius="10dp"
             app:realtimeOverlayColor="@android:color/transparent" />
+
+        <com.termux.app.TerminalGrainOverlayView
+            android:id="@+id/terminal_grain_overlay"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:visibility="gone" />
 
         <RelativeLayout
             android:id="@+id/activity_termux_root_relative_layout"

@@ -441,11 +441,29 @@ public class TermuxAppSharedPreferences extends AppSharedPreferences {
 
     public int getTerminalBlurRadius() {
         int radius = SharedPreferenceUtils.getInt(mSharedPreferences, TERMUX_APP.KEY_TERMINAL_BLUR_RADIUS, TERMUX_APP.DEFAULT_VALUE_TERMINAL_BLUR_RADIUS);
-        return Math.max(radius, 0);
+        return DataUtils.clamp(radius, 0, 25);
     }
 
     public void setTerminalBlurRadius(int value) {
-        SharedPreferenceUtils.setInt(mSharedPreferences, TERMUX_APP.KEY_TERMINAL_BLUR_RADIUS, Math.max(value, 0), false);
+        SharedPreferenceUtils.setInt(mSharedPreferences, TERMUX_APP.KEY_TERMINAL_BLUR_RADIUS, DataUtils.clamp(value, 0, 25), false);
+    }
+
+    public int getTerminalBlurDownsampleFactor() {
+        int factor = SharedPreferenceUtils.getInt(mSharedPreferences, TERMUX_APP.KEY_TERMINAL_BLUR_DOWNSAMPLE_FACTOR, TERMUX_APP.DEFAULT_VALUE_TERMINAL_BLUR_DOWNSAMPLE_FACTOR);
+        return DataUtils.clamp(factor, 1, 8);
+    }
+
+    public void setTerminalBlurDownsampleFactor(int value) {
+        SharedPreferenceUtils.setInt(mSharedPreferences, TERMUX_APP.KEY_TERMINAL_BLUR_DOWNSAMPLE_FACTOR, DataUtils.clamp(value, 1, 8), false);
+    }
+
+    public int getTerminalGrainIntensity() {
+        int intensity = SharedPreferenceUtils.getInt(mSharedPreferences, TERMUX_APP.KEY_TERMINAL_GRAIN_INTENSITY, TERMUX_APP.DEFAULT_VALUE_TERMINAL_GRAIN_INTENSITY);
+        return DataUtils.clamp(intensity, 0, 100);
+    }
+
+    public void setTerminalGrainIntensity(int value) {
+        SharedPreferenceUtils.setInt(mSharedPreferences, TERMUX_APP.KEY_TERMINAL_GRAIN_INTENSITY, DataUtils.clamp(value, 0, 100), false);
     }
 
     public int getSessionsBlurRadius() {
