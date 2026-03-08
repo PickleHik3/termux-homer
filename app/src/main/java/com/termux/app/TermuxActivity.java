@@ -590,7 +590,6 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         WindowCompat.setDecorFitsSystemWindows(getWindow(), !enable);
 
         if (mTermuxActivityRootView != null) {
-            mTermuxActivityRootView.setFitsSystemWindows(!enable);
             mTermuxActivityRootView.setClipToPadding(!enable);
             mTermuxActivityRootView.setClipChildren(!enable);
         }
@@ -630,19 +629,6 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         applyBackgroundLayerTopInset(R.id.terminal_monetbackground, safeInsetTop);
         applyBackgroundLayerTopInset(R.id.terminal_backgroundblur, safeInsetTop);
         applyBackgroundLayerTopInset(R.id.terminal_grain_overlay, safeInsetTop);
-
-        View terminalContentRoot = findViewById(R.id.activity_termux_root_relative_layout);
-        if (terminalContentRoot == null) {
-            return;
-        }
-        if (terminalContentRoot.getPaddingTop() != safeInsetTop) {
-            terminalContentRoot.setPadding(
-                terminalContentRoot.getPaddingLeft(),
-                safeInsetTop,
-                terminalContentRoot.getPaddingRight(),
-                terminalContentRoot.getPaddingBottom()
-            );
-        }
     }
 
     @Override

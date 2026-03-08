@@ -108,7 +108,7 @@ public class TermuxActivityExtraKeysLayoutParamsTest {
         assertEquals(-32, ((FrameLayout.LayoutParams) terminalMonetBackground.getLayoutParams()).topMargin);
         assertEquals(-32, ((FrameLayout.LayoutParams) terminalBlurBackground.getLayoutParams()).topMargin);
         assertEquals(-32, ((FrameLayout.LayoutParams) terminalGrainOverlay.getLayoutParams()).topMargin);
-        assertEquals(32, terminalContentRoot.getPaddingTop());
+        assertEquals(0, terminalContentRoot.getPaddingTop());
 
         ReflectionHelpers.callInstanceMethod(activity, "applyTerminalStatusBarInset",
             ReflectionHelpers.ClassParameter.from(int.class, 0));
