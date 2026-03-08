@@ -6,6 +6,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.RelativeLayout;
 
+import com.github.mmin18.widget.RealtimeBlurView;
 import com.termux.R;
 
 import org.junit.Test;
@@ -68,5 +69,20 @@ public class TermuxActivityExtraKeysLayoutParamsTest {
         int heightSpec = View.MeasureSpec.makeMeasureSpec(1920, View.MeasureSpec.EXACTLY);
         rootRelativeLayout.measure(widthSpec, heightSpec);
         rootRelativeLayout.layout(0, 0, 1080, 1920);
+    }
+
+    @Test
+    public void realtimeBlurViews_areInflatedAndConfigurable() {
+        TermuxActivity activity = Robolectric.buildActivity(TermuxActivity.class).get();
+        activity.setContentView(R.layout.activity_termux);
+
+        View sessionsBlur = activity.findViewById(R.id.sessions_backgroundblur);
+        View extraKeysBlur = activity.findViewById(R.id.extrakeys_backgroundblur);
+
+        assertTrue(sessionsBlur instanceof RealtimeBlurView);
+        assertTrue(extraKeysBlur instanceof RealtimeBlurView);
+
+        ((RealtimeBlurView) sessionsBlur).setBlurRadius(12f);
+        ((RealtimeBlurView) extraKeysBlur).setBlurRadius(16f);
     }
 }
