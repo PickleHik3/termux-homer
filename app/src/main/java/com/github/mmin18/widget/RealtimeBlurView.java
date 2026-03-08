@@ -37,6 +37,7 @@ public class RealtimeBlurView extends View {
     private Canvas mBlurringCanvas;
     private boolean mIsRendering;
     private final Paint mPaint;
+    private final Paint mBitmapPaint;
     private final Rect mRectSrc = new Rect();
     private final Rect mRectDst = new Rect();
 
@@ -69,6 +70,7 @@ public class RealtimeBlurView extends View {
         a.recycle();
 
         mPaint = new Paint();
+        mBitmapPaint = new Paint(Paint.FILTER_BITMAP_FLAG | Paint.DITHER_FLAG);
     }
 
     protected BlurImpl getBlurImpl() {
@@ -304,7 +306,7 @@ public class RealtimeBlurView extends View {
             mRectSrc.bottom = blurredBitmap.getHeight();
             mRectDst.right = getWidth();
             mRectDst.bottom = getHeight();
-            canvas.drawBitmap(blurredBitmap, mRectSrc, mRectDst, null);
+            canvas.drawBitmap(blurredBitmap, mRectSrc, mRectDst, mBitmapPaint);
         }
         mPaint.setColor(overlayColor);
         canvas.drawRect(mRectDst, mPaint);

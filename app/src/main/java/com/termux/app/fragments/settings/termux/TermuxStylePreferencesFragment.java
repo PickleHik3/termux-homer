@@ -174,6 +174,12 @@ class TermuxStylePreferencesDataStore extends PreferenceDataStore {
             case "terminal_blur_radius":
                 mPreferences.setTerminalBlurRadius(value);
                 break;
+            case "terminal_blur_downsample_factor":
+                mPreferences.setTerminalBlurDownsampleFactor(value);
+                break;
+            case "terminal_grain_intensity":
+                mPreferences.setTerminalGrainIntensity(value);
+                break;
             case "sessions_blur_radius":
                 mPreferences.setSessionsBlurRadius(value);
                 break;
@@ -208,6 +214,10 @@ class TermuxStylePreferencesDataStore extends PreferenceDataStore {
                 return mPreferences.getTerminalBackgroundOpacity();
             case "terminal_blur_radius":
                 return mPreferences.getTerminalBlurRadius();
+            case "terminal_blur_downsample_factor":
+                return mPreferences.getTerminalBlurDownsampleFactor();
+            case "terminal_grain_intensity":
+                return mPreferences.getTerminalGrainIntensity();
             case "sessions_blur_radius":
                 return mPreferences.getSessionsBlurRadius();
             case "extrakeys_blur_radius":

@@ -312,6 +312,10 @@
                 <string name="termux_monet_overlay_enabled_on">Use the current Monet surface color for the overlay.</string>
                 <string name="termux_terminal_blur_radius_title">Terminal blur amount</string>
                 <string name="termux_terminal_blur_radius_summary">Blur radius for terminal content (Android 12+). 0 disables blur.</string>
+                <string name="termux_terminal_blur_downsample_factor_title">Terminal blur quality</string>
+                <string name="termux_terminal_blur_downsample_factor_summary">Downsample factor for terminal blur (1 = sharpest/heaviest, 8 = softest/lightest).</string>
+                <string name="termux_terminal_grain_intensity_title">Terminal grain intensity</string>
+                <string name="termux_terminal_grain_intensity_summary">Adds film grain over terminal background only. Works with or without blur and opacity.</string>
                 
             <!-- Extra Keys Category -->
             <string name="termux_extrakeys_header">Extra Keys</string>
