@@ -2,6 +2,11 @@ name: Attach Debug APKs To Release
 
 on:
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Existing release tag to upload APKs to (for example: v0.1.1)'
+        required: false
+        type: string
 
 jobs:
   attach-apks:
@@ -29,6 +34,7 @@ jobs:
         shell: bash {0}
         env:
           PACKAGE_VARIANT: ${{ matrix.package_variant }}
+          RELEASE_TAG_INPUT: ${{ github.event.inputs.release_tag }}
           TERMUX_RELEASE_STORE_FILE: ${{ secrets.TERMUX_RELEASE_STORE_FILE }}
           TERMUX_RELEASE_STORE_PASSWORD: ${{ secrets.TERMUX_RELEASE_STORE_PASSWORD }}
           TERMUX_RELEASE_KEY_ALIAS: ${{ secrets.TERMUX_RELEASE_KEY_ALIAS }}
@@ -42,6 +48,9 @@ jobs:
 
           echo "Setting vars"
           RELEASE_VERSION_NAME="${GITHUB_REF/refs\/tags\//}"
+          if [ -n "$RELEASE_TAG_INPUT" ]; then
+            RELEASE_VERSION_NAME="$RELEASE_TAG_INPUT"
+          fi
           RELEASE_VERSION_PLAIN="${RELEASE_VERSION_NAME/v/}"
           CURRENT_VERSION_NAME_REGEX='\s+versionName "([^"]+)"$'
           CURRENT_VERSION_NAME="$(grep -m 1 -E "$CURRENT_VERSION_NAME_REGEX" ./app/build.gradle | sed -r "s/$CURRENT_VERSION_NAME_REGEX/\1/")"
