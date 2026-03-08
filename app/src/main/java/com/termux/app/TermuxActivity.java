@@ -82,8 +82,6 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
-import androidx.core.view.ViewCompat;
-import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.core.view.WindowInsetsCompat.Type;
 import androidx.drawerlayout.widget.DrawerLayout;
@@ -290,7 +288,6 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         // Apply wallpaper or normal theme based on preference
         setActivityThemeAndWindow();
         super.onCreate(savedInstanceState);
-        WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
         setContentView(R.layout.activity_termux);
         // Load termux shared preferences
         // This will also fail if TermuxConstants.TERMUX_PACKAGE_NAME does not equal applicationId
@@ -312,10 +309,9 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         View content = findViewById(android.R.id.content);
         content.setOnApplyWindowInsetsListener((v, insets) -> {
             WindowInsetsCompat insetsCompat = WindowInsetsCompat.toWindowInsetsCompat(insets, v);
-            applySystemBarInsets(insetsCompat);
+            mNavBarHeight = insetsCompat.getInsets(Type.systemBars()).bottom;
             return insetsCompat.toWindowInsets();
         });
-        ViewCompat.requestApplyInsets(content);
         if (mProperties.isUsingFullScreen()) {
             WindowInsetsController insetsController = getWindow().getInsetsController();
             if (insetsController != null) {
@@ -429,23 +425,6 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
     private void configureViewVisibility(int viewId, boolean isVisible) {
         View view = findViewById(viewId);
         view.setVisibility(isVisible ? View.VISIBLE : View.GONE);
-    }
-
-    private void applySystemBarInsets(@NonNull WindowInsetsCompat insetsCompat) {
-        mNavBarHeight = insetsCompat.getInsets(Type.systemBars()).bottom;
-        int statusBarInsetTop = insetsCompat.getInsets(Type.statusBars()).top;
-        View terminalContentRoot = findViewById(R.id.activity_termux_root_relative_layout);
-        if (terminalContentRoot == null) {
-            return;
-        }
-        if (terminalContentRoot.getPaddingTop() != statusBarInsetTop) {
-            terminalContentRoot.setPadding(
-                terminalContentRoot.getPaddingLeft(),
-                statusBarInsetTop,
-                terminalContentRoot.getPaddingRight(),
-                terminalContentRoot.getPaddingBottom()
-            );
-        }
     }
 
     private void applyTerminalMonetBackgroundOpacity() {
