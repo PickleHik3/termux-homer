@@ -59,13 +59,13 @@ public class SuggestionBarAppDiscoveryTest {
     }
 
     @Test
-    public void testReloadAllApps_withNoRegisteredApps_rendersZeroChildrenAndDoesNotCrash() {
+    public void testReloadAllApps_withNoRegisteredApps_rendersEmptyStateHintAndDoesNotCrash() {
         suggestionBarView.reloadAllApps();
         suggestionBarView.reloadWithInput("", null);
 
         int childCount = suggestionBarView.getChildCount();
 
-        assertEquals("SuggestionBarView should handle empty app list without crashing", 0, childCount);
+        assertEquals("SuggestionBarView should render a single empty-state hint when no apps are available", 1, childCount);
     }
 
     @Test

@@ -12,7 +12,6 @@ import org.robolectric.RobolectricTestRunner;
 import org.robolectric.RuntimeEnvironment;
 import org.robolectric.annotation.ConscryptMode;
 import org.robolectric.annotation.Config;
-import org.robolectric.util.ReflectionHelpers;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -46,7 +45,7 @@ public class SuggestionBarFuzzySearchTest {
                 new TestButton("alpha"),
                 new TestButton("beta")
         );
-        ReflectionHelpers.setField(suggestionBarView, "allSuggestionButtons", new ArrayList<>(buttons));
+        suggestionBarView.setSuggestionButtons(new ArrayList<>(buttons));
         suggestionBarView.setMaxButtonCount(2);
 
         suggestionBarView.reloadWithInput("al", null);
@@ -72,7 +71,7 @@ public class SuggestionBarFuzzySearchTest {
         );
 
         List<TestButton> expected = buildExpectedFuzzyOrder(buttons, "termx", 70);
-        ReflectionHelpers.setField(suggestionBarView, "allSuggestionButtons", new ArrayList<>(buttons));
+        suggestionBarView.setSuggestionButtons(new ArrayList<>(buttons));
         suggestionBarView.setMaxButtonCount(expected.size());
 
         suggestionBarView.reloadWithInput("termx", null);

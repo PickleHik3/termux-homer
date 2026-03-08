@@ -1,6 +1,7 @@
 package com.termux.app.launcher;
 
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.os.Build;
 
 import com.termux.app.launcher.data.LauncherConfigRepository;
@@ -9,6 +10,7 @@ import com.termux.app.launcher.model.PinnedAppItem;
 import com.termux.app.launcher.model.PinnedFolderItem;
 import com.termux.app.launcher.model.PinnedItem;
 import com.termux.shared.termux.settings.preferences.TermuxAppSharedPreferences;
+import com.termux.shared.termux.settings.preferences.TermuxPreferenceConstants.TERMUX_APP;
 
 import org.junit.Before;
 import org.junit.Test;
@@ -36,8 +38,11 @@ public class LauncherConfigRepositoryTest {
             TermuxAppSharedPreferences.class,
             ReflectionHelpers.ClassParameter.from(Context.class, context)
         );
-        preferences.setAppLauncherPinnedItemsV2("");
-        preferences.setAppLauncherPinnedItemsSchemaVersion(0);
+        SharedPreferences rawPreferences = preferences.getSharedPreferences();
+        rawPreferences.edit()
+            .putString(TERMUX_APP.KEY_APP_LAUNCHER_PINNED_ITEMS_V2, "")
+            .putInt(TERMUX_APP.KEY_APP_LAUNCHER_PINNED_ITEMS_SCHEMA_VERSION, 0)
+            .commit();
         repository = new LauncherConfigRepository(preferences);
     }
 
@@ -83,4 +88,3 @@ public class LauncherConfigRepositoryTest {
         assertEquals(2, loadedFolder.apps.size());
     }
 }
-

@@ -125,7 +125,7 @@ public class TermuxAppSharedPreferences extends AppSharedPreferences {
         );
         if (value == null || value.trim().isEmpty()) {
             value = TERMUX_APP.DEFAULT_APP_LAUNCHER_INPUT_CHAR;
-            SharedPreferenceUtils.setString(mSharedPreferences, TERMUX_APP.KEY_APP_LAUNCHER_INPUT_CHAR, value, false);
+            SharedPreferenceUtils.setString(mSharedPreferences, TERMUX_APP.KEY_APP_LAUNCHER_INPUT_CHAR, value, true);
         }
         return value;
     }
@@ -186,7 +186,7 @@ public class TermuxAppSharedPreferences extends AppSharedPreferences {
     }
 
     public void setAppLauncherPinnedItemsV2(String value) {
-        SharedPreferenceUtils.setString(mSharedPreferences, TERMUX_APP.KEY_APP_LAUNCHER_PINNED_ITEMS_V2, value, false);
+        SharedPreferenceUtils.setString(mSharedPreferences, TERMUX_APP.KEY_APP_LAUNCHER_PINNED_ITEMS_V2, value, true);
     }
 
     public int getAppLauncherPinnedItemsSchemaVersion() {
@@ -195,7 +195,7 @@ public class TermuxAppSharedPreferences extends AppSharedPreferences {
     }
 
     public void setAppLauncherPinnedItemsSchemaVersion(int version) {
-        SharedPreferenceUtils.setInt(mSharedPreferences, TERMUX_APP.KEY_APP_LAUNCHER_PINNED_ITEMS_SCHEMA_VERSION, version, false);
+        SharedPreferenceUtils.setInt(mSharedPreferences, TERMUX_APP.KEY_APP_LAUNCHER_PINNED_ITEMS_SCHEMA_VERSION, version, true);
     }
 
     public boolean isAppLauncherAzRowEnabled() {
@@ -238,14 +238,19 @@ public class TermuxAppSharedPreferences extends AppSharedPreferences {
 
         boolean hasStoredValue = mSharedPreferences.contains(TERMUX_APP.KEY_TERMINAL_MARGIN_ADJUSTMENT);
         if (!hasStoredValue || !isTerminalMarginAdjustmentEnabled()) {
-            setTerminalMarginAdjustment(true);
+            SharedPreferenceUtils.setBoolean(
+                mSharedPreferences,
+                TERMUX_APP.KEY_TERMINAL_MARGIN_ADJUSTMENT,
+                true,
+                true
+            );
         }
 
         SharedPreferenceUtils.setBoolean(
             mSharedPreferences,
             TERMUX_APP.KEY_TERMINAL_MARGIN_ADJUSTMENT_DEFAULT_MIGRATION_DONE,
             true,
-            false
+            true
         );
     }
 

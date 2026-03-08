@@ -1,9 +1,11 @@
 package com.termux.app.launcher;
 
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.os.Build;
 
 import com.termux.shared.termux.settings.preferences.TermuxAppSharedPreferences;
+import com.termux.shared.termux.settings.preferences.TermuxPreferenceConstants.TERMUX_APP;
 
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -26,7 +28,10 @@ public class LauncherInputCharPreferenceTest {
             ReflectionHelpers.ClassParameter.from(Context.class, context)
         );
 
-        preferences.setAppLauncherInputChar("");
+        SharedPreferences rawPreferences = preferences.getSharedPreferences();
+        rawPreferences.edit()
+            .putString(TERMUX_APP.KEY_APP_LAUNCHER_INPUT_CHAR, "")
+            .commit();
 
         assertEquals("/", preferences.getAppLauncherInputChar());
     }

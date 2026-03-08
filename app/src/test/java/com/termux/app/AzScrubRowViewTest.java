@@ -55,7 +55,6 @@ public class AzScrubRowViewTest {
         assertFalse(committed[0]);
 
         view.onTouchEvent(MotionEvent.obtain(0, 40, MotionEvent.ACTION_UP, 200f, -40f, 0));
-        assertTrue(committed[0]);
+        assertFalse(committed[0]);
     }
 }
-

@@ -29,11 +29,12 @@ public class TermuxAppSharedPreferencesMigrationTest {
             ReflectionHelpers.ClassParameter.from(Context.class, context)
         );
 
-        preferences.setTerminalMarginAdjustment(false);
-        preferences.getSharedPreferences()
+        SharedPreferences rawPreferences = preferences.getSharedPreferences();
+        rawPreferences
             .edit()
+            .putBoolean(TERMUX_APP.KEY_TERMINAL_MARGIN_ADJUSTMENT, false)
             .putBoolean(TERMUX_APP.KEY_TERMINAL_MARGIN_ADJUSTMENT_DEFAULT_MIGRATION_DONE, false)
-            .apply();
+            .commit();
 
         preferences.migrateTerminalMarginAdjustmentDefaultIfNeeded();
 
@@ -54,10 +55,10 @@ public class TermuxAppSharedPreferencesMigrationTest {
         );
 
         SharedPreferences rawPreferences = preferences.getSharedPreferences();
-        preferences.setTerminalMarginAdjustment(false);
         rawPreferences.edit()
+            .putBoolean(TERMUX_APP.KEY_TERMINAL_MARGIN_ADJUSTMENT, false)
             .putBoolean(TERMUX_APP.KEY_TERMINAL_MARGIN_ADJUSTMENT_DEFAULT_MIGRATION_DONE, true)
-            .apply();
+            .commit();
 
         preferences.migrateTerminalMarginAdjustmentDefaultIfNeeded();
 
