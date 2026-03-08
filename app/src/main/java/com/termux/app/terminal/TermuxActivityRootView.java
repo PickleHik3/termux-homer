@@ -120,11 +120,8 @@ public class TermuxActivityRootView extends LinearLayout implements ViewTreeObse
     public void onGlobalLayout() {
         if (mActivity == null || !mActivity.isVisible()) return;
 
-        View trackedBottomView = mActivity.getAccessoryStackContainerView();
-        if (trackedBottomView == null || trackedBottomView.getVisibility() != View.VISIBLE || trackedBottomView.getHeight() <= 0) {
-            trackedBottomView = mActivity.getTermuxActivityBottomSpaceView();
-        }
-        if (trackedBottomView == null) return;
+        View bottomSpaceView = mActivity.getTermuxActivityBottomSpaceView();
+        if (bottomSpaceView == null) return;
 
         boolean root_view_logging_enabled = ROOT_VIEW_LOGGING_ENABLED;
 
@@ -134,7 +131,7 @@ public class TermuxActivityRootView extends LinearLayout implements ViewTreeObse
         FrameLayout.LayoutParams params = (FrameLayout.LayoutParams) getLayoutParams();
 
         // Get the position Rects of the bottom space view and the main window holding it
-        Rect[] windowAndViewRects = ViewUtils.getWindowAndViewRects(trackedBottomView, mStatusBarHeight);
+        Rect[] windowAndViewRects = ViewUtils.getWindowAndViewRects(bottomSpaceView, mStatusBarHeight);
         if (windowAndViewRects == null)
             return;
 

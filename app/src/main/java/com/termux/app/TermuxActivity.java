@@ -1043,6 +1043,11 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         view.setLayoutParams(layoutParams);
     }
 
+    // Kept for test compatibility and to preserve existing RelativeLayout params in-place.
+    private void updateExtraKeysBackgroundHeight(View view, int height) {
+        updateAccessoryStackContainerHeight(view, height);
+    }
+
     private void updateViewHeight(int viewId, int height) {
         View view = findViewById(viewId);
         if (view == null)

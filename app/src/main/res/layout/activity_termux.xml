@@ -6,7 +6,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:fitsSystemWindows="false">
+    android:fitsSystemWindows="true">
 
     <FrameLayout
         android:id="@+id/terminal_root_container"
@@ -34,8 +34,7 @@
             android:layout_height="match_parent"
             android:layout_marginHorizontal="0dp"
             android:layout_marginVertical="0dp"
-            android:orientation="vertical"
-            android:fitsSystemWindows="true">
+            android:orientation="vertical">
 
         <androidx.drawerlayout.widget.DrawerLayout
             android:id="@+id/drawer_layout"
