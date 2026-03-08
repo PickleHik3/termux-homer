@@ -1373,6 +1373,10 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         return mTermuxActivityBottomSpaceView;
     }
 
+    public View getAccessoryStackContainerView() {
+        return findViewById(R.id.accessory_stack_container);
+    }
+
     public ExtraKeysView getExtraKeysView(int i) {
         if (i==0)
             return mExtraKeysView;
