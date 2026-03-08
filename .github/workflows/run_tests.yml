@@ -20,5 +20,22 @@ jobs:
         distribution: 'temurin'
         java-version: '17'
     - name: Execute tests
+      env:
+        GRADLE_OPTS: >-
+          -Dorg.gradle.internal.http.connectionTimeout=120000
+          -Dorg.gradle.internal.http.socketTimeout=120000
       run: |
-        ./gradlew :app:testDebugUnitTest :terminal-emulator:test
+        attempts=0
+        max_attempts=3
+        until [ "$attempts" -ge "$max_attempts" ]; do
+          if ./gradlew :app:testDebugUnitTest :terminal-emulator:test; then
+            exit 0
+          fi
+          attempts=$((attempts + 1))
+          if [ "$attempts" -ge "$max_attempts" ]; then
+            echo "Gradle test run failed after ${max_attempts} attempts."
+            exit 1
+          fi
+          echo "Gradle test run failed, retrying in 20 seconds... (${attempts}/${max_attempts})"
+          sleep 20
+        done
