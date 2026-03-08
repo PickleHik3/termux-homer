@@ -8,9 +8,6 @@ import com.termux.app.launcher.model.PinnedItem;
 
 import org.junit.Before;
 import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.robolectric.RobolectricTestRunner;
-import org.robolectric.annotation.Config;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -18,8 +15,6 @@ import java.util.List;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
-@RunWith(RobolectricTestRunner.class)
-@Config(sdk = 28)
 public class LauncherConfigRepositoryTest {
     private LauncherConfigRepository repository;
 
