@@ -11,6 +11,7 @@ import com.termux.app.launcher.model.PinnedFolderItem;
 import com.termux.app.launcher.model.PinnedItem;
 import com.termux.shared.termux.settings.preferences.TermuxAppSharedPreferences;
 import com.termux.shared.termux.settings.preferences.TermuxPreferenceConstants.TERMUX_APP;
+import com.termux.testutils.InMemorySharedPreferences;
 
 import org.junit.Before;
 import org.junit.Test;
@@ -19,7 +20,6 @@ import org.robolectric.RobolectricTestRunner;
 import org.robolectric.RuntimeEnvironment;
 import org.robolectric.annotation.Config;
 import org.robolectric.annotation.LooperMode;
-import org.robolectric.util.ReflectionHelpers;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -36,11 +36,8 @@ public class LauncherConfigRepositoryTest {
     @Before
     public void setUp() {
         Context context = RuntimeEnvironment.application;
-        TermuxAppSharedPreferences preferences = ReflectionHelpers.callConstructor(
-            TermuxAppSharedPreferences.class,
-            ReflectionHelpers.ClassParameter.from(Context.class, context)
-        );
-        SharedPreferences rawPreferences = preferences.getSharedPreferences();
+        SharedPreferences rawPreferences = new InMemorySharedPreferences();
+        TermuxAppSharedPreferences preferences = new TermuxAppSharedPreferences(context, rawPreferences, rawPreferences);
         rawPreferences.edit()
             .putString(TERMUX_APP.KEY_APP_LAUNCHER_PINNED_ITEMS_V2, "")
             .putInt(TERMUX_APP.KEY_APP_LAUNCHER_PINNED_ITEMS_SCHEMA_VERSION, 0)

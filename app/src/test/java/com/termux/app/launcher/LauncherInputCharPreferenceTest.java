@@ -6,6 +6,7 @@ import android.os.Build;
 
 import com.termux.shared.termux.settings.preferences.TermuxAppSharedPreferences;
 import com.termux.shared.termux.settings.preferences.TermuxPreferenceConstants.TERMUX_APP;
+import com.termux.testutils.InMemorySharedPreferences;
 
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -13,7 +14,6 @@ import org.robolectric.RobolectricTestRunner;
 import org.robolectric.RuntimeEnvironment;
 import org.robolectric.annotation.Config;
 import org.robolectric.annotation.LooperMode;
-import org.robolectric.util.ReflectionHelpers;
 
 import static org.junit.Assert.assertEquals;
 
@@ -25,12 +25,8 @@ public class LauncherInputCharPreferenceTest {
     @Test
     public void blankInputCharFallsBackToSlash() {
         Context context = RuntimeEnvironment.application;
-        TermuxAppSharedPreferences preferences = ReflectionHelpers.callConstructor(
-            TermuxAppSharedPreferences.class,
-            ReflectionHelpers.ClassParameter.from(Context.class, context)
-        );
-
-        SharedPreferences rawPreferences = preferences.getSharedPreferences();
+        SharedPreferences rawPreferences = new InMemorySharedPreferences();
+        TermuxAppSharedPreferences preferences = new TermuxAppSharedPreferences(context, rawPreferences, rawPreferences);
         rawPreferences.edit()
             .putString(TERMUX_APP.KEY_APP_LAUNCHER_INPUT_CHAR, "")
             .commit();

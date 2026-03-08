@@ -1,6 +1,7 @@
 package com.termux.shared.termux.settings.preferences;
 
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.util.TypedValue;
 import android.os.Build;
 import android.view.Display;
@@ -27,7 +28,15 @@ public class TermuxAppSharedPreferences extends AppSharedPreferences {
     private static final String LOG_TAG = "TermuxAppSharedPreferences";
 
     private TermuxAppSharedPreferences(@NonNull Context context) {
-        super(context, SharedPreferenceUtils.getPrivateSharedPreferences(context, TermuxConstants.TERMUX_DEFAULT_PREFERENCES_FILE_BASENAME_WITHOUT_EXTENSION), SharedPreferenceUtils.getPrivateAndMultiProcessSharedPreferences(context, TermuxConstants.TERMUX_DEFAULT_PREFERENCES_FILE_BASENAME_WITHOUT_EXTENSION));
+        this(
+            context,
+            SharedPreferenceUtils.getPrivateSharedPreferences(context, TermuxConstants.TERMUX_DEFAULT_PREFERENCES_FILE_BASENAME_WITHOUT_EXTENSION),
+            SharedPreferenceUtils.getPrivateAndMultiProcessSharedPreferences(context, TermuxConstants.TERMUX_DEFAULT_PREFERENCES_FILE_BASENAME_WITHOUT_EXTENSION)
+        );
+    }
+
+    public TermuxAppSharedPreferences(@NonNull Context context, @NonNull SharedPreferences sharedPreferences, @Nullable SharedPreferences multiProcessSharedPreferences) {
+        super(context, sharedPreferences, multiProcessSharedPreferences);
         setFontVariables(context);
     }
 
