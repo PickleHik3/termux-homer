@@ -1,61 +1,29 @@
 package com.termux.shared.termux.settings.preferences;
 
-import android.content.Context;
-import android.content.SharedPreferences;
-import android.os.Build;
-
-import com.termux.shared.settings.preferences.SharedPreferenceUtils;
-import com.termux.shared.termux.settings.preferences.TermuxPreferenceConstants.TERMUX_APP;
-import com.termux.testutils.InMemorySharedPreferences;
-
 import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.robolectric.RobolectricTestRunner;
-import org.robolectric.RuntimeEnvironment;
-import org.robolectric.annotation.Config;
-import org.robolectric.annotation.LooperMode;
 
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
-@RunWith(RobolectricTestRunner.class)
-@Config(sdk = {Build.VERSION_CODES.P})
-@LooperMode(LooperMode.Mode.LEGACY)
 public class TermuxAppSharedPreferencesMigrationTest {
 
     @Test
-    public void migrationEnablesMarginAdjustmentWhenPreviouslyDisabled() {
-        Context context = RuntimeEnvironment.application;
-        SharedPreferences rawPreferences = new InMemorySharedPreferences();
-        TermuxAppSharedPreferences preferences = new TermuxAppSharedPreferences(context, rawPreferences, rawPreferences);
-        rawPreferences
-            .edit()
-            .putBoolean(TERMUX_APP.KEY_TERMINAL_MARGIN_ADJUSTMENT, false)
-            .putBoolean(TERMUX_APP.KEY_TERMINAL_MARGIN_ADJUSTMENT_DEFAULT_MIGRATION_DONE, false)
-            .commit();
-
-        preferences.migrateTerminalMarginAdjustmentDefaultIfNeeded();
-
-        assertTrue(preferences.isTerminalMarginAdjustmentEnabled());
-        assertTrue(SharedPreferenceUtils.getBoolean(
-            preferences.getSharedPreferences(),
-            TERMUX_APP.KEY_TERMINAL_MARGIN_ADJUSTMENT_DEFAULT_MIGRATION_DONE,
-            false
-        ));
+    public void migrationEnablesWhenNotDoneAndNotStored() {
+        assertTrue(TermuxAppSharedPreferences.shouldEnableTerminalMarginAdjustmentOnMigration(false, false, false));
     }
 
     @Test
-    public void migrationDoesNotOverrideWhenAlreadyMarkedDone() {
-        Context context = RuntimeEnvironment.application;
-        SharedPreferences rawPreferences = new InMemorySharedPreferences();
-        TermuxAppSharedPreferences preferences = new TermuxAppSharedPreferences(context, rawPreferences, rawPreferences);
-        rawPreferences.edit()
-            .putBoolean(TERMUX_APP.KEY_TERMINAL_MARGIN_ADJUSTMENT, false)
-            .putBoolean(TERMUX_APP.KEY_TERMINAL_MARGIN_ADJUSTMENT_DEFAULT_MIGRATION_DONE, true)
-            .commit();
+    public void migrationEnablesWhenNotDoneAndExplicitlyDisabled() {
+        assertTrue(TermuxAppSharedPreferences.shouldEnableTerminalMarginAdjustmentOnMigration(false, true, false));
+    }
 
-        preferences.migrateTerminalMarginAdjustmentDefaultIfNeeded();
+    @Test
+    public void migrationDoesNotEnableWhenAlreadyDone() {
+        assertFalse(TermuxAppSharedPreferences.shouldEnableTerminalMarginAdjustmentOnMigration(true, true, false));
+    }
 
-        assertFalse(preferences.isTerminalMarginAdjustmentEnabled());
+    @Test
+    public void migrationDoesNotEnableWhenNotDoneButAlreadyEnabledAndStored() {
+        assertFalse(TermuxAppSharedPreferences.shouldEnableTerminalMarginAdjustmentOnMigration(false, true, true));
     }
 }
