@@ -69,6 +69,7 @@ public class TermuxActivityRootView extends LinearLayout implements ViewTreeObse
     public long lastMarginBottomTime;
 
     public long lastMarginBottomExtraTime;
+    public long lastMarginApplyTime;
 
     /**
      * Log root view events.
@@ -78,6 +79,9 @@ public class TermuxActivityRootView extends LinearLayout implements ViewTreeObse
     private static final String LOG_TAG = "TermuxActivityRootView";
 
     private static int mStatusBarHeight;
+    private static final int MAX_MARGIN_ADJUSTMENT_DP = 220;
+    private static final int MARGIN_SPIKE_THRESHOLD_DP = 120;
+    private static final long MARGIN_SPIKE_DEBOUNCE_MS = 180L;
 
     public TermuxActivityRootView(Context context) {
         super(context);
@@ -198,6 +202,7 @@ public class TermuxActivityRootView extends LinearLayout implements ViewTreeObse
                     Logger.logVerbose(LOG_TAG, "Setting bottom margin to 0");
                 params.setMargins(0, 0, 0, 0);
                 setLayoutParams(params);
+                lastMarginApplyTime = System.currentTimeMillis();
             } else {
                 if (root_view_logging_enabled)
                     Logger.logVerbose(LOG_TAG, "Bottom margin already equals 0");
@@ -212,6 +217,24 @@ public class TermuxActivityRootView extends LinearLayout implements ViewTreeObse
         } else // ELse find the part of the extra keys/terminal that is hidden and add a margin accordingly
         {
             int pxHidden = bottomSpaceViewRect.bottom - windowAvailableRect.bottom;
+            int maxMarginPx = (int) ViewUtils.dpToPx(getContext(), MAX_MARGIN_ADJUSTMENT_DP);
+            int spikeThresholdPx = (int) ViewUtils.dpToPx(getContext(), MARGIN_SPIKE_THRESHOLD_DP);
+            long now = System.currentTimeMillis();
+
+            if (pxHidden > maxMarginPx) {
+                if (root_view_logging_enabled)
+                    Logger.logVerbose(LOG_TAG, "Clamping excessive bottom margin from " + pxHidden + " to " + maxMarginPx);
+                pxHidden = maxMarginPx;
+            }
+
+            // Ignore abrupt jumps that cause the whole stack to float upward for a frame and then snap back.
+            if (params.bottomMargin > 0 && pxHidden > 0 && Math.abs(pxHidden - params.bottomMargin) > spikeThresholdPx &&
+                (now - lastMarginApplyTime) < MARGIN_SPIKE_DEBOUNCE_MS) {
+                if (root_view_logging_enabled)
+                    Logger.logVerbose(LOG_TAG, "Ignoring margin spike from " + params.bottomMargin + " to " + pxHidden);
+                pxHidden = params.bottomMargin;
+            }
+
             if (root_view_logging_enabled)
                 Logger.logVerbose(LOG_TAG, "pxHidden " + pxHidden + ", bottom " + params.bottomMargin);
             boolean setMargin = params.bottomMargin != pxHidden;
@@ -244,6 +267,7 @@ public class TermuxActivityRootView extends LinearLayout implements ViewTreeObse
                 params.setMargins(0, 0, 0, pxHidden);
                 setLayoutParams(params);
                 lastMarginBottom = pxHidden;
+                lastMarginApplyTime = now;
             } else {
                 if (root_view_logging_enabled)
                     Logger.logVerbose(LOG_TAG, "Bottom margin already equals " + pxHidden);
