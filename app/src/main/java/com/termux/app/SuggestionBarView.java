@@ -13,15 +13,21 @@ import android.content.ClipData;
 import android.content.Context;
 import android.content.Intent;
 import android.content.ComponentName;
+import android.content.pm.LauncherApps;
 import android.content.pm.ChangedPackages;
 import android.content.pm.PackageManager;
+import android.content.pm.ShortcutInfo;
+import android.net.Uri;
 import android.graphics.ColorFilter;
 import android.graphics.ColorMatrixColorFilter;
+import android.graphics.Rect;
 import android.graphics.Typeface;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Build;
+import android.os.Process;
+import android.os.UserHandle;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.text.TextUtils;
@@ -32,6 +38,7 @@ import android.view.VelocityTracker;
 import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.ViewConfiguration;
 import android.view.ViewGroup;
 import android.view.ViewParent;
 import android.view.WindowManager;
@@ -49,6 +56,7 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ListView;
 import android.widget.PopupWindow;
+import android.widget.ScrollView;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
@@ -83,6 +91,9 @@ public final class SuggestionBarView extends GridLayout {
     private static final String LOG_TAG = "SuggestionBarView";
     private static final int TEXT_COLOR = 0xFFC0B18B;
     private static final char[] AZ_ORDER = "ABCDEFGHIJKLMNOPQRSTUVWXYZ#".toCharArray();
+    private static final int POPUP_MAX_WIDTH_DP = 320;
+    private static final int POPUP_MIN_WIDTH_DP = 188;
+    private static final float POPUP_MAX_HEIGHT_FACTOR = 0.45f;
 
     private List<LauncherAppEntry> allApps = new ArrayList<>();
     private int applicationSequenceNumber = 0;
@@ -105,6 +116,8 @@ public final class SuggestionBarView extends GridLayout {
     private List<SuggestionBarButton> injectedSuggestionButtons;
 
     private PopupWindow folderPopupWindow;
+    private PopupWindow appContextPopupWindow;
+    private PopupWindow shortcutsPopupWindow;
 
     private String lastInput = "";
     private TerminalView lastTerminalView;
@@ -123,6 +136,7 @@ public final class SuggestionBarView extends GridLayout {
     private boolean deleteDropZoneVisible = false;
     private boolean deleteDropZoneHover = false;
     @Nullable private View deleteDropZoneView;
+    @Nullable private LongPressPickupState activeLongPressPickupState;
     private final Runnable azResetRunnable = this::clearAzPreviewWithFade;
 
     public SuggestionBarView(Context context, AttributeSet attrs) {
@@ -529,15 +543,11 @@ public final class SuggestionBarView extends GridLayout {
                     pressTarget.setOnLongClickListener(v -> startPinnedDrag(v, pinnedIndex));
                 } else {
                     View pressTarget = resolvePrimaryPressTarget(view);
-                    pressTarget.setLongClickable(true);
-                    pressTarget.setOnLongClickListener(v -> startPinnedDrag(v, pinnedIndex));
+                    bindAppContextLongPress(pressTarget, entry, pinnedIndex, null, null, true);
                 }
-            } else if (!azPreview) {
-                final int slotIndex = col;
-                view.setOnLongClickListener(v -> {
-                    showUnifiedPinEditor(slotIndex, null);
-                    return true;
-                });
+            } else {
+                View pressTarget = resolvePrimaryPressTarget(view);
+                bindAppContextLongPress(pressTarget, entry, -1, null, null, false);
             }
 
             addView(view);
@@ -776,6 +786,8 @@ public final class SuggestionBarView extends GridLayout {
             terminalView.clearInputLine();
         }
         dismissFolderPopup();
+        dismissAppContextPopup();
+        dismissShortcutsPopup();
     }
 
     private void launchEntryFromTouch(@NonNull View sourceView, @NonNull LauncherAppEntry entry, @Nullable TerminalView terminalView) {
@@ -1512,6 +1524,8 @@ public final class SuggestionBarView extends GridLayout {
 
     private void showFolderPopup(PinnedFolderItem folder, @Nullable View anchor) {
         dismissFolderPopup();
+        dismissAppContextPopup();
+        dismissShortcutsPopup();
 
         List<LauncherAppEntry> folderEntries = new ArrayList<>();
         for (AppRef ref : folder.apps) {
@@ -1587,61 +1601,13 @@ public final class SuggestionBarView extends GridLayout {
         shell.addView(header, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         shell.addView(grid, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
-        shell.measure(View.MeasureSpec.makeMeasureSpec(screenW, View.MeasureSpec.AT_MOST),
-            View.MeasureSpec.makeMeasureSpec(screenH, View.MeasureSpec.AT_MOST));
-        int contentW = shell.getMeasuredWidth();
-        int contentH = shell.getMeasuredHeight();
-
-        FrameLayout popupRoot = new FrameLayout(getContext());
-        GradientDrawable panelBg = new GradientDrawable();
-        panelBg.setCornerRadius(dp(12));
-        popupRoot.setBackground(panelBg);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            popupRoot.setClipToOutline(true);
-        }
-        int alpha = clamp(appBarOpacity, 0, 100);
         int overlayBase = folder.tintOverrideEnabled ? (folder.tintColor & 0x00FFFFFF) : (inheritedTintColor & 0x00FFFFFF);
-        int overlayColor = (((int) (255f * (alpha / 100f))) << 24) | overlayBase;
-        panelBg.setColor(overlayColor);
-        popupRoot.addView(shell, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-        popupRoot.measure(View.MeasureSpec.makeMeasureSpec(contentW, View.MeasureSpec.EXACTLY),
-            View.MeasureSpec.makeMeasureSpec(contentH, View.MeasureSpec.EXACTLY));
-        int popupWidth = popupRoot.getMeasuredWidth();
-        int popupHeight = popupRoot.getMeasuredHeight();
-
-        folderPopupWindow = new PopupWindow(popupRoot, ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, false);
-        folderPopupWindow.setFocusable(false);
-        folderPopupWindow.setTouchable(true);
-        folderPopupWindow.setOutsideTouchable(true);
-        folderPopupWindow.setInputMethodMode(PopupWindow.INPUT_METHOD_NOT_NEEDED);
-        folderPopupWindow.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_UNCHANGED);
-        folderPopupWindow.setBackgroundDrawable(new ColorDrawable(0x00000000));
-        folderPopupWindow.setElevation(8f);
-        folderPopupWindow.setOnDismissListener(() -> {
+        folderPopupWindow = buildPopupWindow(shell, overlayBase, () -> {
             if (folderPopupWindow != null && !folderPopupWindow.isShowing()) {
                 folderPopupWindow = null;
             }
         });
-        int gap = dp(4);
-        if (anchor != null) {
-            int[] location = new int[2];
-            anchor.getLocationOnScreen(location);
-            int x = location[0] + (anchor.getWidth() / 2) - (popupWidth / 2);
-            int y = location[1] - popupHeight - gap;
-            x = clamp(x, 0, Math.max(0, screenW - popupWidth));
-            y = Math.max(0, y);
-            folderPopupWindow.showAtLocation(this, Gravity.NO_GRAVITY, x, y);
-        } else {
-            folderPopupWindow.showAtLocation(this, Gravity.CENTER_HORIZONTAL | Gravity.BOTTOM, 0, getHeight() + gap);
-        }
-        popupRoot.setAlpha(0f);
-        popupRoot.setTranslationY(dp(8));
-        popupRoot.animate()
-            .alpha(1f)
-            .translationY(0f)
-            .setDuration(150)
-            .setInterpolator(new DecelerateInterpolator())
-            .start();
+        showPopupAtAnchor(folderPopupWindow, anchor);
     }
 
     private void removePinnedAt(int index) {
@@ -1652,6 +1618,8 @@ public final class SuggestionBarView extends GridLayout {
     }
 
     private void persistPinsAndReload() {
+        dismissAppContextPopup();
+        dismissShortcutsPopup();
         if (configRepository != null) {
             configRepository.savePinnedItems(pinnedItems);
             pinnedItems = configRepository.loadPinnedItems();
@@ -1662,24 +1630,9 @@ public final class SuggestionBarView extends GridLayout {
     private void dismissFolderPopup() {
         if (folderPopupWindow != null) {
             final PopupWindow popup = folderPopupWindow;
-            View content = popup.getContentView();
-            if (content != null && popup.isShowing()) {
-                content.animate()
-                    .alpha(0f)
-                    .translationY(dp(6))
-                    .setDuration(110)
-                    .withEndAction(() -> {
-                        try {
-                            popup.dismiss();
-                        } catch (Exception ignored) {
-                        }
-                        if (folderPopupWindow == popup) folderPopupWindow = null;
-                    })
-                    .start();
-            } else {
-                popup.dismiss();
+            dismissPopupWindowAnimated(popup, () -> {
                 if (folderPopupWindow == popup) folderPopupWindow = null;
-            }
+            });
         }
     }
 
@@ -1718,6 +1671,377 @@ public final class SuggestionBarView extends GridLayout {
             }
         }
         return view;
+    }
+
+    private void bindAppContextLongPress(
+        @NonNull View pressTarget,
+        @NonNull LauncherAppEntry entry,
+        int pinnedIndex,
+        @Nullable PinnedFolderItem sourceFolder,
+        @Nullable AppRef folderEntryRef,
+        boolean allowDragPickup
+    ) {
+        pressTarget.setLongClickable(true);
+        pressTarget.setOnLongClickListener(v -> {
+            dismissShortcutsPopup();
+            showAppContextPopup(new AppMenuContext(entry, v, pinnedIndex, sourceFolder, folderEntryRef));
+            if (allowDragPickup && pinnedIndex >= 0) {
+                LongPressPickupState state = activeLongPressPickupState;
+                if (state == null || state.sourceView != pressTarget) {
+                    state = new LongPressPickupState(pressTarget, pinnedIndex, 0f, 0f);
+                    activeLongPressPickupState = state;
+                }
+                state.menuShown = true;
+            }
+            return true;
+        });
+        pressTarget.setOnTouchListener((v, event) -> {
+            if (!allowDragPickup || pinnedIndex < 0 || event == null) return false;
+            int action = event.getActionMasked();
+            if (action == MotionEvent.ACTION_DOWN) {
+                activeLongPressPickupState = new LongPressPickupState(
+                    pressTarget,
+                    pinnedIndex,
+                    event.getRawX(),
+                    event.getRawY()
+                );
+            } else if (action == MotionEvent.ACTION_MOVE) {
+                LongPressPickupState state = activeLongPressPickupState;
+                if (state != null && state.sourceView == pressTarget && state.menuShown && !state.dragStarted) {
+                    float dx = Math.abs(event.getRawX() - state.downRawX);
+                    float dy = Math.abs(event.getRawY() - state.downRawY);
+                    int slop = ViewConfiguration.get(getContext()).getScaledTouchSlop();
+                    if (Math.max(dx, dy) > slop) {
+                        state.dragStarted = true;
+                        dismissAppContextPopup();
+                        startPinnedDrag(pressTarget, pinnedIndex);
+                        activeLongPressPickupState = null;
+                        return true;
+                    }
+                }
+            } else if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) {
+                LongPressPickupState state = activeLongPressPickupState;
+                if (state != null && state.sourceView == pressTarget) {
+                    activeLongPressPickupState = null;
+                }
+            }
+            return false;
+        });
+    }
+
+    private void showAppContextPopup(@NonNull AppMenuContext context) {
+        dismissAppContextPopup();
+        List<ShortcutInfo> shortcuts = queryEntryShortcuts(context.entry);
+        boolean hasShortcuts = !shortcuts.isEmpty();
+        boolean canRemove = context.pinnedIndex >= 0 || (context.sourceFolder != null && context.folderEntryRef != null);
+
+        LinearLayout shell = new LinearLayout(getContext());
+        shell.setOrientation(LinearLayout.VERTICAL);
+        shell.setPadding(dp(3), dp(3), dp(3), dp(3));
+
+        TextView header = new TextView(getContext());
+        header.setText(context.entry.label);
+        header.setTextColor(TEXT_COLOR);
+        header.setTextSize(12f);
+        header.setTypeface(Typeface.DEFAULT_BOLD);
+        header.setPadding(dp(8), dp(4), dp(8), dp(6));
+        shell.addView(header, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        if (hasShortcuts) {
+            addPopupActionRow(shell, "Shortcuts", () -> {
+                dismissAppContextPopup();
+                showShortcutsPopup(context, shortcuts);
+            });
+        }
+
+        addPopupActionRow(shell, "App info", () -> {
+            dismissAppContextPopup();
+            openAppInfo(context.entry);
+        });
+
+        if (canRemove) {
+            addPopupActionRow(shell, "Remove", () -> {
+                dismissAppContextPopup();
+                removeFromContextSource(context);
+            });
+        }
+
+        addPopupActionRow(shell, "Uninstall", () -> {
+            dismissAppContextPopup();
+            requestUninstall(context.entry);
+        });
+
+        int tintBase = context.sourceFolder != null && context.sourceFolder.tintOverrideEnabled
+            ? (context.sourceFolder.tintColor & 0x00FFFFFF)
+            : (inheritedTintColor & 0x00FFFFFF);
+        appContextPopupWindow = buildPopupWindow(shell, tintBase, () -> {
+            if (appContextPopupWindow != null && !appContextPopupWindow.isShowing()) {
+                appContextPopupWindow = null;
+            }
+        });
+        showPopupAtAnchor(appContextPopupWindow, context.anchor);
+    }
+
+    private void showShortcutsPopup(@NonNull AppMenuContext context, @NonNull List<ShortcutInfo> shortcuts) {
+        dismissShortcutsPopup();
+        if (shortcuts.isEmpty()) return;
+
+        LinearLayout shell = new LinearLayout(getContext());
+        shell.setOrientation(LinearLayout.VERTICAL);
+        shell.setPadding(dp(3), dp(3), dp(3), dp(3));
+
+        TextView header = new TextView(getContext());
+        header.setText("Shortcuts");
+        header.setTextColor(TEXT_COLOR);
+        header.setTextSize(12f);
+        header.setTypeface(Typeface.DEFAULT_BOLD);
+        header.setPadding(dp(8), dp(4), dp(8), dp(6));
+        shell.addView(header, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        for (ShortcutInfo info : shortcuts) {
+            String label = info.getShortLabel() != null ? info.getShortLabel().toString() : info.getId();
+            addPopupActionRow(shell, label, () -> {
+                dismissShortcutsPopup();
+                launchShortcut(info);
+            });
+        }
+
+        int tintBase = context.sourceFolder != null && context.sourceFolder.tintOverrideEnabled
+            ? (context.sourceFolder.tintColor & 0x00FFFFFF)
+            : (inheritedTintColor & 0x00FFFFFF);
+        shortcutsPopupWindow = buildPopupWindow(shell, tintBase, () -> {
+            if (shortcutsPopupWindow != null && !shortcutsPopupWindow.isShowing()) {
+                shortcutsPopupWindow = null;
+            }
+        });
+        showPopupAtAnchor(shortcutsPopupWindow, context.anchor);
+    }
+
+    @NonNull
+    private List<ShortcutInfo> queryEntryShortcuts(@NonNull LauncherAppEntry entry) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N_MR1) return new ArrayList<>();
+        try {
+            LauncherApps launcherApps = (LauncherApps) getContext().getSystemService(Context.LAUNCHER_APPS_SERVICE);
+            if (launcherApps == null) return new ArrayList<>();
+            LauncherApps.ShortcutQuery query = new LauncherApps.ShortcutQuery();
+            query.setPackage(entry.appRef.packageName);
+            if (!TextUtils.isEmpty(entry.appRef.activityName)) {
+                String activityName = entry.appRef.activityName;
+                if (activityName.startsWith(".")) {
+                    activityName = entry.appRef.packageName + activityName;
+                }
+                query.setActivity(new ComponentName(entry.appRef.packageName, activityName));
+            }
+            int flags = LauncherApps.ShortcutQuery.FLAG_MATCH_DYNAMIC
+                | LauncherApps.ShortcutQuery.FLAG_MATCH_MANIFEST
+                | LauncherApps.ShortcutQuery.FLAG_MATCH_PINNED;
+            query.setQueryFlags(flags);
+            UserHandle user = Process.myUserHandle();
+            List<ShortcutInfo> shortcuts = launcherApps.getShortcuts(query, user);
+            return shortcuts == null ? new ArrayList<>() : shortcuts;
+        } catch (Throwable throwable) {
+            Log.d(LOG_TAG, "shortcut query failed for " + entry.appRef.stableId() + ": " + throwable.getMessage());
+            return new ArrayList<>();
+        }
+    }
+
+    private void launchShortcut(@NonNull ShortcutInfo shortcutInfo) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N_MR1) return;
+        try {
+            LauncherApps launcherApps = (LauncherApps) getContext().getSystemService(Context.LAUNCHER_APPS_SERVICE);
+            if (launcherApps == null) return;
+            launcherApps.startShortcut(
+                shortcutInfo.getPackage(),
+                shortcutInfo.getId(),
+                (Rect) null,
+                ActivityOptions.makeBasic().toBundle(),
+                Process.myUserHandle()
+            );
+            dismissFolderPopup();
+            if (lastTerminalView != null) {
+                lastTerminalView.clearInputLine();
+            }
+        } catch (Throwable throwable) {
+            Log.d(LOG_TAG, "shortcut launch failed for " + shortcutInfo.getId() + ": " + throwable.getMessage());
+        }
+    }
+
+    private void openAppInfo(@NonNull LauncherAppEntry entry) {
+        try {
+            Intent intent = new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+            intent.setData(Uri.parse("package:" + entry.appRef.packageName));
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            getContext().startActivity(intent);
+        } catch (Throwable throwable) {
+            Log.d(LOG_TAG, "app info open failed for " + entry.appRef.packageName + ": " + throwable.getMessage());
+        }
+    }
+
+    private void requestUninstall(@NonNull LauncherAppEntry entry) {
+        try {
+            Intent intent = new Intent(Intent.ACTION_DELETE);
+            intent.setData(Uri.parse("package:" + entry.appRef.packageName));
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            getContext().startActivity(intent);
+        } catch (Throwable throwable) {
+            Log.d(LOG_TAG, "uninstall intent failed for " + entry.appRef.packageName + ": " + throwable.getMessage());
+        }
+    }
+
+    private void removeFromContextSource(@NonNull AppMenuContext context) {
+        if (context.pinnedIndex >= 0) {
+            removePinnedAt(context.pinnedIndex);
+            return;
+        }
+        if (context.sourceFolder != null && context.folderEntryRef != null) {
+            removeAppFromFolder(context.sourceFolder, context.folderEntryRef);
+            persistPinsAndReload();
+        }
+    }
+
+    private void addPopupActionRow(@NonNull LinearLayout shell, @NonNull String title, @NonNull Runnable action) {
+        TextView actionRow = new TextView(getContext());
+        actionRow.setText(title);
+        actionRow.setTextColor(TEXT_COLOR);
+        actionRow.setTextSize(12f);
+        actionRow.setPadding(dp(8), dp(7), dp(8), dp(7));
+        actionRow.setClickable(true);
+        actionRow.setOnClickListener(v -> action.run());
+        shell.addView(actionRow, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+    }
+
+    @NonNull
+    private PopupWindow buildPopupWindow(@NonNull View content, int tintBase, @Nullable Runnable onDismiss) {
+        int screenW = getResources().getDisplayMetrics().widthPixels;
+        int screenH = getResources().getDisplayMetrics().heightPixels;
+        int maxWidth = popupMaxWidth(screenW);
+        int minWidth = popupMinWidth(screenW);
+        int maxHeight = popupMaxHeight(screenH);
+
+        content.measure(
+            View.MeasureSpec.makeMeasureSpec(maxWidth, View.MeasureSpec.AT_MOST),
+            View.MeasureSpec.makeMeasureSpec(maxHeight, View.MeasureSpec.AT_MOST)
+        );
+        int desiredWidth = clamp(content.getMeasuredWidth(), minWidth, maxWidth);
+        int desiredHeight = Math.max(dp(36), Math.min(content.getMeasuredHeight(), maxHeight));
+
+        ScrollView scrollView = new ScrollView(getContext());
+        scrollView.setFillViewport(true);
+        scrollView.setOverScrollMode(OVER_SCROLL_NEVER);
+        scrollView.addView(content, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        FrameLayout popupRoot = new FrameLayout(getContext());
+        GradientDrawable panelBg = new GradientDrawable();
+        panelBg.setCornerRadius(dp(12));
+        int alpha = clamp(appBarOpacity, 0, 100);
+        int overlayColor = (((int) (255f * (alpha / 100f))) << 24) | (tintBase & 0x00FFFFFF);
+        panelBg.setColor(overlayColor);
+        popupRoot.setBackground(panelBg);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            popupRoot.setClipToOutline(true);
+        }
+        popupRoot.addView(scrollView, new FrameLayout.LayoutParams(desiredWidth, desiredHeight));
+
+        PopupWindow popup = new PopupWindow(popupRoot, desiredWidth, desiredHeight, false);
+        popup.setFocusable(false);
+        popup.setTouchable(true);
+        popup.setOutsideTouchable(true);
+        popup.setInputMethodMode(PopupWindow.INPUT_METHOD_NOT_NEEDED);
+        popup.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_UNCHANGED);
+        popup.setBackgroundDrawable(new ColorDrawable(0x00000000));
+        popup.setElevation(8f);
+        popup.setOnDismissListener(() -> {
+            if (onDismiss != null) onDismiss.run();
+        });
+        return popup;
+    }
+
+    private void showPopupAtAnchor(@NonNull PopupWindow popupWindow, @Nullable View anchor) {
+        int screenW = getResources().getDisplayMetrics().widthPixels;
+        int screenH = getResources().getDisplayMetrics().heightPixels;
+        int popupWidth = popupWindow.getWidth();
+        int popupHeight = popupWindow.getHeight();
+        int gap = dp(4);
+        if (anchor != null) {
+            int[] location = new int[2];
+            anchor.getLocationOnScreen(location);
+            int x = location[0] + (anchor.getWidth() / 2) - (popupWidth / 2);
+            int y = location[1] - popupHeight - gap;
+            x = clamp(x, 0, Math.max(0, screenW - popupWidth));
+            y = clamp(y, 0, Math.max(0, screenH - popupHeight));
+            popupWindow.showAtLocation(this, Gravity.NO_GRAVITY, x, y);
+        } else {
+            popupWindow.showAtLocation(this, Gravity.CENTER_HORIZONTAL | Gravity.BOTTOM, 0, getHeight() + gap);
+        }
+        View root = popupWindow.getContentView();
+        if (root != null) {
+            root.setAlpha(0f);
+            root.setTranslationY(dp(8));
+            root.animate()
+                .alpha(1f)
+                .translationY(0f)
+                .setDuration(150)
+                .setInterpolator(new DecelerateInterpolator())
+                .start();
+        }
+    }
+
+    private int popupMaxWidth(int screenW) {
+        return Math.min(screenW - dp(24), Math.min(dp(POPUP_MAX_WIDTH_DP), (int) (screenW * 0.9f)));
+    }
+
+    private int popupMinWidth(int screenW) {
+        return Math.min(popupMaxWidth(screenW), dp(POPUP_MIN_WIDTH_DP));
+    }
+
+    private int popupMaxHeight(int screenH) {
+        return Math.min(screenH - dp(80), (int) (screenH * POPUP_MAX_HEIGHT_FACTOR));
+    }
+
+    private void dismissAppContextPopup() {
+        if (appContextPopupWindow != null) {
+            final PopupWindow popup = appContextPopupWindow;
+            dismissPopupWindowAnimated(popup, () -> {
+                if (appContextPopupWindow == popup) {
+                    appContextPopupWindow = null;
+                }
+            });
+        }
+    }
+
+    private void dismissShortcutsPopup() {
+        if (shortcutsPopupWindow != null) {
+            final PopupWindow popup = shortcutsPopupWindow;
+            dismissPopupWindowAnimated(popup, () -> {
+                if (shortcutsPopupWindow == popup) {
+                    shortcutsPopupWindow = null;
+                }
+            });
+        }
+    }
+
+    private void dismissPopupWindowAnimated(@NonNull PopupWindow popup, @Nullable Runnable onDone) {
+        View content = popup.getContentView();
+        if (content != null && popup.isShowing()) {
+            content.animate()
+                .alpha(0f)
+                .translationY(dp(6))
+                .setDuration(110)
+                .withEndAction(() -> {
+                    try {
+                        popup.dismiss();
+                    } catch (Exception ignored) {
+                    }
+                    if (onDone != null) onDone.run();
+                })
+                .start();
+        } else {
+            try {
+                popup.dismiss();
+            } catch (Exception ignored) {
+            }
+            if (onDone != null) onDone.run();
+        }
     }
 
     private int findPinnedFolderIndex(@NonNull PinnedFolderItem folder) {
@@ -1956,6 +2280,44 @@ public final class SuggestionBarView extends GridLayout {
             this.id = id;
             this.label = label;
             this.item = item;
+        }
+    }
+
+    private static final class AppMenuContext {
+        final LauncherAppEntry entry;
+        final View anchor;
+        final int pinnedIndex;
+        @Nullable final PinnedFolderItem sourceFolder;
+        @Nullable final AppRef folderEntryRef;
+
+        AppMenuContext(
+            @NonNull LauncherAppEntry entry,
+            @NonNull View anchor,
+            int pinnedIndex,
+            @Nullable PinnedFolderItem sourceFolder,
+            @Nullable AppRef folderEntryRef
+        ) {
+            this.entry = entry;
+            this.anchor = anchor;
+            this.pinnedIndex = pinnedIndex;
+            this.sourceFolder = sourceFolder;
+            this.folderEntryRef = folderEntryRef;
+        }
+    }
+
+    private static final class LongPressPickupState {
+        final View sourceView;
+        final int pinnedIndex;
+        final float downRawX;
+        final float downRawY;
+        boolean menuShown = false;
+        boolean dragStarted = false;
+
+        LongPressPickupState(@NonNull View sourceView, int pinnedIndex, float downRawX, float downRawY) {
+            this.sourceView = sourceView;
+            this.pinnedIndex = pinnedIndex;
+            this.downRawX = downRawX;
+            this.downRawY = downRawY;
         }
     }
 
@@ -2487,8 +2849,8 @@ public final class SuggestionBarView extends GridLayout {
     private View createPopupEntryButton(@NonNull LauncherAppEntry entry, int sizePx, @NonNull PinnedFolderItem sourceFolder) {
         if (entry.icon == null || !showIcons) {
             View fallback = createEntryButton(entry);
-            fallback.setLongClickable(true);
-            fallback.setOnLongClickListener(v -> startFolderPopupDrag(v, entry, sourceFolder));
+            View pressTarget = resolvePrimaryPressTarget(fallback);
+            bindAppContextLongPress(pressTarget, entry, -1, sourceFolder, resolveForSelectionRef(entry.appRef), false);
             return fallback;
         }
         ImageButton button = new ImageButton(getContext());
@@ -2510,8 +2872,7 @@ public final class SuggestionBarView extends GridLayout {
             button.setColorFilter(new ColorMatrixColorFilter(colorMatrix));
         }
         button.setOnClickListener(v -> launchEntryFromTouch(v, entry, lastTerminalView));
-        button.setLongClickable(true);
-        button.setOnLongClickListener(v -> startFolderPopupDrag(v, entry, sourceFolder));
+        bindAppContextLongPress(button, entry, -1, sourceFolder, resolveForSelectionRef(entry.appRef), false);
         button.setContentDescription(entry.label);
         return button;
     }
