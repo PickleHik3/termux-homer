@@ -65,6 +65,7 @@ import androidx.recyclerview.widget.ItemTouchHelper;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.github.mmin18.widget.RealtimeBlurView;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.termux.R;
 import com.termux.app.launcher.data.LauncherAppDataProvider;
@@ -93,6 +94,7 @@ public final class SuggestionBarView extends GridLayout {
     private static final char[] AZ_ORDER = "ABCDEFGHIJKLMNOPQRSTUVWXYZ#".toCharArray();
     private static final int POPUP_MAX_WIDTH_DP = 320;
     private static final int POPUP_MIN_WIDTH_DP = 188;
+    private static final int POPUP_MIN_WIDTH_TIGHT_DP = 92;
     private static final float POPUP_MAX_HEIGHT_FACTOR = 0.45f;
 
     private List<LauncherAppEntry> allApps = new ArrayList<>();
@@ -133,10 +135,14 @@ public final class SuggestionBarView extends GridLayout {
     private VelocityTracker swipeVelocityTracker;
     private boolean pageSwitchAnimating = false;
     private int folderDragHoverIndex = -1;
-    private boolean deleteDropZoneVisible = false;
-    private boolean deleteDropZoneHover = false;
-    @Nullable private View deleteDropZoneView;
     @Nullable private LongPressPickupState activeLongPressPickupState;
+    @Nullable private AppMenuContext activeAppMenuContext;
+    @Nullable private List<ShortcutInfo> activeAppMenuShortcuts;
+    private final List<MenuActionRow> appContextRows = new ArrayList<>();
+    private final List<MenuActionRow> shortcutsRows = new ArrayList<>();
+    @Nullable private MenuActionRow activeMenuHighlight;
+    private int activeMenuTintBase = (0xFF202020 & 0x00FFFFFF);
+    @Nullable private TextView shortcutsMainRowView;
     private final Runnable azResetRunnable = this::clearAzPreviewWithFade;
 
     public SuggestionBarView(Context context, AttributeSet attrs) {
@@ -1602,7 +1608,7 @@ public final class SuggestionBarView extends GridLayout {
         shell.addView(grid, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
         int overlayBase = folder.tintOverrideEnabled ? (folder.tintColor & 0x00FFFFFF) : (inheritedTintColor & 0x00FFFFFF);
-        folderPopupWindow = buildPopupWindow(shell, overlayBase, () -> {
+        folderPopupWindow = buildPopupWindow(shell, overlayBase, false, () -> {
             if (folderPopupWindow != null && !folderPopupWindow.isShowing()) {
                 folderPopupWindow = null;
             }
@@ -1685,18 +1691,16 @@ public final class SuggestionBarView extends GridLayout {
         pressTarget.setOnLongClickListener(v -> {
             dismissShortcutsPopup();
             showAppContextPopup(new AppMenuContext(entry, v, pinnedIndex, sourceFolder, folderEntryRef));
-            if (allowDragPickup && pinnedIndex >= 0) {
-                LongPressPickupState state = activeLongPressPickupState;
-                if (state == null || state.sourceView != pressTarget) {
-                    state = new LongPressPickupState(pressTarget, pinnedIndex, 0f, 0f);
-                    activeLongPressPickupState = state;
-                }
-                state.menuShown = true;
+            LongPressPickupState state = activeLongPressPickupState;
+            if (state == null || state.sourceView != pressTarget) {
+                state = new LongPressPickupState(pressTarget, pinnedIndex, 0f, 0f);
+                activeLongPressPickupState = state;
             }
+            state.menuShown = true;
             return true;
         });
         pressTarget.setOnTouchListener((v, event) -> {
-            if (!allowDragPickup || pinnedIndex < 0 || event == null) return false;
+            if (event == null) return false;
             int action = event.getActionMasked();
             if (action == MotionEvent.ACTION_DOWN) {
                 activeLongPressPickupState = new LongPressPickupState(
@@ -1708,20 +1712,38 @@ public final class SuggestionBarView extends GridLayout {
             } else if (action == MotionEvent.ACTION_MOVE) {
                 LongPressPickupState state = activeLongPressPickupState;
                 if (state != null && state.sourceView == pressTarget && state.menuShown && !state.dragStarted) {
-                    float dx = Math.abs(event.getRawX() - state.downRawX);
-                    float dy = Math.abs(event.getRawY() - state.downRawY);
+                    float dx = event.getRawX() - state.downRawX;
+                    float dy = event.getRawY() - state.downRawY;
+                    float absDx = Math.abs(dx);
+                    float absDy = Math.abs(dy);
                     int slop = ViewConfiguration.get(getContext()).getScaledTouchSlop();
-                    if (Math.max(dx, dy) > slop) {
+                    boolean xDominantPickup = allowDragPickup
+                        && pinnedIndex >= 0
+                        && absDx > slop
+                        && absDx > (absDy * 1.15f);
+                    if (xDominantPickup) {
                         state.dragStarted = true;
+                        clearMenuHighlight();
                         dismissAppContextPopup();
                         startPinnedDrag(pressTarget, pinnedIndex);
                         activeLongPressPickupState = null;
                         return true;
                     }
+                    updateMenuHighlightForRaw(event.getRawX(), event.getRawY(), true);
+                    return true;
                 }
             } else if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) {
                 LongPressPickupState state = activeLongPressPickupState;
                 if (state != null && state.sourceView == pressTarget) {
+                    if (action == MotionEvent.ACTION_UP && state.menuShown && !state.dragStarted) {
+                        updateMenuHighlightForRaw(event.getRawX(), event.getRawY(), true);
+                        executeHighlightedMenuActionOrKeepOpen();
+                        activeLongPressPickupState = null;
+                        return true;
+                    }
+                    if (action == MotionEvent.ACTION_CANCEL) {
+                        clearMenuHighlight();
+                    }
                     activeLongPressPickupState = null;
                 }
             }
@@ -1733,11 +1755,19 @@ public final class SuggestionBarView extends GridLayout {
         dismissAppContextPopup();
         List<ShortcutInfo> shortcuts = queryEntryShortcuts(context.entry);
         boolean hasShortcuts = !shortcuts.isEmpty();
-        boolean canRemove = context.pinnedIndex >= 0 || (context.sourceFolder != null && context.folderEntryRef != null);
+        boolean folderSource = context.sourceFolder != null && context.folderEntryRef != null;
+        int topPinnedIndex = context.pinnedIndex >= 0 ? context.pinnedIndex : findPinnedAppIndex(context.entry.appRef);
+        boolean topPinned = topPinnedIndex >= 0;
 
         LinearLayout shell = new LinearLayout(getContext());
         shell.setOrientation(LinearLayout.VERTICAL);
         shell.setPadding(dp(3), dp(3), dp(3), dp(3));
+        appContextRows.clear();
+        shortcutsRows.clear();
+        clearMenuHighlight();
+        shortcutsMainRowView = null;
+        activeAppMenuContext = context;
+        activeAppMenuShortcuts = shortcuts;
 
         TextView header = new TextView(getContext());
         header.setText(context.entry.label);
@@ -1745,36 +1775,79 @@ public final class SuggestionBarView extends GridLayout {
         header.setTextSize(12f);
         header.setTypeface(Typeface.DEFAULT_BOLD);
         header.setPadding(dp(8), dp(4), dp(8), dp(6));
-        shell.addView(header, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-
-        if (hasShortcuts) {
-            addPopupActionRow(shell, "Shortcuts", () -> {
-                dismissAppContextPopup();
-                showShortcutsPopup(context, shortcuts);
-            });
-        }
-
-        addPopupActionRow(shell, "App info", () -> {
-            dismissAppContextPopup();
-            openAppInfo(context.entry);
-        });
-
-        if (canRemove) {
-            addPopupActionRow(shell, "Remove", () -> {
-                dismissAppContextPopup();
-                removeFromContextSource(context);
-            });
-        }
-
-        addPopupActionRow(shell, "Uninstall", () -> {
-            dismissAppContextPopup();
-            requestUninstall(context.entry);
-        });
+        shell.addView(header, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
         int tintBase = context.sourceFolder != null && context.sourceFolder.tintOverrideEnabled
             ? (context.sourceFolder.tintColor & 0x00FFFFFF)
             : (inheritedTintColor & 0x00FFFFFF);
-        appContextPopupWindow = buildPopupWindow(shell, tintBase, () -> {
+        activeMenuTintBase = tintBase;
+
+        if (hasShortcuts) {
+            TextView shortcutsRow = addPopupActionRow(shell, "Shortcuts", tintBase, () -> {
+                if (shortcutsPopupWindow != null && shortcutsPopupWindow.isShowing()) {
+                    dismissShortcutsPopup();
+                    clearMenuHighlight();
+                } else {
+                    showShortcutsPopup(context, shortcuts, shortcutsMainRowView);
+                }
+            });
+            shortcutsMainRowView = shortcutsRow;
+            appContextRows.add(new MenuActionRow(shortcutsRow, () -> {
+                if (shortcutsPopupWindow == null || !shortcutsPopupWindow.isShowing()) {
+                    showShortcutsPopup(context, shortcuts, shortcutsMainRowView);
+                }
+            }, true));
+        }
+
+        TextView appInfoRow = addPopupActionRow(shell, "App info", tintBase, () -> {
+            dismissAppContextPopup();
+            openAppInfo(context.entry);
+        });
+        appContextRows.add(new MenuActionRow(appInfoRow, () -> {
+            dismissAppContextPopup();
+            openAppInfo(context.entry);
+        }, false));
+
+        if (folderSource) {
+            TextView removeRow = addPopupActionRow(shell, "Remove from folder", tintBase, () -> {
+                dismissAppContextPopup();
+                removeFromContextSource(context);
+            });
+            appContextRows.add(new MenuActionRow(removeRow, () -> {
+                dismissAppContextPopup();
+                removeFromContextSource(context);
+            }, false));
+        } else if (topPinned) {
+            final int targetPinnedIndex = topPinnedIndex;
+            TextView unpinRow = addPopupActionRow(shell, "Unpin", tintBase, () -> {
+                dismissAppContextPopup();
+                removePinnedAt(targetPinnedIndex);
+            });
+            appContextRows.add(new MenuActionRow(unpinRow, () -> {
+                dismissAppContextPopup();
+                removePinnedAt(targetPinnedIndex);
+            }, false));
+        } else {
+            TextView pinRow = addPopupActionRow(shell, "Pin", tintBase, () -> {
+                dismissAppContextPopup();
+                pinEntryToTopLevel(context.entry);
+            });
+            appContextRows.add(new MenuActionRow(pinRow, () -> {
+                dismissAppContextPopup();
+                pinEntryToTopLevel(context.entry);
+            }, false));
+        }
+
+        TextView uninstallRow = addPopupActionRow(shell, "Uninstall", tintBase, () -> {
+            dismissAppContextPopup();
+            requestUninstall(context.entry);
+        });
+        appContextRows.add(new MenuActionRow(uninstallRow, () -> {
+            dismissAppContextPopup();
+            requestUninstall(context.entry);
+        }, false));
+
+        appContextPopupWindow = buildPopupWindow(shell, tintBase, true, () -> {
             if (appContextPopupWindow != null && !appContextPopupWindow.isShowing()) {
                 appContextPopupWindow = null;
             }
@@ -1782,39 +1855,40 @@ public final class SuggestionBarView extends GridLayout {
         showPopupAtAnchor(appContextPopupWindow, context.anchor);
     }
 
-    private void showShortcutsPopup(@NonNull AppMenuContext context, @NonNull List<ShortcutInfo> shortcuts) {
+    private void showShortcutsPopup(@NonNull AppMenuContext context, @NonNull List<ShortcutInfo> shortcuts, @Nullable View shortcutsRowAnchor) {
         dismissShortcutsPopup();
         if (shortcuts.isEmpty()) return;
 
         LinearLayout shell = new LinearLayout(getContext());
         shell.setOrientation(LinearLayout.VERTICAL);
         shell.setPadding(dp(3), dp(3), dp(3), dp(3));
-
-        TextView header = new TextView(getContext());
-        header.setText("Shortcuts");
-        header.setTextColor(TEXT_COLOR);
-        header.setTextSize(12f);
-        header.setTypeface(Typeface.DEFAULT_BOLD);
-        header.setPadding(dp(8), dp(4), dp(8), dp(6));
-        shell.addView(header, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        shortcutsRows.clear();
 
         for (ShortcutInfo info : shortcuts) {
             String label = info.getShortLabel() != null ? info.getShortLabel().toString() : info.getId();
-            addPopupActionRow(shell, label, () -> {
-                dismissShortcutsPopup();
+            TextView shortcutRow = addPopupActionRow(shell, label, activeMenuTintBase, () -> {
+                dismissAppContextPopup();
                 launchShortcut(info);
             });
+            shortcutsRows.add(new MenuActionRow(shortcutRow, () -> {
+                dismissAppContextPopup();
+                launchShortcut(info);
+            }, false));
         }
 
         int tintBase = context.sourceFolder != null && context.sourceFolder.tintOverrideEnabled
             ? (context.sourceFolder.tintColor & 0x00FFFFFF)
             : (inheritedTintColor & 0x00FFFFFF);
-        shortcutsPopupWindow = buildPopupWindow(shell, tintBase, () -> {
+        shortcutsPopupWindow = buildPopupWindow(shell, tintBase, true, () -> {
             if (shortcutsPopupWindow != null && !shortcutsPopupWindow.isShowing()) {
                 shortcutsPopupWindow = null;
             }
         });
-        showPopupAtAnchor(shortcutsPopupWindow, context.anchor);
+        if (shortcutsRowAnchor != null && appContextPopupWindow != null && appContextPopupWindow.isShowing()) {
+            showSidePopupAlignedToRow(shortcutsPopupWindow, shortcutsRowAnchor, appContextPopupWindow);
+        } else {
+            showPopupAtAnchor(shortcutsPopupWindow, context.anchor);
+        }
     }
 
     @NonNull
@@ -1899,23 +1973,121 @@ public final class SuggestionBarView extends GridLayout {
         }
     }
 
-    private void addPopupActionRow(@NonNull LinearLayout shell, @NonNull String title, @NonNull Runnable action) {
+    private int findPinnedAppIndex(@NonNull AppRef ref) {
+        AppRef resolved = resolveForSelectionRef(ref);
+        String targetStable = resolved.stableId();
+        for (int i = 0; i < pinnedItems.size(); i++) {
+            PinnedItem item = pinnedItems.get(i);
+            if (!(item instanceof PinnedAppItem)) continue;
+            AppRef pinnedRef = resolveForSelectionRef(((PinnedAppItem) item).appRef);
+            if (targetStable.equals(pinnedRef.stableId())) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    private void pinEntryToTopLevel(@NonNull LauncherAppEntry entry) {
+        if (findPinnedAppIndex(entry.appRef) >= 0) return;
+        pinnedItems.add(new PinnedAppItem(resolveForSelectionRef(entry.appRef)));
+        persistPinsAndReload();
+    }
+
+    private TextView addPopupActionRow(@NonNull LinearLayout shell, @NonNull String title, int tintBase, @NonNull Runnable action) {
         TextView actionRow = new TextView(getContext());
         actionRow.setText(title);
         actionRow.setTextColor(TEXT_COLOR);
         actionRow.setTextSize(12f);
         actionRow.setPadding(dp(8), dp(7), dp(8), dp(7));
         actionRow.setClickable(true);
+        stylePopupRow(actionRow, false, tintBase);
         actionRow.setOnClickListener(v -> action.run());
-        shell.addView(actionRow, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        shell.addView(actionRow, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        return actionRow;
+    }
+
+    private void stylePopupRow(@NonNull TextView row, boolean highlighted, int tintBase) {
+        GradientDrawable bg = new GradientDrawable();
+        bg.setCornerRadius(dp(8));
+        if (highlighted) {
+            int fill = blendColors((0x8C << 24) | (tintBase & 0x00FFFFFF), 0x66FFFFFF, 0.35f);
+            bg.setColor(fill);
+            bg.setStroke(dp(1), blendColors(0x99FFFFFF, (0xFF << 24) | (tintBase & 0x00FFFFFF), 0.5f));
+            row.setTextColor(0xFFF0ECE0);
+        } else {
+            bg.setColor(0x00000000);
+            bg.setStroke(0, 0x00000000);
+            row.setTextColor(TEXT_COLOR);
+        }
+        row.setBackground(bg);
+    }
+
+    private void clearMenuHighlight() {
+        if (activeMenuHighlight != null && activeMenuHighlight.rowView != null) {
+            stylePopupRow(activeMenuHighlight.rowView, false, activeMenuTintBase);
+        }
+        activeMenuHighlight = null;
+    }
+
+    private void setMenuHighlight(@Nullable MenuActionRow target) {
+        if (activeMenuHighlight == target) return;
+        if (activeMenuHighlight != null && activeMenuHighlight.rowView != null) {
+            stylePopupRow(activeMenuHighlight.rowView, false, activeMenuTintBase);
+        }
+        activeMenuHighlight = target;
+        if (activeMenuHighlight != null && activeMenuHighlight.rowView != null) {
+            stylePopupRow(activeMenuHighlight.rowView, true, activeMenuTintBase);
+        }
+    }
+
+    private boolean updateMenuHighlightForRaw(float rawX, float rawY, boolean openShortcutsOnFocus) {
+        MenuActionRow target = resolveMenuRowAtRaw(rawX, rawY, openShortcutsOnFocus);
+        setMenuHighlight(target);
+        return target != null;
+    }
+
+    @Nullable
+    private MenuActionRow resolveMenuRowAtRaw(float rawX, float rawY, boolean openShortcutsOnFocus) {
+        for (MenuActionRow row : shortcutsRows) {
+            if (row.rowView != null && isRawInsideView(row.rowView, rawX, rawY)) {
+                return row;
+            }
+        }
+        for (MenuActionRow row : appContextRows) {
+            if (row.rowView != null && isRawInsideView(row.rowView, rawX, rawY)) {
+                if (openShortcutsOnFocus && row.opensShortcuts && shortcutsPopupWindow == null) {
+                    if (activeAppMenuContext != null && activeAppMenuShortcuts != null && !activeAppMenuShortcuts.isEmpty()) {
+                        showShortcutsPopup(activeAppMenuContext, activeAppMenuShortcuts, shortcutsMainRowView);
+                    }
+                }
+                return row;
+            }
+        }
+        return null;
+    }
+
+    private static boolean isRawInsideView(@NonNull View view, float rawX, float rawY) {
+        int[] loc = new int[2];
+        view.getLocationOnScreen(loc);
+        float left = loc[0];
+        float top = loc[1];
+        float right = left + view.getWidth();
+        float bottom = top + view.getHeight();
+        return rawX >= left && rawX <= right && rawY >= top && rawY <= bottom;
+    }
+
+    private void executeHighlightedMenuActionOrKeepOpen() {
+        if (activeMenuHighlight != null && activeMenuHighlight.action != null) {
+            activeMenuHighlight.action.run();
+        }
     }
 
     @NonNull
-    private PopupWindow buildPopupWindow(@NonNull View content, int tintBase, @Nullable Runnable onDismiss) {
+    private PopupWindow buildPopupWindow(@NonNull View content, int tintBase, boolean tightWrap, @Nullable Runnable onDismiss) {
         int screenW = getResources().getDisplayMetrics().widthPixels;
         int screenH = getResources().getDisplayMetrics().heightPixels;
         int maxWidth = popupMaxWidth(screenW);
-        int minWidth = popupMinWidth(screenW);
+        int minWidth = popupMinWidth(screenW, tightWrap);
         int maxHeight = popupMaxHeight(screenH);
 
         content.measure(
@@ -1928,7 +2100,7 @@ public final class SuggestionBarView extends GridLayout {
         ScrollView scrollView = new ScrollView(getContext());
         scrollView.setFillViewport(true);
         scrollView.setOverScrollMode(OVER_SCROLL_NEVER);
-        scrollView.addView(content, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        scrollView.addView(content, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
         FrameLayout popupRoot = new FrameLayout(getContext());
         GradientDrawable panelBg = new GradientDrawable();
@@ -1939,6 +2111,12 @@ public final class SuggestionBarView extends GridLayout {
         popupRoot.setBackground(panelBg);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             popupRoot.setClipToOutline(true);
+        }
+        if (blurEnabled && blurRadiusDp > 0) {
+            RealtimeBlurView blurView = new RealtimeBlurView(getContext());
+            blurView.setBlurRadius(Math.max(0f, (float) dp(blurRadiusDp)));
+            blurView.setOverlayColor(overlayColor);
+            popupRoot.addView(blurView, new FrameLayout.LayoutParams(desiredWidth, desiredHeight));
         }
         popupRoot.addView(scrollView, new FrameLayout.LayoutParams(desiredWidth, desiredHeight));
 
@@ -1990,15 +2168,60 @@ public final class SuggestionBarView extends GridLayout {
         return Math.min(screenW - dp(24), Math.min(dp(POPUP_MAX_WIDTH_DP), (int) (screenW * 0.9f)));
     }
 
-    private int popupMinWidth(int screenW) {
-        return Math.min(popupMaxWidth(screenW), dp(POPUP_MIN_WIDTH_DP));
+    private int popupMinWidth(int screenW, boolean tightWrap) {
+        int target = tightWrap ? POPUP_MIN_WIDTH_TIGHT_DP : POPUP_MIN_WIDTH_DP;
+        return Math.min(popupMaxWidth(screenW), dp(target));
     }
 
     private int popupMaxHeight(int screenH) {
         return Math.min(screenH - dp(80), (int) (screenH * POPUP_MAX_HEIGHT_FACTOR));
     }
 
+    private void showSidePopupAlignedToRow(@NonNull PopupWindow sidePopup, @NonNull View rowAnchor, @NonNull PopupWindow mainPopup) {
+        int screenW = getResources().getDisplayMetrics().widthPixels;
+        int screenH = getResources().getDisplayMetrics().heightPixels;
+        int[] mainLoc = new int[2];
+        int[] rowLoc = new int[2];
+        View mainRoot = mainPopup.getContentView();
+        if (mainRoot == null) {
+            showPopupAtAnchor(sidePopup, rowAnchor);
+            return;
+        }
+        mainRoot.getLocationOnScreen(mainLoc);
+        rowAnchor.getLocationOnScreen(rowLoc);
+        int gap = dp(4);
+        int popupWidth = sidePopup.getWidth();
+        int popupHeight = sidePopup.getHeight();
+        int preferredRightX = mainLoc[0] + mainPopup.getWidth() + gap;
+        int preferredLeftX = mainLoc[0] - popupWidth - gap;
+        int x = preferredRightX;
+        if (preferredRightX + popupWidth > screenW && preferredLeftX >= 0) {
+            x = preferredLeftX;
+        }
+        x = clamp(x, 0, Math.max(0, screenW - popupWidth));
+        int rowCenterY = rowLoc[1] + (rowAnchor.getHeight() / 2);
+        int y = clamp(rowCenterY - (popupHeight / 2), 0, Math.max(0, screenH - popupHeight));
+        sidePopup.showAtLocation(this, Gravity.NO_GRAVITY, x, y);
+        View root = sidePopup.getContentView();
+        if (root != null) {
+            root.setAlpha(0f);
+            root.setTranslationX(x >= mainLoc[0] ? dp(6) : -dp(6));
+            root.animate()
+                .alpha(1f)
+                .translationX(0f)
+                .setDuration(140L)
+                .setInterpolator(new DecelerateInterpolator())
+                .start();
+        }
+    }
+
     private void dismissAppContextPopup() {
+        dismissShortcutsPopup();
+        clearMenuHighlight();
+        appContextRows.clear();
+        activeAppMenuContext = null;
+        activeAppMenuShortcuts = null;
+        shortcutsMainRowView = null;
         if (appContextPopupWindow != null) {
             final PopupWindow popup = appContextPopupWindow;
             dismissPopupWindowAnimated(popup, () -> {
@@ -2010,6 +2233,8 @@ public final class SuggestionBarView extends GridLayout {
     }
 
     private void dismissShortcutsPopup() {
+        clearMenuHighlight();
+        shortcutsRows.clear();
         if (shortcutsPopupWindow != null) {
             final PopupWindow popup = shortcutsPopupWindow;
             dismissPopupWindowAnimated(popup, () -> {
@@ -2073,86 +2298,16 @@ public final class SuggestionBarView extends GridLayout {
 
     private void applyBarDragTransforms() {
         int maxSlots = Math.max(1, maxButtonCount);
-        float slotWidth = Math.max(dp(24), getWidth() / (float) maxSlots);
-        float deleteShift = deleteDropZoneVisible ? slotWidth : 0f;
         float insertShift = (folderDragHoverIndex >= 0) ? Math.max(dp(10), getWidth() / (float) Math.max(4, maxSlots) * 0.35f) : 0f;
         for (int i = 0; i < getChildCount(); i++) {
             View child = getChildAt(i);
             if (child == null) continue;
-            if (child == deleteDropZoneView) continue;
-            float tx = deleteShift;
+            float tx = 0f;
             if (folderDragHoverIndex >= 0 && i >= folderDragHoverIndex) {
                 tx += insertShift;
             }
             child.animate().translationX(tx).setDuration(90).setInterpolator(new DecelerateInterpolator()).start();
         }
-    }
-
-    private void showDeleteDropZone() {
-        if (deleteDropZoneVisible) return;
-        deleteDropZoneVisible = true;
-        deleteDropZoneHover = false;
-        if (deleteDropZoneView == null) {
-            deleteDropZoneView = createDeleteDropZoneView();
-        }
-        if (deleteDropZoneView.getParent() != this) {
-            deleteDropZoneView.setLayoutParams(createSlotParams(0));
-            addView(deleteDropZoneView);
-        }
-        applyBarDragTransforms();
-        updateDeleteDropZoneVisual(false);
-    }
-
-    private void hideDeleteDropZone() {
-        if (!deleteDropZoneVisible) return;
-        deleteDropZoneVisible = false;
-        deleteDropZoneHover = false;
-        if (deleteDropZoneView != null && deleteDropZoneView.getParent() == this) {
-            removeView(deleteDropZoneView);
-        }
-        applyBarDragTransforms();
-    }
-
-    private void setDeleteDropZoneHover(boolean hovering) {
-        if (!deleteDropZoneVisible) return;
-        if (deleteDropZoneHover == hovering) return;
-        deleteDropZoneHover = hovering;
-        updateDeleteDropZoneVisual(hovering);
-        if (hovering) {
-            clearFolderDragInsertionPreview();
-        }
-    }
-
-    private void updateDeleteDropZoneVisual(boolean hover) {
-        if (deleteDropZoneView == null) return;
-        deleteDropZoneView.animate()
-            .alpha(hover ? 0.96f : 0.75f)
-            .scaleX(hover ? 1.04f : 1f)
-            .scaleY(hover ? 1.04f : 1f)
-            .setDuration(90L)
-            .setInterpolator(new DecelerateInterpolator())
-            .start();
-    }
-
-    @NonNull
-    private View createDeleteDropZoneView() {
-        FrameLayout zone = new FrameLayout(getContext());
-        GradientDrawable bg = new GradientDrawable();
-        bg.setColor(0x66B00020);
-        bg.setCornerRadius(dp(10));
-        bg.setStroke(dp(1), 0x99FF6B6B);
-        zone.setBackground(bg);
-        zone.setAlpha(0.75f);
-        ImageView icon = new ImageView(getContext());
-        icon.setImageResource(R.drawable.ic_delete_sweep_24);
-        icon.setColorFilter(0xFFFFD8D8);
-        FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(dp(20), dp(20), Gravity.CENTER);
-        zone.addView(icon, params);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            zone.setElevation(dp(18));
-            zone.setTranslationZ(dp(18));
-        }
-        return zone;
     }
 
     private String[] appLabels(List<LauncherAppEntry> entries) {
@@ -2283,6 +2438,18 @@ public final class SuggestionBarView extends GridLayout {
         }
     }
 
+    private static final class MenuActionRow {
+        @NonNull final TextView rowView;
+        @NonNull final Runnable action;
+        final boolean opensShortcuts;
+
+        MenuActionRow(@NonNull TextView rowView, @NonNull Runnable action, boolean opensShortcuts) {
+            this.rowView = rowView;
+            this.action = action;
+            this.opensShortcuts = opensShortcuts;
+        }
+    }
+
     private static final class AppMenuContext {
         final LauncherAppEntry entry;
         final View anchor;
@@ -2386,8 +2553,7 @@ public final class SuggestionBarView extends GridLayout {
         float width = Math.max(1f, targetView.getWidth());
         float x = Math.max(0f, Math.min(width, event.getX()));
         float slotWidth = width / slotCount;
-        boolean inDeleteZone = deleteDropZoneVisible && x <= (slotWidth * 0.95f);
-        float contentX = deleteDropZoneVisible ? Math.max(0f, x - slotWidth) : x;
+        float contentX = x;
         int hoveredSlot = clamp((int) (contentX / Math.max(1f, slotWidth)), 0, slotCount - 1);
         float slotStartX = hoveredSlot * slotWidth;
         float dropXRatio = slotWidth <= 0f ? 0.5f : Math.max(0f, Math.min(1f, (contentX - slotStartX) / slotWidth));
@@ -2401,38 +2567,20 @@ public final class SuggestionBarView extends GridLayout {
 
         switch (event.getAction()) {
             case DragEvent.ACTION_DRAG_STARTED:
-                showDeleteDropZone();
                 updateFolderDragInsertionPreview(hoveredSlot);
                 return true;
             case DragEvent.ACTION_DRAG_LOCATION:
-                setDeleteDropZoneHover(inDeleteZone);
-                if (!inDeleteZone) {
-                    updateFolderDragInsertionPreview(hoveredSlot);
-                }
+                updateFolderDragInsertionPreview(hoveredSlot);
                 return true;
             case DragEvent.ACTION_DRAG_ENTERED:
                 targetView.setAlpha(0.92f);
-                setDeleteDropZoneHover(inDeleteZone);
-                if (!inDeleteZone) {
-                    updateFolderDragInsertionPreview(hoveredSlot);
-                }
+                updateFolderDragInsertionPreview(hoveredSlot);
                 return true;
             case DragEvent.ACTION_DRAG_EXITED:
                 targetView.setAlpha(1f);
-                setDeleteDropZoneHover(false);
                 return true;
             case DragEvent.ACTION_DROP:
                 targetView.setAlpha(1f);
-                if (inDeleteZone) {
-                    setDeleteDropZoneHover(false);
-                    hideDeleteDropZone();
-                    clearFolderDragInsertionPreview();
-                    if (pinnedDrag) {
-                        return applyPinnedDelete((PinnedDragState) localState);
-                    } else {
-                        return applyFolderDragDelete((FolderAppDragState) localState);
-                    }
-                }
                 clearFolderDragInsertionPreview();
                 if (pinnedDrag) {
                     return applyPinnedDrop((PinnedDragState) localState, targetIndex, targetItem, dropXRatio);
@@ -2441,27 +2589,11 @@ public final class SuggestionBarView extends GridLayout {
                 }
             case DragEvent.ACTION_DRAG_ENDED:
                 targetView.setAlpha(1f);
-                setDeleteDropZoneHover(false);
-                hideDeleteDropZone();
                 clearFolderDragInsertionPreview();
                 return true;
             default:
                 return false;
         }
-    }
-
-    private boolean applyPinnedDelete(@NonNull PinnedDragState dragState) {
-        if (dragState.sourceIndex < 0 || dragState.sourceIndex >= pinnedItems.size()) return false;
-        pinnedItems.remove(dragState.sourceIndex);
-        persistPinsAndReload();
-        return true;
-    }
-
-    private boolean applyFolderDragDelete(@NonNull FolderAppDragState dragState) {
-        if (dragState.sourceFolder == null || dragState.appRef == null) return false;
-        removeAppFromFolder(dragState.sourceFolder, dragState.appRef);
-        persistPinsAndReload();
-        return true;
     }
 
     private boolean applyPinnedDrop(@NonNull PinnedDragState dragState, int targetIndex, @Nullable PinnedItem targetItem, float dropXRatio) {
