@@ -96,10 +96,11 @@ public final class SuggestionBarView extends GridLayout {
     private static final char[] AZ_ORDER = "ABCDEFGHIJKLMNOPQRSTUVWXYZ#".toCharArray();
     private static final int POPUP_MAX_WIDTH_DP = 320;
     private static final int POPUP_MIN_WIDTH_DP = 188;
-    private static final int POPUP_MIN_WIDTH_TIGHT_DP = 92;
+    private static final int POPUP_MIN_WIDTH_TIGHT_DP = 132;
     private static final float POPUP_MAX_HEIGHT_FACTOR = 0.45f;
-    private static final long PICKUP_DECISION_WINDOW_MS = 300L;
-    private static final float PICKUP_AXIS_SLOP_FACTOR = 1.1f;
+    private static final long PICKUP_DECISION_WINDOW_MS = 650L;
+    private static final float PICKUP_X_AXIS_SLOP_FACTOR = 0.9f;
+    private static final float PICKUP_Y_INTENT_SLOP_FACTOR = 1.8f;
     private static final float MENU_SELECTION_ARM_SLOP_FACTOR = 0.8f;
 
     private List<LauncherAppEntry> allApps = new ArrayList<>();
@@ -1749,8 +1750,9 @@ public final class SuggestionBarView extends GridLayout {
                     float absDx = Math.abs(dx);
                     float absDy = Math.abs(dy);
                     int slop = ViewConfiguration.get(getContext()).getScaledTouchSlop();
-                    float axisThreshold = slop * PICKUP_AXIS_SLOP_FACTOR;
-                    if (absDy >= axisThreshold) {
+                    float yIntentThreshold = slop * PICKUP_Y_INTENT_SLOP_FACTOR;
+                    float xPickupThreshold = slop * PICKUP_X_AXIS_SLOP_FACTOR;
+                    if (absDy >= yIntentThreshold) {
                         state.definitiveYMovement = true;
                     }
                     if (!state.selectionArmed && Math.max(absDx, absDy) >= (slop * MENU_SELECTION_ARM_SLOP_FACTOR)) {
@@ -1762,7 +1764,7 @@ public final class SuggestionBarView extends GridLayout {
                         && pinnedIndex >= 0
                         && withinPickupWindow
                         && !state.definitiveYMovement
-                        && absDx >= axisThreshold;
+                        && absDx >= xPickupThreshold;
 
                     if (shouldStartPickup) {
                         state.dragStarted = true;
@@ -1832,22 +1834,14 @@ public final class SuggestionBarView extends GridLayout {
             : (inheritedTintColor & 0x00FFFFFF);
         activeMenuTintBase = tintBase;
 
-        if (hasShortcuts) {
-            TextView shortcutsRow = addPopupActionRow(shell, "Shortcuts", tintBase, () -> {
-                if (shortcutsPopupWindow != null && shortcutsPopupWindow.isShowing()) {
-                    dismissShortcutsPopup();
-                    clearMenuHighlight();
-                } else {
-                    showShortcutsPopup(context, shortcuts, shortcutsMainRowView);
-                }
-            });
-            shortcutsMainRowView = shortcutsRow;
-            appContextRows.add(new MenuActionRow(shortcutsRow, () -> {
-                if (shortcutsPopupWindow == null || !shortcutsPopupWindow.isShowing()) {
-                    showShortcutsPopup(context, shortcuts, shortcutsMainRowView);
-                }
-            }, true));
-        }
+        TextView uninstallRow = addPopupActionRow(shell, "Uninstall", tintBase, () -> {
+            dismissAppContextPopup();
+            requestUninstall(context.entry);
+        });
+        appContextRows.add(new MenuActionRow(uninstallRow, () -> {
+            dismissAppContextPopup();
+            requestUninstall(context.entry);
+        }, false));
 
         TextView appInfoRow = addPopupActionRow(shell, "App info", tintBase, () -> {
             dismissAppContextPopup();
@@ -1888,14 +1882,22 @@ public final class SuggestionBarView extends GridLayout {
             }, false));
         }
 
-        TextView uninstallRow = addPopupActionRow(shell, "Uninstall", tintBase, () -> {
-            dismissAppContextPopup();
-            requestUninstall(context.entry);
-        });
-        appContextRows.add(new MenuActionRow(uninstallRow, () -> {
-            dismissAppContextPopup();
-            requestUninstall(context.entry);
-        }, false));
+        if (hasShortcuts) {
+            TextView shortcutsRow = addPopupActionRow(shell, "Shortcuts", tintBase, () -> {
+                if (shortcutsPopupWindow != null && shortcutsPopupWindow.isShowing()) {
+                    dismissShortcutsPopup();
+                    clearMenuHighlight();
+                } else {
+                    showShortcutsPopup(context, shortcuts, shortcutsMainRowView);
+                }
+            });
+            shortcutsMainRowView = shortcutsRow;
+            appContextRows.add(new MenuActionRow(shortcutsRow, () -> {
+                if (shortcutsPopupWindow == null || !shortcutsPopupWindow.isShowing()) {
+                    showShortcutsPopup(context, shortcuts, shortcutsMainRowView);
+                }
+            }, true));
+        }
 
         appContextPopupWindow = buildPopupWindow(shell, tintBase, true, () -> {
             if (appContextPopupWindow != null && !appContextPopupWindow.isShowing()) {
@@ -2121,6 +2123,8 @@ public final class SuggestionBarView extends GridLayout {
         actionRow.setText(title);
         actionRow.setTextColor(TEXT_COLOR);
         actionRow.setTextSize(12f);
+        actionRow.setSingleLine(true);
+        actionRow.setEllipsize(TextUtils.TruncateAt.END);
         actionRow.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
         actionRow.setPadding(dp(8), dp(7), dp(8), dp(7));
         actionRow.setClickable(true);
@@ -2166,6 +2170,10 @@ public final class SuggestionBarView extends GridLayout {
 
     private boolean updateMenuHighlightForRaw(float rawX, float rawY, boolean openShortcutsOnFocus, boolean allowProjectedOutside) {
         MenuActionRow target = resolveMenuRowAtRaw(rawX, rawY, openShortcutsOnFocus, allowProjectedOutside);
+        boolean keepShortcutsVisible = isRowInList(target, shortcutsRows) || (target != null && target.opensShortcuts);
+        if (!keepShortcutsVisible && shortcutsPopupWindow != null && shortcutsPopupWindow.isShowing()) {
+            dismissShortcutsPopup();
+        }
         setMenuHighlight(target);
         return target != null;
     }
@@ -2182,6 +2190,10 @@ public final class SuggestionBarView extends GridLayout {
             return strictMain;
         }
         if (!allowProjectedOutside) {
+            return null;
+        }
+        int lowestBottom = Math.max(lowestRowBottom(appContextRows), lowestRowBottom(shortcutsRows));
+        if (lowestBottom > 0 && rawY > (lowestBottom + dp(12))) {
             return null;
         }
 
@@ -2207,6 +2219,14 @@ public final class SuggestionBarView extends GridLayout {
         MenuActionRow row = resolveNearestRowByY(appContextRows, rawY);
         maybeOpenShortcutsForFocusedRow(row, openShortcutsOnFocus);
         return row;
+    }
+
+    private static boolean isRowInList(@Nullable MenuActionRow row, @NonNull List<MenuActionRow> rows) {
+        if (row == null) return false;
+        for (MenuActionRow candidate : rows) {
+            if (candidate == row) return true;
+        }
+        return false;
     }
 
     private void maybeOpenShortcutsForFocusedRow(@Nullable MenuActionRow row, boolean openShortcutsOnFocus) {
@@ -2245,6 +2265,16 @@ public final class SuggestionBarView extends GridLayout {
             }
         }
         return nearest;
+    }
+
+    private static int lowestRowBottom(@NonNull List<MenuActionRow> rows) {
+        int bottom = -1;
+        Rect rowBounds = new Rect();
+        for (MenuActionRow row : rows) {
+            if (!getViewScreenRect(row.rowView, rowBounds)) continue;
+            if (rowBounds.bottom > bottom) bottom = rowBounds.bottom;
+        }
+        return bottom;
     }
 
     private float popupDistance(@Nullable PopupWindow popupWindow, float rawX, float rawY) {

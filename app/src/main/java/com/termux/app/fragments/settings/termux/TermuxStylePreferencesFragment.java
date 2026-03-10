@@ -337,7 +337,7 @@ class TermuxStylePreferencesDataStore extends PreferenceDataStore {
     private void triggerReloadOnAllEffectsOffTransition(boolean beforeAllOff) {
         if (!beforeAllOff && areVisualEffectsFullyOff()) {
             // Mirrors termux-reload-settings behavior for the enhanced -> legacy transition.
-            TermuxActivity.updateTermuxActivityStyling(mContext, true);
+            TermuxActivity.requestTermuxActivityStylingOnNextResume(mContext, true);
         }
     }
 

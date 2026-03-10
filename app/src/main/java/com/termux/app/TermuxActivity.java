@@ -268,6 +268,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
     private static final String ARG_ACTIVITY_RECREATED = "activity_recreated";
 
     private static final String LOG_TAG = "TermuxActivity";
+    private static volatile boolean sPendingStyleReloadOnNextResume = false;
 
     private static final int SUGGESTION_BAR_MIN_BUTTON_DP = 56;
     private static final int SUGGESTION_BAR_MAX_INPUT_CHARS = 10;
@@ -410,6 +411,10 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         Logger.logVerbose(LOG_TAG, "onResume");
         if (mIsInvalidState)
             return;
+        if (consumePendingStyleReloadOnNextResume()) {
+            reloadActivityStyling(true);
+            return;
+        }
         if (mTermuxTerminalSessionActivityClient != null)
             mTermuxTerminalSessionActivityClient.onResume();
         if (mTermuxTerminalViewClient != null)
@@ -1664,6 +1669,19 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         context.sendBroadcast(stylingIntent);
     }
 
+    public static void requestTermuxActivityStylingOnNextResume(Context context, boolean recreateActivity) {
+        sPendingStyleReloadOnNextResume = true;
+        updateTermuxActivityStyling(context, recreateActivity);
+    }
+
+    private static boolean consumePendingStyleReloadOnNextResume() {
+        if (!sPendingStyleReloadOnNextResume) {
+            return false;
+        }
+        sPendingStyleReloadOnNextResume = false;
+        return true;
+    }
+
     private void registerTermuxActivityBroadcastReceiver() {
         IntentFilter intentFilter = new IntentFilter();
         intentFilter.addAction(TERMUX_ACTIVITY.ACTION_NOTIFY_APP_CRASH);
@@ -1750,6 +1768,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
                         return;
                     case TERMUX_ACTIVITY.ACTION_RELOAD_STYLE:
                         Logger.logDebug(LOG_TAG, "Received intent to reload styling");
+                        sPendingStyleReloadOnNextResume = false;
                         reloadActivityStyling(intent.getBooleanExtra(TERMUX_ACTIVITY.EXTRA_RECREATE_ACTIVITY, true));
                         return;
                     case TERMUX_ACTIVITY.ACTION_REQUEST_PERMISSIONS:
