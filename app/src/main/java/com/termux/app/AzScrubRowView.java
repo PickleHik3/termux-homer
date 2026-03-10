@@ -25,7 +25,9 @@ public final class AzScrubRowView extends AppCompatTextView {
         default void onDoubleTap() {}
     }
 
-    private static final char[] LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ#".toCharArray();
+    public static final char PINNED_APPS_SYMBOL = '\u2605';
+    private static final char[] ALPHABET_LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ#".toCharArray();
+    private static final char[] LETTERS = (PINNED_APPS_SYMBOL + "ABCDEFGHIJKLMNOPQRSTUVWXYZ#").toCharArray();
     private char[] visibleLetters = LETTERS;
 
     @Nullable private ScrubCallback callback;
@@ -145,14 +147,15 @@ public final class AzScrubRowView extends AppCompatTextView {
             invalidate();
             return;
         }
-        char[] out = new char[normalized.size()];
+        char[] out = new char[normalized.size() + 1];
         int i = 0;
-        for (char base : LETTERS) {
+        out[i++] = PINNED_APPS_SYMBOL;
+        for (char base : ALPHABET_LETTERS) {
             if (normalized.contains(base)) {
                 out[i++] = base;
             }
         }
-        if (i == 0) {
+        if (i <= 1) {
             visibleLetters = LETTERS;
         } else if (i == out.length) {
             visibleLetters = out;

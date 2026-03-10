@@ -866,6 +866,10 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
                 @Override
                 public void onScrub(char letter, int selectionIndex, boolean commit) {
                     if (mSuggestionBarView != null) {
+                        if (letter == AzScrubRowView.PINNED_APPS_SYMBOL) {
+                            mSuggestionBarView.clearAzPreview();
+                            return;
+                        }
                         mSuggestionBarView.persistAzPreview(letter, selectionIndex);
                     }
                 }

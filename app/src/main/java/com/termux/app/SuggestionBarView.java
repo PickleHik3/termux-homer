@@ -1899,7 +1899,8 @@ public final class SuggestionBarView extends GridLayout {
             }, true));
         }
 
-        normalizePopupRowWidths(appContextRows, header);
+        int rowWidth = normalizePopupRowWidths(appContextRows);
+        constrainPopupHeaderWidth(header, rowWidth);
 
         appContextPopupWindow = buildPopupWindow(shell, tintBase, true, () -> {
             if (appContextPopupWindow != null && !appContextPopupWindow.isShowing()) {
@@ -1974,7 +1975,8 @@ public final class SuggestionBarView extends GridLayout {
             }
         }, false));
 
-        normalizePopupRowWidths(appContextRows, header);
+        int rowWidth = normalizePopupRowWidths(appContextRows);
+        constrainPopupHeaderWidth(header, rowWidth);
 
         appContextPopupWindow = buildPopupWindow(shell, tintBase, true, () -> {
             if (appContextPopupWindow != null && !appContextPopupWindow.isShowing()) {
@@ -2004,7 +2006,7 @@ public final class SuggestionBarView extends GridLayout {
                 launchShortcut(info);
             }, false));
         }
-        normalizePopupRowWidths(shortcutsRows, null);
+        normalizePopupRowWidths(shortcutsRows);
 
         int tintBase = context.sourceFolder != null && context.sourceFolder.tintOverrideEnabled
             ? (context.sourceFolder.tintColor & 0x00FFFFFF)
@@ -2137,20 +2139,16 @@ public final class SuggestionBarView extends GridLayout {
         return actionRow;
     }
 
-    private void normalizePopupRowWidths(@NonNull List<MenuActionRow> rows, @Nullable TextView header) {
-        if (rows.isEmpty()) return;
+    private int normalizePopupRowWidths(@NonNull List<MenuActionRow> rows) {
+        if (rows.isEmpty()) return 0;
         int maxWidth = 0;
         int unspecified = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED);
-        if (header != null) {
-            header.measure(unspecified, unspecified);
-            maxWidth = Math.max(maxWidth, header.getMeasuredWidth());
-        }
         for (MenuActionRow row : rows) {
             if (row.rowView == null) continue;
             row.rowView.measure(unspecified, unspecified);
             maxWidth = Math.max(maxWidth, row.rowView.getMeasuredWidth());
         }
-        if (maxWidth <= 0) return;
+        if (maxWidth <= 0) return 0;
         for (MenuActionRow row : rows) {
             if (row.rowView == null) continue;
             ViewGroup.LayoutParams params = row.rowView.getLayoutParams();
@@ -2161,6 +2159,20 @@ public final class SuggestionBarView extends GridLayout {
             }
             row.rowView.setLayoutParams(params);
         }
+        return maxWidth;
+    }
+
+    private void constrainPopupHeaderWidth(@NonNull TextView header, int targetWidth) {
+        if (targetWidth <= 0) return;
+        header.setSingleLine(true);
+        header.setEllipsize(TextUtils.TruncateAt.END);
+        ViewGroup.LayoutParams params = header.getLayoutParams();
+        if (params == null) {
+            params = new LinearLayout.LayoutParams(targetWidth, ViewGroup.LayoutParams.WRAP_CONTENT);
+        } else {
+            params.width = targetWidth;
+        }
+        header.setLayoutParams(params);
     }
 
     private void stylePopupRow(@NonNull TextView row, boolean highlighted, int tintBase) {
