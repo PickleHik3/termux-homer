@@ -172,13 +172,17 @@ class TermuxStylePreferencesDataStore extends PreferenceDataStore {
                 TermuxActivity.updateTermuxActivityStyling(mContext, true);
                 break;
             case "terminal_blur_radius":
+                boolean beforeBlurChangeAllOff = areVisualEffectsFullyOff();
                 mPreferences.setTerminalBlurRadius(value);
+                triggerReloadOnAllEffectsOffTransition(beforeBlurChangeAllOff);
                 break;
             case "terminal_blur_downsample_factor":
                 mPreferences.setTerminalBlurDownsampleFactor(value);
                 break;
             case "terminal_grain_intensity":
+                boolean beforeGrainChangeAllOff = areVisualEffectsFullyOff();
                 mPreferences.setTerminalGrainIntensity(value);
+                triggerReloadOnAllEffectsOffTransition(beforeGrainChangeAllOff);
                 break;
             case "sessions_blur_radius":
                 mPreferences.setSessionsBlurRadius(value);
@@ -321,6 +325,20 @@ class TermuxStylePreferencesDataStore extends PreferenceDataStore {
         }
         syncBackgroundOverlayColor(mPreferences.getTerminalBackgroundOpacity(), manualOverride);
         TermuxActivity.updateTermuxActivityStyling(mContext, true);
+    }
+
+    private boolean areVisualEffectsFullyOff() {
+        return !mPreferences.isMonetBackgroundEnabled()
+            && !mPreferences.isMonetOverlayEnabled()
+            && mPreferences.getTerminalBlurRadius() <= 0
+            && mPreferences.getTerminalGrainIntensity() <= 0;
+    }
+
+    private void triggerReloadOnAllEffectsOffTransition(boolean beforeAllOff) {
+        if (!beforeAllOff && areVisualEffectsFullyOff()) {
+            // Mirrors termux-reload-settings behavior for the enhanced -> legacy transition.
+            TermuxActivity.updateTermuxActivityStyling(mContext, true);
+        }
     }
 
     private String getCurrentOverlayColorString() {
