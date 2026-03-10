@@ -45,9 +45,12 @@ public class AzScrubRowViewTest {
         });
 
         view.onTouchEvent(MotionEvent.obtain(0, 10, MotionEvent.ACTION_DOWN, 0f, 24f, 0));
-        assertEquals('A', lastLetter[0]);
+        assertEquals(AzScrubRowView.PINNED_APPS_SYMBOL, lastLetter[0]);
         assertEquals(0, lastSelection[0]);
         assertFalse(committed[0]);
+
+        view.onTouchEvent(MotionEvent.obtain(0, 15, MotionEvent.ACTION_MOVE, 30f, 24f, 0));
+        assertEquals('A', lastLetter[0]);
 
         view.onTouchEvent(MotionEvent.obtain(0, 20, MotionEvent.ACTION_MOVE, 539f, 24f, 0));
         assertEquals('#', lastLetter[0]);
