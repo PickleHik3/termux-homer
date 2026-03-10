@@ -1061,6 +1061,17 @@ public class LauncherCtlApiServer {
             prefixes.put("pm list packages");
             prefixes.put("cmd package list packages");
             defaultConfig.put("allowedCommandPrefixes", prefixes);
+            defaultConfig.put("help", "Set execEnabled=true and copy only needed entries from commandPrefixTemplates into allowedCommandPrefixes.");
+            JSONArray templates = new JSONArray();
+            templates.put("am broadcast -a com.termux.app.restart -p com.termux");
+            templates.put("am start -S -n com.termux/.app.TermuxActivity");
+            templates.put("am start -n");
+            templates.put("am force-stop");
+            templates.put("cmd package query-activities");
+            templates.put("cmd package list packages");
+            templates.put("pm list packages");
+            templates.put("id");
+            defaultConfig.put("commandPrefixTemplates", templates);
             writeTextFile(CONFIG_FILE_PATH, defaultConfig.toString(2) + "\n");
         } catch (Exception e) {
             Logger.logErrorExtended(LOG_TAG, "Failed to write default LauncherCtl config: " + e.getMessage());
