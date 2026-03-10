@@ -70,6 +70,7 @@ public class TooieApiServer {
     private static final String ENDPOINT_FILE_PATH = TOOIE_DIR_PATH + "/endpoint";
     private static final String CONFIG_FILE_PATH = TOOIE_DIR_PATH + "/config.json";
     private static final String TOOIE_BIN_PATH = TermuxConstants.TERMUX_BIN_PREFIX_DIR_PATH + "/tooie";
+    private static final String LAUNCHER_RESTART_BIN_PATH = TermuxConstants.TERMUX_BIN_PREFIX_DIR_PATH + "/launcher-restart";
 
     private static final int MAX_REQUEST_LINE_BYTES = 4096;
     private static final int MAX_HEADER_LINE_BYTES = 4096;
@@ -122,6 +123,7 @@ public class TooieApiServer {
             running = true;
             writeClientConfig();
             installTooieCliScript();
+            installLauncherRestartScript();
             startAcceptLoop(context.getApplicationContext());
             Logger.logInfo(LOG_TAG, "Tooie API listening on 127.0.0.1:" + port);
         } catch (Exception e) {
@@ -968,6 +970,65 @@ public class TooieApiServer {
             }
         } catch (Exception e) {
             Logger.logErrorExtended(LOG_TAG, "Failed to install tooie cli: " + e.getMessage());
+        }
+    }
+
+    private void installLauncherRestartScript() {
+        File loginBinary = new File(TermuxConstants.TERMUX_BIN_PREFIX_DIR_PATH + "/login");
+        if (!loginBinary.exists()) {
+            Logger.logInfo(LOG_TAG, "Skipping launcher-restart install until bootstrap is initialized.");
+            return;
+        }
+
+        String script =
+            "#!/data/data/com.termux/files/usr/bin/sh\n" +
+            "set -eu\n" +
+            "\n" +
+            "if [ \"$#\" != \"0\" ]; then\n" +
+            "  echo \"usage: launcher-restart\" >&2\n" +
+            "  exit 2\n" +
+            "fi\n" +
+            "\n" +
+            "# Keep behavior aligned with tel-restart for launcher state cleanup when present.\n" +
+            "if command -v tel-delete-status >/dev/null 2>&1; then\n" +
+            "  tel-delete-status -1 || true\n" +
+            "fi\n" +
+            "\n" +
+            "# Preferred path: exported app restart broadcast.\n" +
+            "if cmd package query-receivers --brief --user 0 -a com.termux.app.restart -p com.termux 2>/dev/null | grep -qv '^No receivers found$'; then\n" +
+            "  if am broadcast -a com.termux.app.restart -p com.termux >/dev/null 2>&1; then\n" +
+            "    exit 0\n" +
+            "  fi\n" +
+            "fi\n" +
+            "\n" +
+            "# Fallbacks for older app builds without the restart receiver.\n" +
+            "RESTART_CMD='am start -S -n com.termux/.app.TermuxActivity'\n" +
+            "if $RESTART_CMD >/dev/null 2>&1; then\n" +
+            "  exit 0\n" +
+            "fi\n" +
+            "\n" +
+            "if command -v tooie >/dev/null 2>&1; then\n" +
+            "  if tooie exec \"$RESTART_CMD\" >/dev/null 2>&1; then\n" +
+            "    exit 0\n" +
+            "  fi\n" +
+            "fi\n" +
+            "\n" +
+            "if [ -x \"$HOME/.rish/rish\" ]; then\n" +
+            "  exec \"$HOME/.rish/rish\" -c \"$RESTART_CMD\"\n" +
+            "fi\n" +
+            "\n" +
+            "echo \"launcher-restart: failed (restart broadcast and fallback launch paths failed)\" >&2\n" +
+            "exit 1\n";
+
+        try {
+            writeTextFile(LAUNCHER_RESTART_BIN_PATH, script);
+            File launcherRestartBin = new File(LAUNCHER_RESTART_BIN_PATH);
+            if (launcherRestartBin.exists()) {
+                launcherRestartBin.setExecutable(true, false);
+                launcherRestartBin.setReadable(true, false);
+            }
+        } catch (Exception e) {
+            Logger.logErrorExtended(LOG_TAG, "Failed to install launcher-restart cli: " + e.getMessage());
         }
     }
 
