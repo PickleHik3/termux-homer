@@ -2,6 +2,8 @@ package com.termux.app;
 
 import android.app.Application;
 import android.content.Context;
+
+import com.jakewharton.processphoenix.ProcessPhoenix;
 import com.termux.BuildConfig;
 import com.termux.privileged.PrivilegedBackendManager;
 import com.termux.shared.errors.Error;
@@ -24,6 +26,9 @@ public class TermuxApplication extends Application {
 
     public void onCreate() {
         super.onCreate();
+        if (ProcessPhoenix.isPhoenixProcess(this)) {
+            return;
+        }
         Context context = getApplicationContext();
         // Set crash handler for the app
         TermuxCrashUtils.setDefaultCrashHandler(this);

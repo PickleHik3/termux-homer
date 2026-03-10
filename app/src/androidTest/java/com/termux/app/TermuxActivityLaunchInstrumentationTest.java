@@ -1,6 +1,8 @@
 package com.termux.app;
 
 import android.content.Context;
+import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.RelativeLayout;
@@ -11,9 +13,12 @@ import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.filters.SdkSuppress;
 import androidx.test.platform.app.InstrumentationRegistry;
 
+import com.termux.shared.termux.TermuxConstants;
+
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
@@ -50,5 +55,17 @@ public class TermuxActivityLaunchInstrumentationTest {
         child.setLayoutParams(correctParams);
         parent.measure(widthSpec, heightSpec);
         parent.layout(0, 0, parent.getMeasuredWidth(), parent.getMeasuredHeight());
+    }
+
+    @Test
+    public void restartReceiverIsResolvable() {
+        Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
+        Intent intent = new Intent(TermuxConstants.TERMUX_APP.TERMUX_ACTIVITY.ACTION_RESTART)
+                .setPackage(context.getPackageName());
+
+        assertFalse("Restart receiver should be exported for package broadcasts",
+                context.getPackageManager()
+                        .queryBroadcastReceivers(intent, 0)
+                        .isEmpty());
     }
 }

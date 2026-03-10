@@ -7,7 +7,7 @@ Download it from [releases](https://github.com/PickleHik3/termux-launcher/releas
 It will work OOB with just with above apk's, if you want to take advantage of the shizuku backend for various stuff, run the bootstrap script from [tooie](https://github.com/PickleHik3/tooie). 
 
 ## Some Quirks
-- if you exit out of the shell by typing "exit" while the app is set as the home launcher, it will become stuttery and unusable, to fix: either force stop termux:launcher from the android apps settings page or if you installed the [tooie](https://github.com/PickleHik3/tooie) then you can do 'tooie --restart' which does the same thing.
+- if you exit out of the shell by typing "exit" while the app is set as the home launcher, it will become stuttery and unusable, to fix: either force stop termux:launcher from the android apps settings page, run `am broadcast -a com.termux.app.restart -p com.termux`, or if you installed the [tooie](https://github.com/PickleHik3/tooie) then you can do `tooie --restart`.
 - Recommended to install [shizuku](https://github.com/rikkaapps/shizuku) to get the live system stats and other features (such as launching android apps from within the shell) from [tooie](https://github.com/PickleHik3/tooie).
 - Recommeded to install [unexpected-keyboard](https://github.com/Julow/Unexpected-Keyboard) if you want to make your life easier working with tmux.
 - for launching apps from the apps bar, shizuku is NOT required.

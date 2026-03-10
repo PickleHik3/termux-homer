@@ -1492,6 +1492,12 @@ public final class TermuxConstants {
             public static final String ACTION_RELOAD_STYLE = TermuxConstants.TERMUX_PACKAGE_NAME + ".app.reload_style";
 
             /**
+             * Intent action to make termux restart its app process.
+             */
+            // Default: "com.termux.app.restart"
+            public static final String ACTION_RESTART = TermuxConstants.TERMUX_PACKAGE_NAME + ".app.restart";
+
+            /**
              * Intent {@code String} extra for what to reload for the TERMUX_ACTIVITY.ACTION_RELOAD_STYLE intent. This has been deperecated.
              */
             @Deprecated

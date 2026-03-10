@@ -210,6 +210,14 @@
             android:exported="false" />
 
         <receiver
+            android:name=".app.TermuxRestartReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="${TERMUX_PACKAGE_NAME}.app.restart" />
+            </intent-filter>
+        </receiver>
+
+        <receiver
             android:name=".app.event.SystemEventReceiver"
             android:exported="false">
             <intent-filter>
