@@ -24,8 +24,8 @@ if $RESTART_CMD >/dev/null 2>&1; then
   exit 0
 fi
 
-if command -v tooie >/dev/null 2>&1; then
-  if tooie exec "$RESTART_CMD" >/dev/null 2>&1; then
+if command -v launcherctl >/dev/null 2>&1; then
+  if launcherctl exec "$RESTART_CMD" >/dev/null 2>&1; then
     exit 0
   fi
 fi

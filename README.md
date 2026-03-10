@@ -44,9 +44,9 @@ adb shell settings put global settings_enable_monitor_phantom_procs false
 ```
 ## Shizuku Integration
 
-Shizuku privileged backend support and Tooie local API endpoints are included in `main`.
+Shizuku privileged backend support and LauncherCtl local API endpoints are included in `main`.
 
-Current Tooie endpoints include:
+Current LauncherCtl endpoints include:
 - `/v1/status`
 - `/v1/apps`
 - `/v1/system/resources` (CPU, memory, storage, battery, network, thermal, backend diagnostics)
@@ -61,7 +61,7 @@ Current Tooie endpoints include:
 - `/v1/auth/rotate`
 
 Docs and policy notes:
-- `docs/en/Tooie_API.md`
+- `docs/en/LauncherCtl_API.md`
 
 ## Upstream Base
 

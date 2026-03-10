@@ -18,7 +18,7 @@ import com.termux.shared.termux.shell.command.environment.TermuxShellEnvironment
 import com.termux.shared.termux.shell.am.TermuxAmSocketServer;
 import com.termux.shared.termux.shell.TermuxShellManager;
 import com.termux.shared.termux.theme.TermuxThemeUtils;
-import com.termux.tooie.TooieApiServer;
+import com.termux.launcherctl.LauncherCtlApiServer;
 
 public class TermuxApplication extends Application {
 
@@ -45,8 +45,8 @@ public class TermuxApplication extends Application {
         TermuxThemeUtils.setAppNightMode(properties.getNightMode());
         // Initialize privileged backend system for enhanced operations
         initPrivilegedBackend(context);
-        // Initialize Tooie local API for shell integrations
-        initTooieApiServer(context);
+        // Initialize LauncherCtl local API for shell integrations
+        initLauncherCtlApiServer(context);
         // Check and create termux files directory. If failed to access it like in case of secondary
         // user or external sd card installation, then don't run files directory related code
         Error error = TermuxFileUtils.isTermuxFilesDirectoryAccessible(this, true, true);
@@ -75,7 +75,7 @@ public class TermuxApplication extends Application {
     @Override
     public void onTerminate() {
         super.onTerminate();
-        TooieApiServer.getInstance().stop();
+        LauncherCtlApiServer.getInstance().stop();
         PrivilegedBackendManager.getInstance().cleanup();
     }
 
@@ -101,11 +101,11 @@ public class TermuxApplication extends Application {
     }
 
     /**
-     * Initialize Tooie localhost API bridge for shell clients.
+     * Initialize LauncherCtl localhost API bridge for shell clients.
      */
-    private void initTooieApiServer(Context context) {
-        Logger.logInfo(LOG_TAG, "Starting Tooie API server...");
-        TooieApiServer.getInstance().start(context);
+    private void initLauncherCtlApiServer(Context context) {
+        Logger.logInfo(LOG_TAG, "Starting LauncherCtl API server...");
+        LauncherCtlApiServer.getInstance().start(context);
     }
 
     public static void setLogConfig(Context context) {

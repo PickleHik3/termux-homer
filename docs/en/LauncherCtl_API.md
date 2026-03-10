@@ -1,25 +1,25 @@
-# Tooie API (Local Shell Bridge)
+# LauncherCtl API (Local Shell Bridge)
 
 ## Overview
-Tooie is a localhost API bridge for exposing Android/app data to shell tools without high-frequency `adb`/`rish` polling loops.
+LauncherCtl is a localhost API bridge for exposing Android/app data to shell tools without high-frequency `adb`/`rish` polling loops.
 
 - Server: in app process, bound to `127.0.0.1` on random port.
-- Auth: bearer token from `~/.tooie/token`.
-- Endpoint URL: `~/.tooie/endpoint`.
-- CLI: `$PREFIX/bin/tooie` (auto-installed on app startup).
+- Auth: bearer token from `~/.launcherctl/token`.
+- Endpoint URL: `~/.launcherctl/endpoint`.
+- CLI: `$PREFIX/bin/launcherctl` (auto-installed on app startup).
 
 ## Files and Components
 
 - Server implementation:
-  - `app/src/main/java/com/termux/tooie/TooieApiServer.java`
+  - `app/src/main/java/com/termux/launcherctl/LauncherCtlApiServer.java`
 - Notification/media source:
-  - `app/src/main/java/com/termux/tooie/TooieNotificationListener.java`
+  - `app/src/main/java/com/termux/launcherctl/LauncherCtlNotificationListener.java`
 - App startup wiring:
   - `app/src/main/java/com/termux/app/TermuxApplication.java`
 - Manifest service entry:
   - `app/src/main/AndroidManifest.xml`
 
-Runtime files under `$HOME/.tooie`:
+Runtime files under `$HOME/.launcherctl`:
 
 - `token`: API bearer token.
 - `endpoint`: local base URL (`http://127.0.0.1:<port>`).
@@ -28,7 +28,7 @@ Runtime files under `$HOME/.tooie`:
 ## Endpoints (v1)
 
 ### `GET /v1/status`
-Returns backend + Tooie runtime status.
+Returns backend + LauncherCtl runtime status.
 
 ### `GET /v1/apps`
 Returns installed apps (package, label, system flag).
@@ -86,7 +86,7 @@ Reads current volume and optionally sets a new value.
 
 ### `POST /v1/exec`
 Runs a privileged command through `PrivilegedBackendManager`.
-Subject to strict policy in `~/.tooie/config.json`.
+Subject to strict policy in `~/.launcherctl/config.json`.
 
 ### `POST /v1/privileged/request-permission`
 Requests privileged permission when Shizuku is available but not yet granted.
@@ -96,31 +96,31 @@ Returns backend status fields to help diagnose permission state.
 Attempts screen lock key event (`223`, fallback `26`) via privileged backend.
 
 ### `POST /v1/auth/rotate`
-Rotates API token and rewrites `~/.tooie/token` and `~/.tooie/endpoint`.
+Rotates API token and rewrites `~/.launcherctl/token` and `~/.launcherctl/endpoint`.
 
 ## CLI Usage
 
 ```sh
-tooie --help
-tooie help exec
-tooie status
-tooie apps
-tooie resources
-tooie media
-tooie art
-tooie notifications
-tooie brightness
-tooie brightness 128
-tooie volume
-tooie volume 8
-tooie volume 6 3
-tooie lock
-tooie exec id
-tooie permission
-tooie token rotate
+launcherctl --help
+launcherctl help exec
+launcherctl status
+launcherctl apps
+launcherctl resources
+launcherctl media
+launcherctl art
+launcherctl notifications
+launcherctl brightness
+launcherctl brightness 128
+launcherctl volume
+launcherctl volume 8
+launcherctl volume 6 3
+launcherctl lock
+launcherctl exec id
+launcherctl permission
+launcherctl token rotate
 ```
 
-Note: `tooie-status` is not a command. Use `tooie status`.
+Note: `launcherctl-status` is not a command. Use `launcherctl status`.
 
 ## Security Model
 
@@ -187,8 +187,8 @@ Rules:
 
 ## Notification and Media Data
 
-`tooie media` and `tooie notifications` require notification listener permission for the app.
-`tooie art` also requires notification listener permission.
+`launcherctl media` and `launcherctl notifications` require notification listener permission for the app.
+`launcherctl art` also requires notification listener permission.
 
 If not granted, responses include:
 - `listenerConnected: false`
@@ -196,20 +196,20 @@ If not granted, responses include:
 
 ## Troubleshooting
 
-### `tooie exec` returns forbidden/disabled
-- Check `~/.tooie/config.json` and set `"execEnabled": true`.
+### `launcherctl exec` returns forbidden/disabled
+- Check `~/.launcherctl/config.json` and set `"execEnabled": true`.
 - Ensure command matches `allowedCommandPrefixes`.
 
-### `tooie media`/`notifications` empty
+### `launcherctl media`/`notifications` empty
 - Grant notification access for the app in Android settings.
 
 ### Token errors (`401`)
-- Run `tooie token rotate`.
+- Run `launcherctl token rotate`.
 - Re-run command after the token file is rewritten.
 
 ## Performance Notes
 
-- Tooie is event-driven for notifications/media and avoids constant polling loops.
+- LauncherCtl is event-driven for notifications/media and avoids constant polling loops.
 - `/v1/apps` can be heavier than status queries; avoid frequent tight loops.
 - `/v1/system/resources` is designed for periodic dashboard polling.
 - `/v1/exec` cost depends on spawned privileged command frequency.

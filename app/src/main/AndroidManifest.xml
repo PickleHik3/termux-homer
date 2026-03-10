@@ -246,7 +246,7 @@
         </service>
 
         <service
-            android:name=".tooie.TooieNotificationListener"
+            android:name=".launcherctl.LauncherCtlNotificationListener"
             android:exported="false"
             android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
             <intent-filter>

@@ -1,4 +1,4 @@
-package com.termux.tooie;
+package com.termux.launcherctl;
 
 import android.app.ActivityManager;
 import android.content.Context;
@@ -60,16 +60,16 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Local Tooie API server exposed on localhost for shell integrations.
+ * Local LauncherCtl API server exposed on localhost for shell integrations.
  */
-public class TooieApiServer {
-    private static final String LOG_TAG = "TooieApiServer";
+public class LauncherCtlApiServer {
+    private static final String LOG_TAG = "LauncherCtlApiServer";
     private static final String API_VERSION = "v1";
-    private static final String TOOIE_DIR_PATH = TermuxConstants.TERMUX_HOME_DIR_PATH + "/.tooie";
-    private static final String TOKEN_FILE_PATH = TOOIE_DIR_PATH + "/token";
-    private static final String ENDPOINT_FILE_PATH = TOOIE_DIR_PATH + "/endpoint";
-    private static final String CONFIG_FILE_PATH = TOOIE_DIR_PATH + "/config.json";
-    private static final String TOOIE_BIN_PATH = TermuxConstants.TERMUX_BIN_PREFIX_DIR_PATH + "/tooie";
+    private static final String LAUNCHERCTL_DIR_PATH = TermuxConstants.TERMUX_HOME_DIR_PATH + "/.launcherctl";
+    private static final String TOKEN_FILE_PATH = LAUNCHERCTL_DIR_PATH + "/token";
+    private static final String ENDPOINT_FILE_PATH = LAUNCHERCTL_DIR_PATH + "/endpoint";
+    private static final String CONFIG_FILE_PATH = LAUNCHERCTL_DIR_PATH + "/config.json";
+    private static final String LAUNCHERCTL_BIN_PATH = TermuxConstants.TERMUX_BIN_PREFIX_DIR_PATH + "/launcherctl";
     private static final String LAUNCHER_RESTART_BIN_PATH = TermuxConstants.TERMUX_BIN_PREFIX_DIR_PATH + "/launcher-restart";
 
     private static final int MAX_REQUEST_LINE_BYTES = 4096;
@@ -82,7 +82,7 @@ public class TooieApiServer {
     private static final int MAX_BRIGHTNESS = 255;
     private static final int DEFAULT_VOLUME_STREAM = AudioManager.STREAM_MUSIC;
 
-    private static TooieApiServer instance;
+    private static LauncherCtlApiServer instance;
 
     private final ThreadPoolExecutor clientExecutor = new ThreadPoolExecutor(
         2, 4, 30L, TimeUnit.SECONDS, new LinkedBlockingQueue<>(64));
@@ -99,12 +99,12 @@ public class TooieApiServer {
     private long lastCpuSampleMs = 0L;
     private Context appContext;
 
-    private TooieApiServer() {
+    private LauncherCtlApiServer() {
     }
 
-    public static synchronized TooieApiServer getInstance() {
+    public static synchronized LauncherCtlApiServer getInstance() {
         if (instance == null) {
-            instance = new TooieApiServer();
+            instance = new LauncherCtlApiServer();
         }
         return instance;
     }
@@ -122,13 +122,13 @@ public class TooieApiServer {
             port = serverSocket.getLocalPort();
             running = true;
             writeClientConfig();
-            installTooieCliScript();
+            installLauncherCtlCliScript();
             installLauncherRestartScript();
             startAcceptLoop(context.getApplicationContext());
-            Logger.logInfo(LOG_TAG, "Tooie API listening on 127.0.0.1:" + port);
+            Logger.logInfo(LOG_TAG, "LauncherCtl API listening on 127.0.0.1:" + port);
         } catch (Exception e) {
             running = false;
-            Logger.logErrorExtended(LOG_TAG, "Failed to start Tooie API server: " + e.getMessage());
+            Logger.logErrorExtended(LOG_TAG, "Failed to start LauncherCtl API server: " + e.getMessage());
             cleanupSocket();
         }
     }
@@ -159,7 +159,7 @@ public class TooieApiServer {
                     }
                 }
             }
-        }, "tooie-api-accept");
+        }, "launcherctl-api-accept");
         acceptThread.setDaemon(true);
         acceptThread.start();
     }
@@ -270,7 +270,7 @@ public class TooieApiServer {
         data.put("statusReason", String.valueOf(manager.getStatusReason()));
         data.put("statusMessage", manager.getStatusMessage());
         data.put("isPrivilegedAvailable", manager.isPrivilegedAvailable());
-        data.put("notificationListenerConnected", TooieNotificationListener.isListenerConnected());
+        data.put("notificationListenerConnected", LauncherCtlNotificationListener.isListenerConnected());
         data.put("execPolicy", describeExecPolicy());
         data.put("privilegedPolicy", describePrivilegedPolicy());
         return data;
@@ -405,19 +405,19 @@ public class TooieApiServer {
     }
 
     private JSONObject buildNowPlaying() throws JSONException {
-        JSONObject snapshot = TooieNotificationListener.getNowPlayingSnapshot();
+        JSONObject snapshot = LauncherCtlNotificationListener.getNowPlayingSnapshot();
         snapshot.put("ok", true);
         return snapshot;
     }
 
     private JSONObject buildNowPlayingArt() throws JSONException {
-        JSONObject snapshot = TooieNotificationListener.getNowPlayingArtSnapshot();
+        JSONObject snapshot = LauncherCtlNotificationListener.getNowPlayingArtSnapshot();
         snapshot.put("ok", true);
         return snapshot;
     }
 
     private JSONObject buildNotifications() throws JSONException {
-        JSONObject snapshot = TooieNotificationListener.getNotificationsSnapshot();
+        JSONObject snapshot = LauncherCtlNotificationListener.getNotificationsSnapshot();
         snapshot.put("ok", true);
         return snapshot;
     }
@@ -868,30 +868,30 @@ public class TooieApiServer {
     }
 
     private void writeClientConfig() throws IOException {
-        File tooieDir = new File(TOOIE_DIR_PATH);
-        if (!tooieDir.exists() && !tooieDir.mkdirs()) {
-            throw new IOException("Failed to create tooie dir: " + TOOIE_DIR_PATH);
+        File launcherctlDir = new File(LAUNCHERCTL_DIR_PATH);
+        if (!launcherctlDir.exists() && !launcherctlDir.mkdirs()) {
+            throw new IOException("Failed to create launcherctl dir: " + LAUNCHERCTL_DIR_PATH);
         }
         writeTextFile(TOKEN_FILE_PATH, token + "\n");
         writeTextFile(ENDPOINT_FILE_PATH, "http://127.0.0.1:" + port + "\n");
         ensureDefaultConfigFile();
     }
 
-    private void installTooieCliScript() {
+    private void installLauncherCtlCliScript() {
         File loginBinary = new File(TermuxConstants.TERMUX_BIN_PREFIX_DIR_PATH + "/login");
         if (!loginBinary.exists()) {
-            Logger.logInfo(LOG_TAG, "Skipping Tooie CLI install until bootstrap is initialized.");
+            Logger.logInfo(LOG_TAG, "Skipping LauncherCtl CLI install until bootstrap is initialized.");
             return;
         }
 
         String script =
             "#!/data/data/com.termux/files/usr/bin/sh\n" +
             "set -eu\n" +
-            "TOOIE_DIR=\"$HOME/.tooie\"\n" +
-            "TOKEN_FILE=\"$TOOIE_DIR/token\"\n" +
-            "ENDPOINT_FILE=\"$TOOIE_DIR/endpoint\"\n" +
+            "LAUNCHERCTL_DIR=\"$HOME/.launcherctl\"\n" +
+            "TOKEN_FILE=\"$LAUNCHERCTL_DIR/token\"\n" +
+            "ENDPOINT_FILE=\"$LAUNCHERCTL_DIR/endpoint\"\n" +
             "if [ ! -r \"$TOKEN_FILE\" ] || [ ! -r \"$ENDPOINT_FILE\" ]; then\n" +
-            "  echo \"tooie: missing $TOKEN_FILE or $ENDPOINT_FILE\" >&2\n" +
+            "  echo \"launcherctl: missing $TOKEN_FILE or $ENDPOINT_FILE\" >&2\n" +
             "  exit 1\n" +
             "fi\n" +
             "TOKEN=$(cat \"$TOKEN_FILE\")\n" +
@@ -939,7 +939,7 @@ public class TooieApiServer {
             "    fi\n" +
             "    ;;\n" +
             "  exec)\n" +
-            "    [ \"$#\" -gt 0 ] || { echo \"usage: tooie exec <command>\" >&2; exit 2; }\n" +
+            "    [ \"$#\" -gt 0 ] || { echo \"usage: launcherctl exec <command>\" >&2; exit 2; }\n" +
             "    CMD_ESCAPED=$(json_escape \"$*\")\n" +
             "    curl $CURL_COMMON -X POST -H \"Authorization: Bearer $TOKEN\" -H \"Content-Type: application/json\" \\\n" +
             "      --data \"{\\\"command\\\":\\\"$CMD_ESCAPED\\\"}\" \"$BASE/v1/exec\"\n" +
@@ -952,24 +952,24 @@ public class TooieApiServer {
             "    ;;\n" +
             "  token)\n" +
             "    sub=\"${1:-}\"; shift || true\n" +
-            "    [ \"$sub\" = \"rotate\" ] || { echo \"usage: tooie token rotate\" >&2; exit 2; }\n" +
+            "    [ \"$sub\" = \"rotate\" ] || { echo \"usage: launcherctl token rotate\" >&2; exit 2; }\n" +
             "    curl $CURL_COMMON -X POST -H \"Authorization: Bearer $TOKEN\" \"$BASE/v1/auth/rotate\"\n" +
             "    ;;\n" +
             "  *)\n" +
-            "    echo \"usage: tooie {status|apps|resources|media|art|notifications|brightness [value]|volume [value] [stream]|exec|permission|lock|token rotate}\" >&2\n" +
+            "    echo \"usage: launcherctl {status|apps|resources|media|art|notifications|brightness [value]|volume [value] [stream]|exec|permission|lock|token rotate}\" >&2\n" +
             "    exit 2\n" +
             "    ;;\n" +
             "esac\n";
 
         try {
-            writeTextFile(TOOIE_BIN_PATH, script);
-            File tooieBin = new File(TOOIE_BIN_PATH);
-            if (tooieBin.exists()) {
-                tooieBin.setExecutable(true, false);
-                tooieBin.setReadable(true, false);
+            writeTextFile(LAUNCHERCTL_BIN_PATH, script);
+            File launcherctlBin = new File(LAUNCHERCTL_BIN_PATH);
+            if (launcherctlBin.exists()) {
+                launcherctlBin.setExecutable(true, false);
+                launcherctlBin.setReadable(true, false);
             }
         } catch (Exception e) {
-            Logger.logErrorExtended(LOG_TAG, "Failed to install tooie cli: " + e.getMessage());
+            Logger.logErrorExtended(LOG_TAG, "Failed to install launcherctl cli: " + e.getMessage());
         }
     }
 
@@ -1007,8 +1007,8 @@ public class TooieApiServer {
             "  exit 0\n" +
             "fi\n" +
             "\n" +
-            "if command -v tooie >/dev/null 2>&1; then\n" +
-            "  if tooie exec \"$RESTART_CMD\" >/dev/null 2>&1; then\n" +
+            "if command -v launcherctl >/dev/null 2>&1; then\n" +
+            "  if launcherctl exec \"$RESTART_CMD\" >/dev/null 2>&1; then\n" +
             "    exit 0\n" +
             "  fi\n" +
             "fi\n" +
@@ -1063,7 +1063,7 @@ public class TooieApiServer {
             defaultConfig.put("allowedCommandPrefixes", prefixes);
             writeTextFile(CONFIG_FILE_PATH, defaultConfig.toString(2) + "\n");
         } catch (Exception e) {
-            Logger.logErrorExtended(LOG_TAG, "Failed to write default Tooie config: " + e.getMessage());
+            Logger.logErrorExtended(LOG_TAG, "Failed to write default LauncherCtl config: " + e.getMessage());
         }
     }
 
@@ -1097,7 +1097,7 @@ public class TooieApiServer {
                 }
             }
         } catch (Exception e) {
-            Logger.logErrorExtended(LOG_TAG, "Failed to parse Tooie config, using defaults: " + e.getMessage());
+            Logger.logErrorExtended(LOG_TAG, "Failed to parse LauncherCtl config, using defaults: " + e.getMessage());
         }
         return policy;
     }

@@ -1,4 +1,4 @@
-package com.termux.tooie;
+package com.termux.launcherctl;
 
 import android.content.ComponentName;
 import android.graphics.Bitmap;
@@ -23,10 +23,10 @@ import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Captures live notification and media-session state for Tooie local API endpoints.
+ * Captures live notification and media-session state for LauncherCtl local API endpoints.
  */
-public class TooieNotificationListener extends NotificationListenerService {
-    private static final String LOG_TAG = "TooieNotifListener";
+public class LauncherCtlNotificationListener extends NotificationListenerService {
+    private static final String LOG_TAG = "LauncherCtlNotifListener";
     private static final ConcurrentHashMap<String, JSONObject> NOTIFICATIONS = new ConcurrentHashMap<>();
     private static final int MAX_ART_BYTES = 512 * 1024;
 
@@ -177,7 +177,7 @@ public class TooieNotificationListener extends NotificationListenerService {
             MediaSessionManager mediaSessionManager = (MediaSessionManager) getSystemService(MEDIA_SESSION_SERVICE);
             if (mediaSessionManager != null) {
                 List<MediaController> sessions =
-                    mediaSessionManager.getActiveSessions(new ComponentName(this, TooieNotificationListener.class));
+                    mediaSessionManager.getActiveSessions(new ComponentName(this, LauncherCtlNotificationListener.class));
                 MediaController selected = selectController(sessions);
                 if (selected != null) {
                     current = toNowPlayingJson(selected);

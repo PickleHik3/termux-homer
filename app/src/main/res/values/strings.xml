@@ -278,15 +278,15 @@
 
             <string name="termux_privileged_endpoints_title">Allowed Privileged Endpoints</string>
             <string name="termux_privileged_endpoint_request_permission_title">Allow /v1/privileged/request-permission</string>
-            <string name="termux_privileged_endpoint_request_permission_summary">Controls Tooie permission-request endpoint availability.</string>
+            <string name="termux_privileged_endpoint_request_permission_summary">Controls LauncherCtl permission-request endpoint availability.</string>
             <string name="termux_privileged_endpoint_exec_title">Allow /v1/exec</string>
-            <string name="termux_privileged_endpoint_exec_summary">Controls Tooie privileged exec endpoint availability.</string>
+            <string name="termux_privileged_endpoint_exec_summary">Controls LauncherCtl privileged exec endpoint availability.</string>
             <string name="termux_privileged_endpoint_brightness_title">Allow /v1/system/brightness</string>
-            <string name="termux_privileged_endpoint_brightness_summary">Controls Tooie brightness endpoint availability.</string>
+            <string name="termux_privileged_endpoint_brightness_summary">Controls LauncherCtl brightness endpoint availability.</string>
             <string name="termux_privileged_endpoint_volume_title">Allow /v1/system/volume</string>
-            <string name="termux_privileged_endpoint_volume_summary">Controls Tooie volume endpoint availability.</string>
+            <string name="termux_privileged_endpoint_volume_summary">Controls LauncherCtl volume endpoint availability.</string>
             <string name="termux_privileged_endpoint_lock_screen_title">Allow /v1/screen/lock</string>
-            <string name="termux_privileged_endpoint_lock_screen_summary">Controls Tooie lock-screen endpoint availability.</string>
+            <string name="termux_privileged_endpoint_lock_screen_summary">Controls LauncherCtl lock-screen endpoint availability.</string>
 
             <!-- Background Category -->
             <string name="termux_background_header">Background</string>
