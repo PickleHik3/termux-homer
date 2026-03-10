@@ -324,7 +324,7 @@ class TermuxStylePreferencesDataStore extends PreferenceDataStore {
             }
         }
         syncBackgroundOverlayColor(mPreferences.getTerminalBackgroundOpacity(), manualOverride);
-        TermuxActivity.updateTermuxActivityStyling(mContext, true);
+        TermuxActivity.requestTermuxActivityStylingOnNextResume(mContext, true);
     }
 
     private boolean areVisualEffectsFullyOff() {
