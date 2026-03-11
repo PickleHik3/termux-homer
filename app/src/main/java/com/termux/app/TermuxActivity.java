@@ -42,6 +42,7 @@ import com.termux.R;
 import com.termux.app.api.file.FileReceiverActivity;
 import com.termux.app.launcher.data.LauncherAppDataProvider;
 import com.termux.app.launcher.data.LauncherConfigRepository;
+import com.termux.launcherctl.LauncherCtlApiServer;
 import com.termux.privileged.PrivilegedBackendManager;
 import com.termux.privileged.PrivilegedPolicyStore;
 import com.termux.privileged.ShizukuBackend;
@@ -748,6 +749,9 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
 
     private void startBootstrapAndSession(@Nullable Intent intent) {
         TermuxInstaller.setupBootstrapIfNeeded(TermuxActivity.this, () -> {
+            // Bootstrap setup may complete after app startup; re-attempt launcher CLI script install.
+            LauncherCtlApiServer.getInstance().ensureCliScriptsInstalled();
+
             // Activity might have been destroyed.
             if (mTermuxService == null)
                 return;

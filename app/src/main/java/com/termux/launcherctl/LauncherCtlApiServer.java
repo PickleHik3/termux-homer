@@ -133,6 +133,18 @@ public class LauncherCtlApiServer {
         }
     }
 
+    /**
+     * Re-attempt CLI script installation after bootstrap setup is complete.
+     */
+    public synchronized void ensureCliScriptsInstalled() {
+        try {
+            installLauncherCtlCliScript();
+            installLauncherRestartScript();
+        } catch (Throwable t) {
+            Logger.logErrorExtended(LOG_TAG, "Failed to ensure launcher CLI scripts are installed: " + t.getMessage());
+        }
+    }
+
     public synchronized void stop() {
         running = false;
         cleanupSocket();
