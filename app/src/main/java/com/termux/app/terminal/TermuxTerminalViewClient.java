@@ -63,6 +63,7 @@ public class TermuxTerminalViewClient extends TermuxTerminalViewClientBase {
     boolean mVirtualControlKeyDown, mVirtualFnKeyDown;
 
     private Runnable mShowSoftKeyboardRunnable;
+    private Runnable mShowSoftKeyboardWhenReadyRunnable;
 
     private boolean mShowSoftKeyboardIgnoreOnce;
 
@@ -75,6 +76,8 @@ public class TermuxTerminalViewClient extends TermuxTerminalViewClientBase {
     private static final String LOG_TAG = "TermuxTerminalViewClient";
     private static final long SOFT_KEYBOARD_SHOW_DELAY_COLD_START_MS = 300L;
     private static final long SOFT_KEYBOARD_SHOW_DELAY_RESUME_MS = 40L;
+    private static final long SOFT_KEYBOARD_RETRY_DELAY_MS = 50L;
+    private static final int SOFT_KEYBOARD_MAX_RETRIES = 8;
     private SuggestionBarCallback mSuggestionBarCallback;
 
     public TermuxTerminalViewClient(TermuxActivity activity, TermuxTerminalSessionActivityClient termuxTerminalSessionActivityClient) {
@@ -624,8 +627,43 @@ public class TermuxTerminalViewClient extends TermuxTerminalViewClientBase {
             long keyboardDelay = mActivity.isOnResumeAfterOnCreate()
                 ? SOFT_KEYBOARD_SHOW_DELAY_COLD_START_MS
                 : SOFT_KEYBOARD_SHOW_DELAY_RESUME_MS;
-            mActivity.getTerminalView().postDelayed(getShowSoftKeyboardRunnable(), keyboardDelay);
+            scheduleSoftKeyboardShowWhenReady(keyboardDelay);
         }
+    }
+
+    private void scheduleSoftKeyboardShowWhenReady(long initialDelayMs) {
+        if (mShowSoftKeyboardWhenReadyRunnable != null) {
+            mActivity.getTerminalView().removeCallbacks(mShowSoftKeyboardWhenReadyRunnable);
+        }
+        mShowSoftKeyboardWhenReadyRunnable = new Runnable() {
+            int attempts = 0;
+
+            @Override
+            public void run() {
+                if (mActivity == null || mActivity.isFinishing()) {
+                    return;
+                }
+                View terminalView = mActivity.getTerminalView();
+                if (terminalView == null || !terminalView.isAttachedToWindow()) {
+                    return;
+                }
+                if (!terminalView.hasFocus()) {
+                    terminalView.requestFocus();
+                }
+                if (terminalView.hasWindowFocus()) {
+                    KeyboardUtils.showSoftKeyboard(mActivity, terminalView);
+                    return;
+                }
+                attempts++;
+                if (attempts <= SOFT_KEYBOARD_MAX_RETRIES) {
+                    terminalView.postDelayed(this, SOFT_KEYBOARD_RETRY_DELAY_MS);
+                } else {
+                    // Final fallback so keyboard still appears on odd lifecycle timing.
+                    KeyboardUtils.showSoftKeyboard(mActivity, terminalView);
+                }
+            }
+        };
+        mActivity.getTerminalView().postDelayed(mShowSoftKeyboardWhenReadyRunnable, Math.max(0L, initialDelayMs));
     }
 
     private Runnable getShowSoftKeyboardRunnable() {
