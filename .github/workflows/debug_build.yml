@@ -28,12 +28,6 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Setup java 17 as required by gradle
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '17'
-
       - name: Execute tests
         env:
           GRADLE_OPTS: >-
