@@ -18,6 +18,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
+import android.os.SystemClock;
 import android.view.ContextMenu;
 import android.view.ContextMenu.ContextMenuInfo;
 import android.view.Gravity;
@@ -273,9 +274,11 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
 
     private static final int SUGGESTION_BAR_MIN_BUTTON_DP = 56;
     private static final int SUGGESTION_BAR_MAX_INPUT_CHARS = 10;
+    private static final long EMPTY_SESSION_RECOVERY_DEBOUNCE_MS = 1500L;
 
     private int mStatusBarInsetTop;
     private boolean mSeamlessStatusBackgroundActive;
+    private long mLastEmptySessionRecoveryElapsedMs;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -380,6 +383,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
             mPendingLaunchIntent = null;
             startBootstrapAndSession(pendingIntent);
         }
+        maybeRecoverFromEmptySession("onStart");
     
         if (mTermuxTerminalSessionActivityClient != null)
             mTermuxTerminalSessionActivityClient.onStart();
@@ -420,6 +424,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
             mTermuxTerminalSessionActivityClient.onResume();
         if (mTermuxTerminalViewClient != null)
             mTermuxTerminalViewClient.onResume();
+        maybeRecoverFromEmptySession("onResume");
 
         if (mPreferences.isMonetBackgroundEnabled()) {
             configureViewVisibility(R.id.terminal_monetbackground, true);
@@ -765,6 +770,23 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
                 // Activity finished - ignore.
             }
         });
+    }
+
+    private void maybeRecoverFromEmptySession(@NonNull String source) {
+        if (!mIsVisible || mTermuxService == null || mTermuxTerminalSessionActivityClient == null) {
+            return;
+        }
+        if (!mTermuxService.isTermuxSessionsEmpty()) {
+            return;
+        }
+        long now = SystemClock.elapsedRealtime();
+        if (mLastEmptySessionRecoveryElapsedMs > 0
+            && (now - mLastEmptySessionRecoveryElapsedMs) < EMPTY_SESSION_RECOVERY_DEBOUNCE_MS) {
+            return;
+        }
+        mLastEmptySessionRecoveryElapsedMs = now;
+        Logger.logWarn(LOG_TAG, "No active terminal session while visible; attempting auto-recovery from " + source);
+        startBootstrapAndSession(null);
     }
 
     @Override

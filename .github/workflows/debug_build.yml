@@ -2,6 +2,8 @@ name: Build nightly
 
 on:
   workflow_dispatch:
+  schedule:
+    - cron: "30 1 * * *"
 
 
 concurrency:
@@ -52,6 +54,18 @@ jobs:
             echo "Gradle test run failed, retrying in 20 seconds... (${attempts}/${max_attempts})"
             sleep 20
           done
+
+      - name: Upload test reports on failure
+        if: failure()
+        uses: actions/upload-artifact@v6
+        with:
+          name: nightly-test-reports-${{ github.run_id }}
+          path: |
+            app/build/reports/tests/
+            app/build/test-results/
+            terminal-emulator/build/reports/tests/
+            terminal-emulator/build/test-results/
+          if-no-files-found: warn
 
       - name: Build APKs
         shell: bash {0}

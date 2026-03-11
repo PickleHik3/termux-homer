@@ -98,6 +98,7 @@ public final class SuggestionBarView extends GridLayout {
     private static final int POPUP_MIN_WIDTH_DP = 188;
     private static final int POPUP_MIN_WIDTH_TIGHT_DP = 132;
     private static final float POPUP_MAX_HEIGHT_FACTOR = 0.45f;
+    private static final long APP_LAUNCH_TOUCH_DELAY_MS = 72L;
     private static final long PICKUP_DECISION_WINDOW_MS = 650L;
     private static final float PICKUP_X_AXIS_SLOP_FACTOR = 0.9f;
     private static final float PICKUP_Y_INTENT_SLOP_FACTOR = 1.8f;
@@ -803,7 +804,7 @@ public final class SuggestionBarView extends GridLayout {
 
     private void launchEntryFromTouch(@NonNull View sourceView, @NonNull LauncherAppEntry entry, @Nullable TerminalView terminalView) {
         applyLaunchBloom(sourceView);
-        sourceView.postDelayed(() -> launchEntry(entry, terminalView), 96L);
+        sourceView.postDelayed(() -> launchEntry(entry, terminalView), APP_LAUNCH_TOUCH_DELAY_MS);
     }
 
     private List<LauncherAppEntry> entriesForPinnedItems(@NonNull List<PinnedItem> source) {

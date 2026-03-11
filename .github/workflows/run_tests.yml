@@ -2,6 +2,12 @@ name: Test app
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - dev
+  pull_request:
+    branches:
+      - dev
 
 
 concurrency:
@@ -39,3 +45,14 @@ jobs:
           echo "Gradle test run failed, retrying in 20 seconds... (${attempts}/${max_attempts})"
           sleep 20
         done
+    - name: Upload test reports on failure
+      if: failure()
+      uses: actions/upload-artifact@v6
+      with:
+        name: test-reports-${{ github.run_id }}
+        path: |
+          app/build/reports/tests/
+          app/build/test-results/
+          terminal-emulator/build/reports/tests/
+          terminal-emulator/build/test-results/
+        if-no-files-found: warn
