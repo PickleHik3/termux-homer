@@ -73,6 +73,8 @@ public class TermuxTerminalViewClient extends TermuxTerminalViewClientBase {
     private List<KeyboardShortcut> mSessionShortcuts;
 
     private static final String LOG_TAG = "TermuxTerminalViewClient";
+    private static final long SOFT_KEYBOARD_SHOW_DELAY_COLD_START_MS = 300L;
+    private static final long SOFT_KEYBOARD_SHOW_DELAY_RESUME_MS = 40L;
     private SuggestionBarCallback mSuggestionBarCallback;
 
     public TermuxTerminalViewClient(TermuxActivity activity, TermuxTerminalSessionActivityClient termuxTerminalSessionActivityClient) {
@@ -619,7 +621,10 @@ public class TermuxTerminalViewClient extends TermuxTerminalViewClientBase {
             // will also show keyboard even if it was closed before opening url. #2111
             Logger.logVerbose(LOG_TAG, "Requesting TerminalView focus and showing soft keyboard");
             mActivity.getTerminalView().requestFocus();
-            mActivity.getTerminalView().postDelayed(getShowSoftKeyboardRunnable(), 300);
+            long keyboardDelay = mActivity.isOnResumeAfterOnCreate()
+                ? SOFT_KEYBOARD_SHOW_DELAY_COLD_START_MS
+                : SOFT_KEYBOARD_SHOW_DELAY_RESUME_MS;
+            mActivity.getTerminalView().postDelayed(getShowSoftKeyboardRunnable(), keyboardDelay);
         }
     }
 
