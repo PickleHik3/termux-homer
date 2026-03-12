@@ -22,11 +22,13 @@ import android.graphics.ColorFilter;
 import android.graphics.ColorMatrixColorFilter;
 import android.graphics.Point;
 import android.graphics.Rect;
+import android.graphics.RectF;
 import android.graphics.Typeface;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Build;
+import android.os.Bundle;
 import android.os.Process;
 import android.os.SystemClock;
 import android.os.UserHandle;
@@ -82,12 +84,15 @@ import com.termux.view.TerminalView;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.lang.ref.WeakReference;
 
 public final class SuggestionBarView extends GridLayout {
 
@@ -98,7 +103,7 @@ public final class SuggestionBarView extends GridLayout {
     private static final int POPUP_MIN_WIDTH_DP = 188;
     private static final int POPUP_MIN_WIDTH_TIGHT_DP = 132;
     private static final float POPUP_MAX_HEIGHT_FACTOR = 0.45f;
-    private static final long APP_LAUNCH_TOUCH_DELAY_MS = 72L;
+    private static final long APP_LAUNCH_TOUCH_DELAY_MS = 56L;
     private static final long PICKUP_DECISION_WINDOW_MS = 650L;
     private static final float PICKUP_X_AXIS_SLOP_FACTOR = 0.9f;
     private static final float PICKUP_Y_INTENT_SLOP_FACTOR = 1.8f;
@@ -118,6 +123,9 @@ public final class SuggestionBarView extends GridLayout {
     private int blurRadiusDp = 10;
     private int inheritedTintColor = 0xFF202020;
     private List<String> defaultButtonStrings = new ArrayList<>();
+    private boolean launcherAnimationsEnabled = true;
+    private boolean launcherAnimationSafeMode = false;
+    private final Map<String, WeakReference<View>> launchTargetViews = new HashMap<>();
 
     private LauncherAppDataProvider appDataProvider;
     private LauncherConfigRepository configRepository;
@@ -212,6 +220,14 @@ public final class SuggestionBarView extends GridLayout {
         }
     }
 
+    public void setLauncherAnimationsEnabled(boolean launcherAnimationsEnabled) {
+        this.launcherAnimationsEnabled = launcherAnimationsEnabled;
+    }
+
+    public void setLauncherAnimationSafeMode(boolean launcherAnimationSafeMode) {
+        this.launcherAnimationSafeMode = launcherAnimationSafeMode;
+    }
+
     public void clearAppCache() {
         allApps = new ArrayList<>();
         applicationSequenceNumber = 0;
@@ -219,6 +235,7 @@ public final class SuggestionBarView extends GridLayout {
         activeAzCandidates = new ArrayList<>();
         activeAzPageIndex = 0;
         injectedSuggestionButtons = null;
+        launchTargetViews.clear();
         cancelAzResetTimeout();
         if (appDataProvider != null) {
             appDataProvider.invalidate();
@@ -490,6 +507,7 @@ public final class SuggestionBarView extends GridLayout {
 
     private void renderButtons(@NonNull List<LauncherAppEntry> entries, boolean azPreview) {
         removeAllViews();
+        launchTargetViews.clear();
         int buttonCount = Math.max(1, maxButtonCount);
         int renderStartCol = 0;
         List<PinnedItem> pinnedForSlots = new ArrayList<>();
@@ -703,6 +721,7 @@ public final class SuggestionBarView extends GridLayout {
             }
             imageButton.setOnClickListener(v -> launchEntryFromTouch(v, entry, lastTerminalView));
             imageButton.setContentDescription(entry.label);
+            registerLaunchTarget(entry.appRef, imageButton);
             shell.addView(imageButton);
             return shell;
         }
@@ -714,6 +733,7 @@ public final class SuggestionBarView extends GridLayout {
         button.setTextColor(TEXT_COLOR);
         button.setPadding(0, 0, 0, 0);
         button.setOnClickListener(v -> launchEntryFromTouch(v, entry, lastTerminalView));
+        registerLaunchTarget(entry.appRef, button);
         return button;
     }
 
@@ -728,6 +748,10 @@ public final class SuggestionBarView extends GridLayout {
     }
 
     private void launchEntry(@NonNull LauncherAppEntry entry, @Nullable TerminalView terminalView) {
+        launchEntry(entry, terminalView, null);
+    }
+
+    private void launchEntry(@NonNull LauncherAppEntry entry, @Nullable TerminalView terminalView, @Nullable View launchSourceView) {
         if (entry.appRef.packageName.startsWith("injected.test")) {
             return;
         }
@@ -758,14 +782,18 @@ public final class SuggestionBarView extends GridLayout {
             resolveFallback.setComponent(resolved);
         }
 
+        Bundle launchOptions = shouldUseTouchLaunchAnimation(launchSourceView)
+            ? buildLaunchOptions(launchSourceView)
+            : null;
+
         boolean launched = false;
-        if (tryStartActivity(context, pkgDefault)) {
+        if (tryStartActivity(context, pkgDefault, launchOptions)) {
             launched = true;
-        } else if (tryStartActivity(context, explicit)) {
+        } else if (tryStartActivity(context, explicit, launchOptions)) {
             launched = true;
-        } else if (tryStartActivity(context, explicitNoCategory)) {
+        } else if (tryStartActivity(context, explicitNoCategory, launchOptions)) {
             launched = true;
-        } else if (resolved != null && tryStartActivity(context, resolveFallback)) {
+        } else if (resolved != null && tryStartActivity(context, resolveFallback, launchOptions)) {
             launched = true;
         }
         if (!launched) {
@@ -781,7 +809,7 @@ public final class SuggestionBarView extends GridLayout {
                 Intent fallbackExplicit = new Intent(Intent.ACTION_MAIN);
                 fallbackExplicit.addCategory(Intent.CATEGORY_LAUNCHER);
                 fallbackExplicit.setComponent(new ComponentName(pkg, cls));
-                if (tryStartActivity(context, fallbackExplicit)) {
+                if (tryStartActivity(context, fallbackExplicit, launchOptions)) {
                     launched = true;
                     break;
                 }
@@ -803,8 +831,12 @@ public final class SuggestionBarView extends GridLayout {
     }
 
     private void launchEntryFromTouch(@NonNull View sourceView, @NonNull LauncherAppEntry entry, @Nullable TerminalView terminalView) {
-        applyLaunchBloom(sourceView);
-        sourceView.postDelayed(() -> launchEntry(entry, terminalView), APP_LAUNCH_TOUCH_DELAY_MS);
+        boolean touchAnimation = shouldUseTouchLaunchAnimation(sourceView);
+        if (touchAnimation) {
+            applyLaunchBloom(sourceView);
+        }
+        long launchDelay = touchAnimation ? APP_LAUNCH_TOUCH_DELAY_MS : 0L;
+        sourceView.postDelayed(() -> launchEntry(entry, terminalView, touchAnimation ? sourceView : null), launchDelay);
     }
 
     private List<LauncherAppEntry> entriesForPinnedItems(@NonNull List<PinnedItem> source) {
@@ -867,12 +899,21 @@ public final class SuggestionBarView extends GridLayout {
         return null;
     }
 
-    private boolean tryStartActivity(@NonNull Context context, @Nullable Intent intent) {
+    private boolean tryStartActivity(@NonNull Context context, @Nullable Intent intent, @Nullable Bundle launchOptions) {
         if (intent == null) return false;
         try {
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
             if (context instanceof Activity) {
-                ((Activity) context).startActivity(intent);
+                Activity activity = (Activity) context;
+                if (launchOptions != null) {
+                    try {
+                        activity.startActivity(intent, launchOptions);
+                        return true;
+                    } catch (RuntimeException optionError) {
+                        Log.d(LOG_TAG, "launch options fallback for " + intent + ": " + optionError.getMessage());
+                    }
+                }
+                activity.startActivity(intent);
             } else {
                 context.startActivity(intent);
             }
@@ -881,6 +922,37 @@ public final class SuggestionBarView extends GridLayout {
             Log.d(LOG_TAG, "launch failed for intent " + intent + ": " + e.getMessage());
             return false;
         }
+    }
+
+    @Nullable
+    private Bundle buildLaunchOptions(@Nullable View sourceView) {
+        if (sourceView == null || !(getContext() instanceof Activity)) {
+            return null;
+        }
+        int width = Math.max(1, sourceView.getWidth());
+        int height = Math.max(1, sourceView.getHeight());
+        ActivityOptions options = ActivityOptions.makeScaleUpAnimation(sourceView, 0, 0, width, height);
+        return options.toBundle();
+    }
+
+    @Nullable
+    public RectF getLaunchIconBounds(@NonNull ComponentName componentName) {
+        WeakReference<View> ref = launchTargetViews.get(componentName.flattenToShortString());
+        if (ref == null) {
+            ref = launchTargetViews.get(componentName.flattenToString());
+        }
+        View target = ref != null ? ref.get() : null;
+        if (target == null || !target.isAttachedToWindow()) {
+            return null;
+        }
+        int[] location = new int[2];
+        target.getLocationOnScreen(location);
+        return new RectF(
+            location[0],
+            location[1],
+            location[0] + target.getWidth(),
+            location[1] + target.getHeight()
+        );
     }
 
     private void showUnifiedPinEditor(final int slotIndex, @Nullable final PinnedItem pinnedAtSlot) {
@@ -3307,7 +3379,47 @@ public final class SuggestionBarView extends GridLayout {
         button.setOnClickListener(v -> launchEntryFromTouch(v, entry, lastTerminalView));
         bindAppContextLongPress(button, entry, -1, sourceFolder, resolveForSelectionRef(entry.appRef), false);
         button.setContentDescription(entry.label);
+        registerLaunchTarget(entry.appRef, button);
         return button;
+    }
+
+    private void registerLaunchTarget(@NonNull AppRef appRef, @NonNull View view) {
+        String key = componentKeyFromRef(appRef);
+        if (key == null) return;
+        launchTargetViews.put(key, new WeakReference<>(view));
+        String fullKey = componentFullKeyFromRef(appRef);
+        if (fullKey != null) {
+            launchTargetViews.put(fullKey, new WeakReference<>(view));
+        }
+    }
+
+    @Nullable
+    private String componentKeyFromRef(@Nullable AppRef appRef) {
+        if (appRef == null || TextUtils.isEmpty(appRef.packageName) || TextUtils.isEmpty(appRef.activityName)) {
+            return null;
+        }
+        String activity = appRef.activityName;
+        if (activity.startsWith(".")) {
+            activity = appRef.packageName + activity;
+        }
+        ComponentName componentName = new ComponentName(appRef.packageName, activity);
+        return componentName.flattenToShortString();
+    }
+
+    @Nullable
+    private String componentFullKeyFromRef(@Nullable AppRef appRef) {
+        if (appRef == null || TextUtils.isEmpty(appRef.packageName) || TextUtils.isEmpty(appRef.activityName)) {
+            return null;
+        }
+        String activity = appRef.activityName;
+        if (activity.startsWith(".")) {
+            activity = appRef.packageName + activity;
+        }
+        return new ComponentName(appRef.packageName, activity).flattenToString();
+    }
+
+    private boolean shouldUseTouchLaunchAnimation(@Nullable View sourceView) {
+        return launcherAnimationsEnabled && !launcherAnimationSafeMode && sourceView != null;
     }
 
     private void applyLaunchBloom(@NonNull View sourceView) {
@@ -3347,28 +3459,28 @@ public final class SuggestionBarView extends GridLayout {
             bloom.setTranslationZ(dp(24));
         }
         sourceView.animate()
-            .scaleX(0.9f)
-            .scaleY(0.9f)
-            .setDuration(68L)
+            .scaleX(0.94f)
+            .scaleY(0.94f)
+            .setDuration(52L)
             .setInterpolator(new AccelerateInterpolator())
             .withEndAction(() -> sourceView.animate()
                 .scaleX(1f)
                 .scaleY(1f)
-                .setDuration(220L)
-                .setInterpolator(new OvershootInterpolator(2.2f))
+                .setDuration(160L)
+                .setInterpolator(new OvershootInterpolator(1.45f))
                 .start())
             .start();
         bloom.animate()
-            .alpha(0.9f)
-            .scaleX(1.34f)
-            .scaleY(1.34f)
-            .setDuration(130L)
+            .alpha(0.78f)
+            .scaleX(1.24f)
+            .scaleY(1.24f)
+            .setDuration(110L)
             .setInterpolator(new DecelerateInterpolator())
             .withEndAction(() -> bloom.animate()
                 .alpha(0f)
-                .scaleX(1.82f)
-                .scaleY(1.82f)
-                .setDuration(170L)
+                .scaleX(1.62f)
+                .scaleY(1.62f)
+                .setDuration(150L)
                 .setInterpolator(new LinearInterpolator())
                 .withEndAction(() -> container.removeView(bloom))
                 .start())

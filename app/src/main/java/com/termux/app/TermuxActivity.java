@@ -41,6 +41,7 @@ import android.widget.Toast;
 import com.github.mmin18.widget.RealtimeBlurView;
 import com.termux.R;
 import com.termux.app.api.file.FileReceiverActivity;
+import com.termux.app.launcher.animation.LauncherTransitionController;
 import com.termux.app.launcher.data.LauncherAppDataProvider;
 import com.termux.app.launcher.data.LauncherConfigRepository;
 import com.termux.launcherctl.LauncherCtlApiServer;
@@ -163,6 +164,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
 
     private LauncherAppDataProvider mLauncherAppDataProvider;
     private LauncherConfigRepository mLauncherConfigRepository;
+    private LauncherTransitionController mLauncherTransitionController;
 
     /**
      * The client for the {@link #mExtraKeysView}.
@@ -310,6 +312,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
             return;
         }
         mPreferences.migrateTerminalMarginAdjustmentDefaultIfNeeded();
+        mLauncherTransitionController = new LauncherTransitionController(this, mPreferences);
         setMargins();
         setSuggestionBarView();
         mTermuxActivityRootView = findViewById(R.id.activity_termux_root_view);
@@ -366,6 +369,15 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         // Send the {@link TermuxConstants#BROADCAST_TERMUX_OPENED} broadcast to notify apps that Termux
         // app has been opened.
         TermuxUtils.sendTermuxOpenedBroadcast(this);
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        if (mLauncherTransitionController != null) {
+            mLauncherTransitionController.maybeHandleGestureContract(intent, mSuggestionBarView);
+        }
     }
 
     @Override
@@ -722,6 +734,9 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         mTermuxService = ((TermuxService.LocalBinder) service).service;
         setTermuxSessionsListView();
         final Intent intent = getIntent();
+        if (mLauncherTransitionController != null) {
+            mLauncherTransitionController.maybeHandleGestureContract(intent, mSuggestionBarView);
+        }
         setIntent(null);
         if (mTermuxService.isTermuxSessionsEmpty()) {
             if (mIsVisible) {
@@ -951,6 +966,11 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         mSuggestionBarView.setInheritedTintColor(ContextCompat.getColor(this, R.color.background_accent));
         mSuggestionBarView.setAppDataProvider(mLauncherAppDataProvider);
         mSuggestionBarView.setConfigRepository(mLauncherConfigRepository);
+        mSuggestionBarView.setLauncherAnimationsEnabled(mPreferences.isAppLauncherAnimationsEnabled());
+        mSuggestionBarView.setLauncherAnimationSafeMode(mPreferences.isAppLauncherAnimationSafeMode());
+        if (mLauncherTransitionController != null) {
+            mLauncherTransitionController.onAnimationPreferenceUpdated();
+        }
         mSuggestionBarView.reloadAllApps();
         syncAzScrubLettersAndTint();
     }

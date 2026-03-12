@@ -13,4 +13,10 @@
         app:summary="@string/termux_app_launcher_bw_icons_summary"
         android:defaultValue="false" />
 
+    <SwitchPreferenceCompat
+        app:key="app_launcher_animations_enabled"
+        app:title="@string/termux_app_launcher_animations_enabled_title"
+        app:summary="@string/termux_app_launcher_animations_enabled_summary"
+        android:defaultValue="true" />
+
 </PreferenceScreen>

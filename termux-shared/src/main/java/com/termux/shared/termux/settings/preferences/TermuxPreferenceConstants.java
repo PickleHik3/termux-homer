@@ -210,6 +210,20 @@ public final class TermuxPreferenceConstants {
         public static final boolean DEFAULT_APP_LAUNCHER_AZ_DOUBLE_TAP_LOCK = false;
 
         /**
+         * Defines the key for enabling launcher app open/close animations.
+         */
+        public static final String KEY_APP_LAUNCHER_ANIMATIONS_ENABLED = "app_launcher_animations_enabled";
+
+        public static final boolean DEFAULT_APP_LAUNCHER_ANIMATIONS_ENABLED = true;
+
+        /**
+         * Defines the key for launcher animation safe mode auto-fallback.
+         */
+        public static final String KEY_APP_LAUNCHER_ANIMATION_SAFE_MODE = "app_launcher_animation_safe_mode";
+
+        public static final boolean DEFAULT_APP_LAUNCHER_ANIMATION_SAFE_MODE = false;
+
+        /**
          * Defines the key for whether the soft keyboard will be enabled, for cases where users want
          * to use a hardware keyboard instead.
          */

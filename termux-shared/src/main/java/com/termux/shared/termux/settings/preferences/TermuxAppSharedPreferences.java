@@ -224,6 +224,24 @@ public class TermuxAppSharedPreferences extends AppSharedPreferences {
         SharedPreferenceUtils.setBoolean(mSharedPreferences, TERMUX_APP.KEY_APP_LAUNCHER_AZ_DOUBLE_TAP_LOCK, value, false);
     }
 
+    public boolean isAppLauncherAnimationsEnabled() {
+        return SharedPreferenceUtils.getBoolean(mSharedPreferences, TERMUX_APP.KEY_APP_LAUNCHER_ANIMATIONS_ENABLED,
+            TERMUX_APP.DEFAULT_APP_LAUNCHER_ANIMATIONS_ENABLED);
+    }
+
+    public void setAppLauncherAnimationsEnabled(boolean value) {
+        SharedPreferenceUtils.setBoolean(mSharedPreferences, TERMUX_APP.KEY_APP_LAUNCHER_ANIMATIONS_ENABLED, value, false);
+    }
+
+    public boolean isAppLauncherAnimationSafeMode() {
+        return SharedPreferenceUtils.getBoolean(mSharedPreferences, TERMUX_APP.KEY_APP_LAUNCHER_ANIMATION_SAFE_MODE,
+            TERMUX_APP.DEFAULT_APP_LAUNCHER_ANIMATION_SAFE_MODE);
+    }
+
+    public void setAppLauncherAnimationSafeMode(boolean value) {
+        SharedPreferenceUtils.setBoolean(mSharedPreferences, TERMUX_APP.KEY_APP_LAUNCHER_ANIMATION_SAFE_MODE, value, false);
+    }
+
     public boolean isTerminalMarginAdjustmentEnabled() {
         return SharedPreferenceUtils.getBoolean(mSharedPreferences, TERMUX_APP.KEY_TERMINAL_MARGIN_ADJUSTMENT, TERMUX_APP.DEFAULT_TERMINAL_MARGIN_ADJUSTMENT);
     }
