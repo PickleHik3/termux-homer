@@ -16,7 +16,6 @@ import android.os.Looper;
 import android.os.Message;
 import android.os.Messenger;
 import android.os.Process;
-import android.os.UserHandle;
 
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -51,7 +50,7 @@ public class GestureNavContractCompatTest {
         Intent intent = new Intent(Intent.ACTION_MAIN);
         Bundle contract = new Bundle();
         contract.putParcelable(EXTRA_COMPONENT_NAME, new ComponentName("pkg", "pkg.Main"));
-        contract.putParcelable(EXTRA_USER, UserHandle.of(0));
+        contract.putParcelable(EXTRA_USER, Process.myUserHandle());
         contract.putParcelable(GestureNavContractCompat.EXTRA_REMOTE_CALLBACK, Message.obtain());
         intent.putExtra(GestureNavContractCompat.EXTRA_GESTURE_CONTRACT, contract);
 
