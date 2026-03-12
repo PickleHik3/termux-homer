@@ -10,9 +10,8 @@ import static org.junit.Assert.assertNull;
 import android.content.ComponentName;
 import android.content.Intent;
 import android.os.Build;
+import android.os.Binder;
 import android.os.Bundle;
-import android.os.Handler;
-import android.os.Looper;
 import android.os.Message;
 import android.os.Messenger;
 import android.os.Process;
@@ -34,7 +33,7 @@ public class GestureNavContractCompatTest {
         contract.putParcelable(EXTRA_USER, Process.myUserHandle());
 
         Message callback = Message.obtain();
-        callback.replyTo = new Messenger(new Handler(Looper.getMainLooper()));
+        callback.replyTo = new Messenger(new Binder());
         contract.putParcelable(GestureNavContractCompat.EXTRA_REMOTE_CALLBACK, callback);
         intent.putExtra(GestureNavContractCompat.EXTRA_GESTURE_CONTRACT, contract);
 
