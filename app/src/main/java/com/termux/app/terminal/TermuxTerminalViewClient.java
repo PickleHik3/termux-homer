@@ -617,17 +617,35 @@ public class TermuxTerminalViewClient extends TermuxTerminalViewClientBase {
         // Do not force show soft keyboard if termux-reload-settings command was run with hardware keyboard
         // or soft keyboard is to be hidden or is disabled
         if (!isReloadTermuxProperties && !noShowKeyboard) {
+            String resumeKeyboardMode = mActivity.getPreferences().getAppLauncherResumeKeyboardMode();
+            boolean shouldAutoShowKeyboard;
+            switch (resumeKeyboardMode) {
+                case "never":
+                    shouldAutoShowKeyboard = false;
+                    break;
+                case "restore_previous":
+                    // On cold start, preserve existing startup behavior.
+                    shouldAutoShowKeyboard = mActivity.isOnResumeAfterOnCreate()
+                        || mActivity.wasSoftKeyboardVisibleBeforeStop();
+                    break;
+                case "always":
+                default:
+                    shouldAutoShowKeyboard = true;
+                    break;
+            }
             // Request focus for TerminalView
             // Also show the keyboard, since onFocusChange will not be called if TerminalView already
             // had focus on startup to show the keyboard, like when opening url with context menu
             // "Select URL" long press and returning to Termux app with back button. This
             // will also show keyboard even if it was closed before opening url. #2111
-            Logger.logVerbose(LOG_TAG, "Requesting TerminalView focus and showing soft keyboard");
+            Logger.logVerbose(LOG_TAG, "Requesting TerminalView focus and applying keyboard resume mode=" + resumeKeyboardMode);
             mActivity.getTerminalView().requestFocus();
-            long keyboardDelay = mActivity.isOnResumeAfterOnCreate()
-                ? SOFT_KEYBOARD_SHOW_DELAY_COLD_START_MS
-                : SOFT_KEYBOARD_SHOW_DELAY_RESUME_MS;
-            scheduleSoftKeyboardShowWhenReady(keyboardDelay);
+            if (shouldAutoShowKeyboard) {
+                long keyboardDelay = mActivity.isOnResumeAfterOnCreate()
+                    ? SOFT_KEYBOARD_SHOW_DELAY_COLD_START_MS
+                    : SOFT_KEYBOARD_SHOW_DELAY_RESUME_MS;
+                scheduleSoftKeyboardShowWhenReady(keyboardDelay);
+            }
         }
     }
 

@@ -210,6 +210,14 @@ public final class TermuxPreferenceConstants {
         public static final boolean DEFAULT_APP_LAUNCHER_AZ_DOUBLE_TAP_LOCK = false;
 
         /**
+         * Defines keyboard restore behavior when returning to launcher from another app.
+         * Values: always, restore_previous, never.
+         */
+        public static final String KEY_APP_LAUNCHER_RESUME_KEYBOARD_MODE = "app_launcher_resume_keyboard_mode";
+
+        public static final String DEFAULT_APP_LAUNCHER_RESUME_KEYBOARD_MODE = "always";
+
+        /**
          * Defines the key for whether the soft keyboard will be enabled, for cases where users want
          * to use a hardware keyboard instead.
          */

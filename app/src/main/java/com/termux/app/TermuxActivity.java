@@ -75,6 +75,7 @@ import com.termux.shared.termux.TermuxUtils;
 import com.termux.shared.termux.settings.properties.TermuxAppSharedProperties;
 import com.termux.shared.termux.theme.TermuxThemeUtils;
 import com.termux.shared.theme.NightMode;
+import com.termux.shared.view.KeyboardUtils;
 import com.termux.shared.view.ViewUtils;
 import com.termux.terminal.TerminalSession;
 import com.termux.terminal.TerminalSessionClient;
@@ -279,6 +280,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
     private int mStatusBarInsetTop;
     private boolean mSeamlessStatusBackgroundActive;
     private long mLastEmptySessionRecoveryElapsedMs;
+    private boolean mSoftKeyboardVisibleBeforeStop = true;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -667,6 +669,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         Logger.logDebug(LOG_TAG, "onStop");
         if (mIsInvalidState)
             return;
+        mSoftKeyboardVisibleBeforeStop = KeyboardUtils.isSoftKeyboardVisible(this);
         mIsVisible = false;
         if (mTermuxTerminalSessionActivityClient != null)
             mTermuxTerminalSessionActivityClient.onStop();
@@ -1577,6 +1580,10 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
 
     public boolean isVisible() {
         return mIsVisible;
+    }
+
+    public boolean wasSoftKeyboardVisibleBeforeStop() {
+        return mSoftKeyboardVisibleBeforeStop;
     }
 
     public boolean isOnResumeAfterOnCreate() {
