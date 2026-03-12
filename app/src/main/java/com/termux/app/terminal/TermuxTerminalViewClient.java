@@ -68,6 +68,7 @@ public class TermuxTerminalViewClient extends TermuxTerminalViewClientBase {
     private boolean mShowSoftKeyboardIgnoreOnce;
 
     private boolean mShowSoftKeyboardWithDelayOnce;
+    private boolean mAllowAutoKeyboardOnFocus = true;
 
     private boolean mTerminalCursorBlinkerStateAlreadySet;
 
@@ -558,6 +559,7 @@ public class TermuxTerminalViewClient extends TermuxTerminalViewClientBase {
 
     public void setSoftKeyboardState(boolean isStartup, boolean isReloadTermuxProperties) {
         boolean noShowKeyboard = false;
+        mAllowAutoKeyboardOnFocus = true;
         // Requesting terminal view focus is necessary regardless of if soft keyboard is to be
         // disabled or hidden at startup, otherwise if hardware keyboard is attached and user
         // starts typing on hardware keyboard without tapping on the terminal first, then a colour
@@ -603,6 +605,10 @@ public class TermuxTerminalViewClient extends TermuxTerminalViewClientBase {
                 if (textInputView != null)
                     textInputViewHasFocus = textInputView.hasFocus();
                 if (hasFocus || textInputViewHasFocus) {
+                    if (!mAllowAutoKeyboardOnFocus) {
+                        Logger.logVerbose(LOG_TAG, "Skipping soft keyboard auto-show on focus due to resume mode");
+                        return;
+                    }
                     if (mShowSoftKeyboardIgnoreOnce) {
                         mShowSoftKeyboardIgnoreOnce = false;
                         return;
@@ -633,6 +639,7 @@ public class TermuxTerminalViewClient extends TermuxTerminalViewClientBase {
                     shouldAutoShowKeyboard = true;
                     break;
             }
+            mAllowAutoKeyboardOnFocus = shouldAutoShowKeyboard;
             // Request focus for TerminalView
             // Also show the keyboard, since onFocusChange will not be called if TerminalView already
             // had focus on startup to show the keyboard, like when opening url with context menu
