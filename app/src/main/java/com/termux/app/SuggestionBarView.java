@@ -126,6 +126,7 @@ public final class SuggestionBarView extends GridLayout {
     private boolean launcherAnimationsEnabled = true;
     private boolean launcherAnimationSafeMode = false;
     private final Map<String, WeakReference<View>> launchTargetViews = new HashMap<>();
+    private final Map<String, WeakReference<View>> launchTargetViewsByPackage = new HashMap<>();
 
     private LauncherAppDataProvider appDataProvider;
     private LauncherConfigRepository configRepository;
@@ -236,6 +237,7 @@ public final class SuggestionBarView extends GridLayout {
         activeAzPageIndex = 0;
         injectedSuggestionButtons = null;
         launchTargetViews.clear();
+        launchTargetViewsByPackage.clear();
         cancelAzResetTimeout();
         if (appDataProvider != null) {
             appDataProvider.invalidate();
@@ -508,6 +510,7 @@ public final class SuggestionBarView extends GridLayout {
     private void renderButtons(@NonNull List<LauncherAppEntry> entries, boolean azPreview) {
         removeAllViews();
         launchTargetViews.clear();
+        launchTargetViewsByPackage.clear();
         int buttonCount = Math.max(1, maxButtonCount);
         int renderStartCol = 0;
         List<PinnedItem> pinnedForSlots = new ArrayList<>();
@@ -782,18 +785,24 @@ public final class SuggestionBarView extends GridLayout {
             resolveFallback.setComponent(resolved);
         }
 
-        Bundle launchOptions = shouldUseTouchLaunchAnimation(launchSourceView)
-            ? buildLaunchOptions(launchSourceView)
+        LaunchAnimationContext launchAnimationContext = shouldUseTouchLaunchAnimation(launchSourceView)
+            ? buildLaunchAnimationContext(launchSourceView)
             : null;
 
         boolean launched = false;
-        if (tryStartActivity(context, pkgDefault, launchOptions)) {
+        if (tryStartMainActivity(context, pkgDefault != null ? pkgDefault.getComponent() : null, launchAnimationContext)) {
             launched = true;
-        } else if (tryStartActivity(context, explicit, launchOptions)) {
+        } else if (tryStartMainActivity(context, explicit != null ? explicit.getComponent() : null, launchAnimationContext)) {
             launched = true;
-        } else if (tryStartActivity(context, explicitNoCategory, launchOptions)) {
+        } else if (tryStartMainActivity(context, resolved, launchAnimationContext)) {
             launched = true;
-        } else if (resolved != null && tryStartActivity(context, resolveFallback, launchOptions)) {
+        } else if (tryStartActivity(context, pkgDefault, launchAnimationContext)) {
+            launched = true;
+        } else if (tryStartActivity(context, explicit, launchAnimationContext)) {
+            launched = true;
+        } else if (tryStartActivity(context, explicitNoCategory, launchAnimationContext)) {
+            launched = true;
+        } else if (resolved != null && tryStartActivity(context, resolveFallback, launchAnimationContext)) {
             launched = true;
         }
         if (!launched) {
@@ -809,7 +818,8 @@ public final class SuggestionBarView extends GridLayout {
                 Intent fallbackExplicit = new Intent(Intent.ACTION_MAIN);
                 fallbackExplicit.addCategory(Intent.CATEGORY_LAUNCHER);
                 fallbackExplicit.setComponent(new ComponentName(pkg, cls));
-                if (tryStartActivity(context, fallbackExplicit, launchOptions)) {
+                if (tryStartMainActivity(context, fallbackExplicit.getComponent(), launchAnimationContext)
+                    || tryStartActivity(context, fallbackExplicit, launchAnimationContext)) {
                     launched = true;
                     break;
                 }
@@ -899,15 +909,40 @@ public final class SuggestionBarView extends GridLayout {
         return null;
     }
 
-    private boolean tryStartActivity(@NonNull Context context, @Nullable Intent intent, @Nullable Bundle launchOptions) {
+    private boolean tryStartMainActivity(@NonNull Context context, @Nullable ComponentName componentName, @Nullable LaunchAnimationContext animationContext) {
+        if (componentName == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP) {
+            return false;
+        }
+        try {
+            LauncherApps launcherApps = (LauncherApps) context.getSystemService(Context.LAUNCHER_APPS_SERVICE);
+            if (launcherApps == null) {
+                return false;
+            }
+            launcherApps.startMainActivity(
+                componentName,
+                Process.myUserHandle(),
+                animationContext != null ? animationContext.sourceBounds : null,
+                animationContext != null ? animationContext.options : null
+            );
+            return true;
+        } catch (Throwable throwable) {
+            Log.d(LOG_TAG, "startMainActivity failed for " + componentName + ": " + throwable.getMessage());
+            return false;
+        }
+    }
+
+    private boolean tryStartActivity(@NonNull Context context, @Nullable Intent intent, @Nullable LaunchAnimationContext animationContext) {
         if (intent == null) return false;
         try {
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
+            if (animationContext != null && animationContext.sourceBounds != null) {
+                intent.setSourceBounds(animationContext.sourceBounds);
+            }
             if (context instanceof Activity) {
                 Activity activity = (Activity) context;
-                if (launchOptions != null) {
+                if (animationContext != null && animationContext.options != null) {
                     try {
-                        activity.startActivity(intent, launchOptions);
+                        activity.startActivity(intent, animationContext.options);
                         return true;
                     } catch (RuntimeException optionError) {
                         Log.d(LOG_TAG, "launch options fallback for " + intent + ": " + optionError.getMessage());
@@ -925,14 +960,23 @@ public final class SuggestionBarView extends GridLayout {
     }
 
     @Nullable
-    private Bundle buildLaunchOptions(@Nullable View sourceView) {
+    private LaunchAnimationContext buildLaunchAnimationContext(@Nullable View sourceView) {
         if (sourceView == null || !(getContext() instanceof Activity)) {
+            return null;
+        }
+        Rect sourceBounds = getSourceBoundsOnScreen(sourceView);
+        if (sourceBounds == null) {
             return null;
         }
         int width = Math.max(1, sourceView.getWidth());
         int height = Math.max(1, sourceView.getHeight());
-        ActivityOptions options = ActivityOptions.makeScaleUpAnimation(sourceView, 0, 0, width, height);
-        return options.toBundle();
+        ActivityOptions options;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            options = ActivityOptions.makeClipRevealAnimation(sourceView, 0, 0, width, height);
+        } else {
+            options = ActivityOptions.makeScaleUpAnimation(sourceView, 0, 0, width, height);
+        }
+        return new LaunchAnimationContext(sourceBounds, options.toBundle());
     }
 
     @Nullable
@@ -941,7 +985,13 @@ public final class SuggestionBarView extends GridLayout {
         if (ref == null) {
             ref = launchTargetViews.get(componentName.flattenToString());
         }
+        if (ref == null) {
+            ref = launchTargetViewsByPackage.get(componentName.getPackageName());
+        }
         View target = ref != null ? ref.get() : null;
+        if (target == null || !target.isAttachedToWindow()) {
+            target = findFirstAttachedLaunchTargetForPackage(componentName.getPackageName());
+        }
         if (target == null || !target.isAttachedToWindow()) {
             return null;
         }
@@ -2070,13 +2120,15 @@ public final class SuggestionBarView extends GridLayout {
 
         for (ShortcutInfo info : shortcuts) {
             String label = info.getShortLabel() != null ? info.getShortLabel().toString() : info.getId();
+            final TextView[] shortcutRowHolder = new TextView[1];
             TextView shortcutRow = addPopupActionRow(shell, label, activeMenuTintBase, () -> {
                 dismissAppContextPopup();
-                launchShortcut(info);
+                launchShortcut(info, shortcutRowHolder[0]);
             });
+            shortcutRowHolder[0] = shortcutRow;
             shortcutsRows.add(new MenuActionRow(shortcutRow, () -> {
                 dismissAppContextPopup();
-                launchShortcut(info);
+                launchShortcut(info, shortcutRowHolder[0]);
             }, false));
         }
         normalizePopupRowWidths(shortcutsRows);
@@ -2125,15 +2177,24 @@ public final class SuggestionBarView extends GridLayout {
     }
 
     private void launchShortcut(@NonNull ShortcutInfo shortcutInfo) {
+        launchShortcut(shortcutInfo, activeAppMenuContext != null ? activeAppMenuContext.anchor : null);
+    }
+
+    private void launchShortcut(@NonNull ShortcutInfo shortcutInfo, @Nullable View sourceView) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N_MR1) return;
         try {
             LauncherApps launcherApps = (LauncherApps) getContext().getSystemService(Context.LAUNCHER_APPS_SERVICE);
             if (launcherApps == null) return;
+            LaunchAnimationContext animationContext = shouldUseTouchLaunchAnimation(sourceView)
+                ? buildLaunchAnimationContext(sourceView)
+                : null;
             launcherApps.startShortcut(
                 shortcutInfo.getPackage(),
                 shortcutInfo.getId(),
-                (Rect) null,
-                ActivityOptions.makeBasic().toBundle(),
+                animationContext != null ? animationContext.sourceBounds : null,
+                animationContext != null && animationContext.options != null
+                    ? animationContext.options
+                    : ActivityOptions.makeBasic().toBundle(),
                 Process.myUserHandle()
             );
             dismissFolderPopup();
@@ -3387,9 +3448,46 @@ public final class SuggestionBarView extends GridLayout {
         String key = componentKeyFromRef(appRef);
         if (key == null) return;
         launchTargetViews.put(key, new WeakReference<>(view));
+        launchTargetViewsByPackage.put(appRef.packageName, new WeakReference<>(view));
         String fullKey = componentFullKeyFromRef(appRef);
         if (fullKey != null) {
             launchTargetViews.put(fullKey, new WeakReference<>(view));
+        }
+    }
+
+    @Nullable
+    private Rect getSourceBoundsOnScreen(@NonNull View sourceView) {
+        if (!sourceView.isAttachedToWindow()) {
+            return null;
+        }
+        int[] location = new int[2];
+        sourceView.getLocationOnScreen(location);
+        int width = Math.max(1, sourceView.getWidth());
+        int height = Math.max(1, sourceView.getHeight());
+        return new Rect(location[0], location[1], location[0] + width, location[1] + height);
+    }
+
+    @Nullable
+    private View findFirstAttachedLaunchTargetForPackage(@NonNull String packageName) {
+        for (Map.Entry<String, WeakReference<View>> entry : launchTargetViews.entrySet()) {
+            if (!entry.getKey().startsWith(packageName + "/")) {
+                continue;
+            }
+            View candidate = entry.getValue().get();
+            if (candidate != null && candidate.isAttachedToWindow()) {
+                return candidate;
+            }
+        }
+        return null;
+    }
+
+    private static final class LaunchAnimationContext {
+        @Nullable final Rect sourceBounds;
+        @Nullable final Bundle options;
+
+        LaunchAnimationContext(@Nullable Rect sourceBounds, @Nullable Bundle options) {
+            this.sourceBounds = sourceBounds;
+            this.options = options;
         }
     }
 
