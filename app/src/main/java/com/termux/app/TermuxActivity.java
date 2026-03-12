@@ -966,8 +966,6 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         mSuggestionBarView.setInheritedTintColor(ContextCompat.getColor(this, R.color.background_accent));
         mSuggestionBarView.setAppDataProvider(mLauncherAppDataProvider);
         mSuggestionBarView.setConfigRepository(mLauncherConfigRepository);
-        mSuggestionBarView.setLauncherAnimationsEnabled(mPreferences.isAppLauncherAnimationsEnabled());
-        mSuggestionBarView.setLauncherAnimationSafeMode(mPreferences.isAppLauncherAnimationSafeMode());
         if (mLauncherTransitionController != null) {
             mLauncherTransitionController.onAnimationPreferenceUpdated();
         }

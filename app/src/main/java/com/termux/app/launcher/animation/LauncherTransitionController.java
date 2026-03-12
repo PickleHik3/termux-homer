@@ -35,7 +35,7 @@ public final class LauncherTransitionController {
     }
 
     public boolean isLauncherAnimationEnabled() {
-        return preferences.isAppLauncherAnimationsEnabled();
+        return true;
     }
 
     public boolean isSafeModeEnabled() {
@@ -44,9 +44,6 @@ public final class LauncherTransitionController {
 
     public void onAnimationPreferenceUpdated() {
         transitionFailureCount = 0;
-        if (!preferences.isAppLauncherAnimationsEnabled() && preferences.isAppLauncherAnimationSafeMode()) {
-            preferences.setAppLauncherAnimationSafeMode(false);
-        }
     }
 
     public boolean shouldUseAdvancedAnimations() {

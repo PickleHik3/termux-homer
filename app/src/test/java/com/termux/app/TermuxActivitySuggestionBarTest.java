@@ -45,9 +45,5 @@ public class TermuxActivitySuggestionBarTest {
         int expectedMax = configuredMax > 0 ? configuredMax : TermuxActivity.calculateSuggestionBarMaxButtons(metrics);
 
         assertEquals(expectedMax, appliedMax);
-        boolean animationsEnabled = ReflectionHelpers.getField(suggestionBarView, "launcherAnimationsEnabled");
-        boolean animationSafeMode = ReflectionHelpers.getField(suggestionBarView, "launcherAnimationSafeMode");
-        assertEquals(preferences.isAppLauncherAnimationsEnabled(), animationsEnabled);
-        assertEquals(preferences.isAppLauncherAnimationSafeMode(), animationSafeMode);
     }
 }

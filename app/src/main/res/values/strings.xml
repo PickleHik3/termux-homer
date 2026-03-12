@@ -355,8 +355,6 @@
                 <string name="termux_app_launcher_az_row_enabled_summary">Shows an alphabet strip between apps bar and extra keys for quick launch scrubbing.</string>
                 <string name="termux_app_launcher_az_double_tap_lock_title">Double-tap A-Z row to lock screen</string>
                 <string name="termux_app_launcher_az_double_tap_lock_summary">Uses Shizuku privileged lock endpoint when you double-tap the alphabet row.</string>
-                <string name="termux_app_launcher_animations_enabled_title">Launcher animations</string>
-                <string name="termux_app_launcher_animations_enabled_summary">Enable enhanced app open/close launcher animations with automatic compatibility fallback.</string>
                 <string name="termux_app_launcher_bar_height_title">Bar height</string>
                 <string name="termux_app_launcher_bar_height_summary">Height multiplier for the app launcher bar (1.0 = default).</string>
                 <string name="termux_app_launcher_icon_scale_title">Icon scaling</string>

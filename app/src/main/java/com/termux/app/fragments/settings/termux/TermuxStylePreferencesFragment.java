@@ -124,12 +124,6 @@ class TermuxStylePreferencesDataStore extends PreferenceDataStore {
             case "app_launcher_az_double_tap_lock":
                 mPreferences.setAppLauncherAzDoubleTapLockEnabled(value);
                 break;
-            case "app_launcher_animations_enabled":
-                mPreferences.setAppLauncherAnimationsEnabled(value);
-                if (!value) {
-                    mPreferences.setAppLauncherAnimationSafeMode(false);
-                }
-                break;
             default:
                 break;
         }
@@ -160,8 +154,6 @@ class TermuxStylePreferencesDataStore extends PreferenceDataStore {
                 return mPreferences.isAppLauncherAzRowEnabled();
             case "app_launcher_az_double_tap_lock":
                 return mPreferences.isAppLauncherAzDoubleTapLockEnabled();
-            case "app_launcher_animations_enabled":
-                return mPreferences.isAppLauncherAnimationsEnabled();
             default:
                 return defValue;
         }

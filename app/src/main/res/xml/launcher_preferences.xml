@@ -82,11 +82,6 @@
             app:summary="@string/termux_app_launcher_az_double_tap_lock_summary"
             android:defaultValue="false" />
 
-        <SwitchPreferenceCompat
-            app:key="app_launcher_animations_enabled"
-            app:title="@string/termux_app_launcher_animations_enabled_title"
-            app:summary="@string/termux_app_launcher_animations_enabled_summary"
-            android:defaultValue="true" />
     </PreferenceCategory>
 
 </PreferenceScreen>

@@ -72,7 +72,6 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.github.mmin18.widget.RealtimeBlurView;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.termux.R;
-import com.termux.app.launcher.animation.FloatingLaunchAnimator;
 import com.termux.app.launcher.data.LauncherAppDataProvider;
 import com.termux.app.launcher.data.LauncherConfigRepository;
 import com.termux.app.launcher.data.LauncherRankingEngine;
@@ -104,7 +103,7 @@ public final class SuggestionBarView extends GridLayout {
     private static final int POPUP_MIN_WIDTH_DP = 188;
     private static final int POPUP_MIN_WIDTH_TIGHT_DP = 132;
     private static final float POPUP_MAX_HEIGHT_FACTOR = 0.45f;
-    private static final long APP_LAUNCH_TOUCH_DELAY_MS = 90L;
+    private static final long APP_LAUNCH_TOUCH_DELAY_MS = 40L;
     private static final long PICKUP_DECISION_WINDOW_MS = 650L;
     private static final float PICKUP_X_AXIS_SLOP_FACTOR = 0.9f;
     private static final float PICKUP_Y_INTENT_SLOP_FACTOR = 1.8f;
@@ -124,8 +123,6 @@ public final class SuggestionBarView extends GridLayout {
     private int blurRadiusDp = 10;
     private int inheritedTintColor = 0xFF202020;
     private List<String> defaultButtonStrings = new ArrayList<>();
-    private boolean launcherAnimationsEnabled = true;
-    private boolean launcherAnimationSafeMode = false;
     private final Map<String, WeakReference<View>> launchTargetViews = new HashMap<>();
     private final Map<String, WeakReference<View>> launchTargetViewsByPackage = new HashMap<>();
 
@@ -220,14 +217,6 @@ public final class SuggestionBarView extends GridLayout {
         } else {
             this.defaultButtonStrings = new ArrayList<>(defaultButtons);
         }
-    }
-
-    public void setLauncherAnimationsEnabled(boolean launcherAnimationsEnabled) {
-        this.launcherAnimationsEnabled = launcherAnimationsEnabled;
-    }
-
-    public void setLauncherAnimationSafeMode(boolean launcherAnimationSafeMode) {
-        this.launcherAnimationSafeMode = launcherAnimationSafeMode;
     }
 
     public void clearAppCache() {
@@ -845,13 +834,8 @@ public final class SuggestionBarView extends GridLayout {
         boolean touchAnimation = shouldUseTouchLaunchAnimation(sourceView);
         long launchDelay = 0L;
         if (touchAnimation) {
-            boolean played = FloatingLaunchAnimator.play(sourceView, inheritedTintColor);
-            if (!played) {
-                applyLaunchBloom(sourceView);
-                launchDelay = APP_LAUNCH_TOUCH_DELAY_MS;
-            } else {
-                launchDelay = FloatingLaunchAnimator.RECOMMENDED_LAUNCH_DELAY_MS;
-            }
+            applyLaunchBloom(sourceView);
+            launchDelay = APP_LAUNCH_TOUCH_DELAY_MS;
         }
         sourceView.postDelayed(() -> launchEntry(entry, terminalView, touchAnimation ? sourceView : null), launchDelay);
     }
@@ -2192,13 +2176,8 @@ public final class SuggestionBarView extends GridLayout {
         boolean touchAnimation = shouldUseTouchLaunchAnimation(sourceView);
         long launchDelay = 0L;
         if (touchAnimation && sourceView != null) {
-            boolean played = FloatingLaunchAnimator.play(sourceView, inheritedTintColor);
-            if (!played) {
-                applyLaunchBloom(sourceView);
-                launchDelay = APP_LAUNCH_TOUCH_DELAY_MS;
-            } else {
-                launchDelay = FloatingLaunchAnimator.RECOMMENDED_LAUNCH_DELAY_MS;
-            }
+            applyLaunchBloom(sourceView);
+            launchDelay = APP_LAUNCH_TOUCH_DELAY_MS;
         }
         Runnable launcherRunnable = () -> doLaunchShortcut(shortcutInfo, touchAnimation ? sourceView : null);
         if (launchDelay > 0L && sourceView != null) {
@@ -3545,7 +3524,7 @@ public final class SuggestionBarView extends GridLayout {
     }
 
     private boolean shouldUseTouchLaunchAnimation(@Nullable View sourceView) {
-        return launcherAnimationsEnabled && sourceView != null;
+        return sourceView != null;
     }
 
     private void applyLaunchBloom(@NonNull View sourceView) {
@@ -3554,61 +3533,90 @@ public final class SuggestionBarView extends GridLayout {
             return;
         }
         ensureUnclipped(container);
-        View bloom = new View(getContext());
-        GradientDrawable glow = new GradientDrawable();
-        glow.setShape(GradientDrawable.OVAL);
+        View glowFill = new View(getContext());
+        View ring = new View(getContext());
         int base = inheritedTintColor & 0x00FFFFFF;
-        glow.setColor(0x00000000);
-        glow.setStroke(dp(2), (0xCC << 24) | base);
-        bloom.setBackground(glow);
+        GradientDrawable fill = new GradientDrawable();
+        fill.setShape(GradientDrawable.OVAL);
+        fill.setColor((0x55 << 24) | base);
+        glowFill.setBackground(fill);
+        GradientDrawable stroke = new GradientDrawable();
+        stroke.setShape(GradientDrawable.OVAL);
+        stroke.setColor(0x00000000);
+        stroke.setStroke(dp(2), (0xDD << 24) | base);
+        ring.setBackground(stroke);
         int size = Math.max(sourceView.getWidth(), sourceView.getHeight());
         if (size <= 0) {
             size = iconSizePx();
         }
-        int bloomSize = Math.round(size * 0.95f);
-        ViewGroup.LayoutParams params = new ViewGroup.LayoutParams(bloomSize, bloomSize);
-        bloom.setLayoutParams(params);
-        bloom.setAlpha(0f);
+        int glowSize = Math.round(size * 1.16f);
+        int ringSize = Math.round(size * 0.96f);
+        glowFill.setLayoutParams(new ViewGroup.LayoutParams(glowSize, glowSize));
+        ring.setLayoutParams(new ViewGroup.LayoutParams(ringSize, ringSize));
+        glowFill.setAlpha(0f);
+        ring.setAlpha(0f);
         int[] srcLoc = new int[2];
         int[] rootLoc = new int[2];
         sourceView.getLocationOnScreen(srcLoc);
         container.getLocationOnScreen(rootLoc);
         float cx = (srcLoc[0] - rootLoc[0]) + sourceView.getWidth() / 2f;
         float cy = (srcLoc[1] - rootLoc[1]) + sourceView.getHeight() / 2f;
-        bloom.setX(cx - bloomSize / 2f);
-        bloom.setY(cy - bloomSize / 2f);
-        bloom.setScaleX(0.72f);
-        bloom.setScaleY(0.72f);
-        container.addView(bloom);
+        glowFill.setX(cx - glowSize / 2f);
+        glowFill.setY(cy - glowSize / 2f);
+        ring.setX(cx - ringSize / 2f);
+        ring.setY(cy - ringSize / 2f);
+        glowFill.setScaleX(0.84f);
+        glowFill.setScaleY(0.84f);
+        ring.setScaleX(0.84f);
+        ring.setScaleY(0.84f);
+        container.addView(glowFill);
+        container.addView(ring);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            bloom.setElevation(dp(24));
-            bloom.setTranslationZ(dp(24));
+            glowFill.setElevation(dp(22));
+            glowFill.setTranslationZ(dp(22));
+            ring.setElevation(dp(24));
+            ring.setTranslationZ(dp(24));
         }
         sourceView.animate()
             .scaleX(0.94f)
             .scaleY(0.94f)
-            .setDuration(52L)
+            .setDuration(56L)
             .setInterpolator(new AccelerateInterpolator())
             .withEndAction(() -> sourceView.animate()
                 .scaleX(1f)
                 .scaleY(1f)
-                .setDuration(160L)
-                .setInterpolator(new OvershootInterpolator(1.45f))
+                .setDuration(140L)
+                .setInterpolator(new OvershootInterpolator(1.28f))
                 .start())
             .start();
-        bloom.animate()
-            .alpha(0.78f)
+        glowFill.animate()
+            .alpha(0.36f)
+            .scaleX(1.18f)
+            .scaleY(1.18f)
+            .setDuration(104L)
+            .setInterpolator(new DecelerateInterpolator())
+            .withEndAction(() -> glowFill.animate()
+                .alpha(0f)
+                .scaleX(1.38f)
+                .scaleY(1.38f)
+                .setDuration(124L)
+                .setInterpolator(new LinearInterpolator())
+                .withEndAction(() -> container.removeView(glowFill))
+                .start())
+            .start();
+        ring.animate()
+            .alpha(0.9f)
             .scaleX(1.24f)
             .scaleY(1.24f)
-            .setDuration(110L)
+            .setDuration(118L)
             .setInterpolator(new DecelerateInterpolator())
-            .withEndAction(() -> bloom.animate()
+            .withEndAction(() -> ring.animate()
                 .alpha(0f)
-                .scaleX(1.62f)
-                .scaleY(1.62f)
-                .setDuration(150L)
+                .scaleX(1.48f)
+                .scaleY(1.48f)
+                .setDuration(132L)
                 .setInterpolator(new LinearInterpolator())
-                .withEndAction(() -> container.removeView(bloom))
+                .withEndAction(() -> container.removeView(ring))
                 .start())
             .start();
     }
