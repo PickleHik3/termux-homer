@@ -22,11 +22,11 @@ import androidx.annotation.Nullable;
  */
 public final class FloatingLaunchAnimator {
 
-    public static final long RECOMMENDED_LAUNCH_DELAY_MS = 120L;
-    private static final long MORPH_DURATION_MS = 320L;
-    private static final long SCRIM_DURATION_MS = 130L;
-    private static final long SOURCE_PRESS_DURATION_MS = 62L;
-    private static final long CLEANUP_FADE_MS = 130L;
+    public static final long RECOMMENDED_LAUNCH_DELAY_MS = 64L;
+    private static final long MORPH_DURATION_MS = 220L;
+    private static final long SCRIM_DURATION_MS = 110L;
+    private static final long SOURCE_PRESS_DURATION_MS = 54L;
+    private static final long CLEANUP_FADE_MS = 90L;
 
     private FloatingLaunchAnimator() {}
 
@@ -57,7 +57,7 @@ public final class FloatingLaunchAnimator {
         }
         Rect to = new Rect(0, 0, root.getWidth(), root.getHeight());
         int color = 0xFF000000 | (baseColor & 0x00FFFFFF);
-        int scrimColor = 0x22000000 | (baseColor & 0x00FFFFFF);
+        int scrimColor = 0x12000000 | (baseColor & 0x00FFFFFF);
 
         FrameLayout overlay = new FrameLayout(sourceView.getContext());
         overlay.setClipChildren(false);
@@ -78,8 +78,9 @@ public final class FloatingLaunchAnimator {
 
         View card = new View(sourceView.getContext());
         GradientDrawable cardBackground = new GradientDrawable();
-        cardBackground.setColor(color);
+        cardBackground.setColor(0x00000000);
         float startRadius = Math.max(12f, Math.min(from.width(), from.height()) * 0.26f);
+        cardBackground.setStroke(dp(sourceView.getContext(), 2f), (0xCC << 24) | (color & 0x00FFFFFF));
         cardBackground.setCornerRadius(startRadius);
         card.setBackground(cardBackground);
         FrameLayout.LayoutParams cardLp = new FrameLayout.LayoutParams(from.width(), from.height());
@@ -101,10 +102,10 @@ public final class FloatingLaunchAnimator {
             card.setLayoutParams(cardLp);
             float radiusProgress = LauncherAnimationInterpolators.EMPHASIZED_DECELERATE.getInterpolation(t);
             cardBackground.setCornerRadius(lerp(startRadius, 0f, radiusProgress));
-            card.setAlpha(lerp(0.84f, 1f, t));
+            card.setAlpha(lerp(0.75f, 0.08f, t));
         });
 
-        ObjectAnimator scrimIn = ObjectAnimator.ofFloat(scrim, View.ALPHA, 0f, 0.22f);
+        ObjectAnimator scrimIn = ObjectAnimator.ofFloat(scrim, View.ALPHA, 0f, 0.08f);
         scrimIn.setDuration(SCRIM_DURATION_MS);
         scrimIn.setInterpolator(LauncherAnimationInterpolators.LINEAR_OUT_SLOW_IN);
 
@@ -161,6 +162,10 @@ public final class FloatingLaunchAnimator {
 
     private static float lerp(float start, float end, float t) {
         return start + (end - start) * t;
+    }
+
+    private static int dp(@NonNull Context context, float value) {
+        return Math.max(1, Math.round(value * context.getResources().getDisplayMetrics().density));
     }
 
     @Nullable
