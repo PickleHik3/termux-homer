@@ -72,6 +72,7 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.github.mmin18.widget.RealtimeBlurView;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.termux.R;
+import com.termux.app.launcher.animation.FloatingLaunchAnimator;
 import com.termux.app.launcher.data.LauncherAppDataProvider;
 import com.termux.app.launcher.data.LauncherConfigRepository;
 import com.termux.app.launcher.data.LauncherRankingEngine;
@@ -842,10 +843,16 @@ public final class SuggestionBarView extends GridLayout {
 
     private void launchEntryFromTouch(@NonNull View sourceView, @NonNull LauncherAppEntry entry, @Nullable TerminalView terminalView) {
         boolean touchAnimation = shouldUseTouchLaunchAnimation(sourceView);
+        long launchDelay = 0L;
         if (touchAnimation) {
-            applyLaunchBloom(sourceView);
+            boolean played = FloatingLaunchAnimator.play(sourceView, inheritedTintColor);
+            if (!played) {
+                applyLaunchBloom(sourceView);
+                launchDelay = APP_LAUNCH_TOUCH_DELAY_MS;
+            } else {
+                launchDelay = FloatingLaunchAnimator.RECOMMENDED_LAUNCH_DELAY_MS;
+            }
         }
-        long launchDelay = touchAnimation ? APP_LAUNCH_TOUCH_DELAY_MS : 0L;
         sourceView.postDelayed(() -> launchEntry(entry, terminalView, touchAnimation ? sourceView : null), launchDelay);
     }
 
@@ -2122,13 +2129,13 @@ public final class SuggestionBarView extends GridLayout {
             String label = info.getShortLabel() != null ? info.getShortLabel().toString() : info.getId();
             final TextView[] shortcutRowHolder = new TextView[1];
             TextView shortcutRow = addPopupActionRow(shell, label, activeMenuTintBase, () -> {
-                dismissAppContextPopup();
                 launchShortcut(info, shortcutRowHolder[0]);
+                dismissAppContextPopup();
             });
             shortcutRowHolder[0] = shortcutRow;
             shortcutsRows.add(new MenuActionRow(shortcutRow, () -> {
-                dismissAppContextPopup();
                 launchShortcut(info, shortcutRowHolder[0]);
+                dismissAppContextPopup();
             }, false));
         }
         normalizePopupRowWidths(shortcutsRows);
@@ -2181,6 +2188,27 @@ public final class SuggestionBarView extends GridLayout {
     }
 
     private void launchShortcut(@NonNull ShortcutInfo shortcutInfo, @Nullable View sourceView) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N_MR1) return;
+        boolean touchAnimation = shouldUseTouchLaunchAnimation(sourceView);
+        long launchDelay = 0L;
+        if (touchAnimation && sourceView != null) {
+            boolean played = FloatingLaunchAnimator.play(sourceView, inheritedTintColor);
+            if (!played) {
+                applyLaunchBloom(sourceView);
+                launchDelay = APP_LAUNCH_TOUCH_DELAY_MS;
+            } else {
+                launchDelay = FloatingLaunchAnimator.RECOMMENDED_LAUNCH_DELAY_MS;
+            }
+        }
+        Runnable launcherRunnable = () -> doLaunchShortcut(shortcutInfo, touchAnimation ? sourceView : null);
+        if (launchDelay > 0L && sourceView != null) {
+            sourceView.postDelayed(launcherRunnable, launchDelay);
+        } else {
+            launcherRunnable.run();
+        }
+    }
+
+    private void doLaunchShortcut(@NonNull ShortcutInfo shortcutInfo, @Nullable View sourceView) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N_MR1) return;
         try {
             LauncherApps launcherApps = (LauncherApps) getContext().getSystemService(Context.LAUNCHER_APPS_SERVICE);
