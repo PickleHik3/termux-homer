@@ -10,14 +10,4 @@
         <item>balanced</item>
         <item>loose</item>
     </string-array>
-    <string-array name="app_launcher_resume_keyboard_mode_entries">
-        <item>@string/termux_app_launcher_resume_keyboard_mode_always</item>
-        <item>@string/termux_app_launcher_resume_keyboard_mode_restore_previous</item>
-        <item>@string/termux_app_launcher_resume_keyboard_mode_never</item>
-    </string-array>
-    <string-array name="app_launcher_resume_keyboard_mode_values">
-        <item>always</item>
-        <item>restore_previous</item>
-        <item>never</item>
-    </string-array>
 </resources>

@@ -63,22 +63,16 @@ public class TermuxTerminalViewClient extends TermuxTerminalViewClientBase {
     boolean mVirtualControlKeyDown, mVirtualFnKeyDown;
 
     private Runnable mShowSoftKeyboardRunnable;
-    private Runnable mShowSoftKeyboardWhenReadyRunnable;
 
     private boolean mShowSoftKeyboardIgnoreOnce;
 
     private boolean mShowSoftKeyboardWithDelayOnce;
-    private boolean mAllowAutoKeyboardOnFocus = true;
 
     private boolean mTerminalCursorBlinkerStateAlreadySet;
 
     private List<KeyboardShortcut> mSessionShortcuts;
 
     private static final String LOG_TAG = "TermuxTerminalViewClient";
-    private static final long SOFT_KEYBOARD_SHOW_DELAY_COLD_START_MS = 300L;
-    private static final long SOFT_KEYBOARD_SHOW_DELAY_RESUME_MS = 40L;
-    private static final long SOFT_KEYBOARD_RETRY_DELAY_MS = 50L;
-    private static final int SOFT_KEYBOARD_MAX_RETRIES = 8;
     private SuggestionBarCallback mSuggestionBarCallback;
 
     public TermuxTerminalViewClient(TermuxActivity activity, TermuxTerminalSessionActivityClient termuxTerminalSessionActivityClient) {
@@ -559,7 +553,6 @@ public class TermuxTerminalViewClient extends TermuxTerminalViewClientBase {
 
     public void setSoftKeyboardState(boolean isStartup, boolean isReloadTermuxProperties) {
         boolean noShowKeyboard = false;
-        mAllowAutoKeyboardOnFocus = true;
         // Requesting terminal view focus is necessary regardless of if soft keyboard is to be
         // disabled or hidden at startup, otherwise if hardware keyboard is attached and user
         // starts typing on hardware keyboard without tapping on the terminal first, then a colour
@@ -605,10 +598,6 @@ public class TermuxTerminalViewClient extends TermuxTerminalViewClientBase {
                 if (textInputView != null)
                     textInputViewHasFocus = textInputView.hasFocus();
                 if (hasFocus || textInputViewHasFocus) {
-                    if (!mAllowAutoKeyboardOnFocus) {
-                        Logger.logVerbose(LOG_TAG, "Skipping soft keyboard auto-show on focus due to resume mode");
-                        return;
-                    }
                     if (mShowSoftKeyboardIgnoreOnce) {
                         mShowSoftKeyboardIgnoreOnce = false;
                         return;
@@ -623,72 +612,15 @@ public class TermuxTerminalViewClient extends TermuxTerminalViewClientBase {
         // Do not force show soft keyboard if termux-reload-settings command was run with hardware keyboard
         // or soft keyboard is to be hidden or is disabled
         if (!isReloadTermuxProperties && !noShowKeyboard) {
-            String resumeKeyboardMode = mActivity.getPreferences().getAppLauncherResumeKeyboardMode();
-            boolean shouldAutoShowKeyboard;
-            switch (resumeKeyboardMode) {
-                case "never":
-                    shouldAutoShowKeyboard = false;
-                    break;
-                case "restore_previous":
-                    // On cold start, preserve existing startup behavior.
-                    shouldAutoShowKeyboard = mActivity.isOnResumeAfterOnCreate()
-                        || mActivity.wasSoftKeyboardVisibleBeforeStop();
-                    break;
-                case "always":
-                default:
-                    shouldAutoShowKeyboard = true;
-                    break;
-            }
-            mAllowAutoKeyboardOnFocus = shouldAutoShowKeyboard;
             // Request focus for TerminalView
             // Also show the keyboard, since onFocusChange will not be called if TerminalView already
             // had focus on startup to show the keyboard, like when opening url with context menu
             // "Select URL" long press and returning to Termux app with back button. This
             // will also show keyboard even if it was closed before opening url. #2111
-            Logger.logVerbose(LOG_TAG, "Requesting TerminalView focus and applying keyboard resume mode=" + resumeKeyboardMode);
+            Logger.logVerbose(LOG_TAG, "Requesting TerminalView focus and showing soft keyboard");
             mActivity.getTerminalView().requestFocus();
-            if (shouldAutoShowKeyboard) {
-                long keyboardDelay = mActivity.isOnResumeAfterOnCreate()
-                    ? SOFT_KEYBOARD_SHOW_DELAY_COLD_START_MS
-                    : SOFT_KEYBOARD_SHOW_DELAY_RESUME_MS;
-                scheduleSoftKeyboardShowWhenReady(keyboardDelay);
-            }
+            mActivity.getTerminalView().postDelayed(getShowSoftKeyboardRunnable(), 300);
         }
-    }
-
-    private void scheduleSoftKeyboardShowWhenReady(long initialDelayMs) {
-        if (mShowSoftKeyboardWhenReadyRunnable != null) {
-            mActivity.getTerminalView().removeCallbacks(mShowSoftKeyboardWhenReadyRunnable);
-        }
-        mShowSoftKeyboardWhenReadyRunnable = new Runnable() {
-            int attempts = 0;
-
-            @Override
-            public void run() {
-                if (mActivity == null || mActivity.isFinishing()) {
-                    return;
-                }
-                View terminalView = mActivity.getTerminalView();
-                if (terminalView == null || !terminalView.isAttachedToWindow()) {
-                    return;
-                }
-                if (!terminalView.hasFocus()) {
-                    terminalView.requestFocus();
-                }
-                if (terminalView.hasWindowFocus()) {
-                    KeyboardUtils.showSoftKeyboard(mActivity, terminalView);
-                    return;
-                }
-                attempts++;
-                if (attempts <= SOFT_KEYBOARD_MAX_RETRIES) {
-                    terminalView.postDelayed(this, SOFT_KEYBOARD_RETRY_DELAY_MS);
-                } else {
-                    // Final fallback so keyboard still appears on odd lifecycle timing.
-                    KeyboardUtils.showSoftKeyboard(mActivity, terminalView);
-                }
-            }
-        };
-        mActivity.getTerminalView().postDelayed(mShowSoftKeyboardWhenReadyRunnable, Math.max(0L, initialDelayMs));
     }
 
     private Runnable getShowSoftKeyboardRunnable() {

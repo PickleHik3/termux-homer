@@ -20,13 +20,6 @@
             android:defaultValue="/"
             android:inputType="text" />
 
-        <ListPreference
-            app:key="app_launcher_resume_keyboard_mode"
-            app:title="@string/termux_app_launcher_resume_keyboard_mode_title"
-            app:summary="@string/termux_app_launcher_resume_keyboard_mode_summary"
-            android:defaultValue="always"
-            app:entries="@array/app_launcher_resume_keyboard_mode_entries"
-            app:entryValues="@array/app_launcher_resume_keyboard_mode_values" />
     </PreferenceCategory>
 
     <PreferenceCategory

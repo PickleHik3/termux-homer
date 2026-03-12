@@ -224,27 +224,6 @@ public class TermuxAppSharedPreferences extends AppSharedPreferences {
         SharedPreferenceUtils.setBoolean(mSharedPreferences, TERMUX_APP.KEY_APP_LAUNCHER_AZ_DOUBLE_TAP_LOCK, value, false);
     }
 
-    public String getAppLauncherResumeKeyboardMode() {
-        String mode = SharedPreferenceUtils.getString(
-            mSharedPreferences,
-            TERMUX_APP.KEY_APP_LAUNCHER_RESUME_KEYBOARD_MODE,
-            TERMUX_APP.DEFAULT_APP_LAUNCHER_RESUME_KEYBOARD_MODE,
-            true
-        );
-        if ("restore_previous".equals(mode) || "never".equals(mode) || "always".equals(mode)) {
-            return mode;
-        }
-        return TERMUX_APP.DEFAULT_APP_LAUNCHER_RESUME_KEYBOARD_MODE;
-    }
-
-    public void setAppLauncherResumeKeyboardMode(String value) {
-        String mode = value == null ? "" : value.trim();
-        if (!"restore_previous".equals(mode) && !"never".equals(mode) && !"always".equals(mode)) {
-            mode = TERMUX_APP.DEFAULT_APP_LAUNCHER_RESUME_KEYBOARD_MODE;
-        }
-        SharedPreferenceUtils.setString(mSharedPreferences, TERMUX_APP.KEY_APP_LAUNCHER_RESUME_KEYBOARD_MODE, mode, false);
-    }
-
     public boolean isTerminalMarginAdjustmentEnabled() {
         return SharedPreferenceUtils.getBoolean(mSharedPreferences, TERMUX_APP.KEY_TERMINAL_MARGIN_ADJUSTMENT, TERMUX_APP.DEFAULT_TERMINAL_MARGIN_ADJUSTMENT);
     }

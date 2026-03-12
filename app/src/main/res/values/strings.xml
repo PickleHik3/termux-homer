@@ -345,11 +345,6 @@
                 <string name="termux_app_launcher_search_mode_loose">Loose</string>
                 <string name="termux_app_launcher_input_char_title">Input split character</string>
                 <string name="termux_app_launcher_input_char_summary">Character used to split the prompt and input when detecting search text.</string>
-                <string name="termux_app_launcher_resume_keyboard_mode_title">Keyboard on return</string>
-                <string name="termux_app_launcher_resume_keyboard_mode_summary">Controls whether keyboard reopens when returning from another app.</string>
-                <string name="termux_app_launcher_resume_keyboard_mode_always">Always reopen</string>
-                <string name="termux_app_launcher_resume_keyboard_mode_restore_previous">Restore previous state</string>
-                <string name="termux_app_launcher_resume_keyboard_mode_never">Never reopen</string>
                 <string name="termux_app_launcher_default_buttons_title">Default apps</string>
                 <string name="termux_app_launcher_default_buttons_summary">Comma-separated list of default apps to pin (for example: phone, telegram, spotify).</string>
                 <string name="termux_app_launcher_show_icons_title">Show icons</string>
