@@ -104,7 +104,7 @@ public final class SuggestionBarView extends GridLayout {
     private static final int POPUP_MIN_WIDTH_DP = 188;
     private static final int POPUP_MIN_WIDTH_TIGHT_DP = 132;
     private static final float POPUP_MAX_HEIGHT_FACTOR = 0.45f;
-    private static final long APP_LAUNCH_TOUCH_DELAY_MS = 56L;
+    private static final long APP_LAUNCH_TOUCH_DELAY_MS = 90L;
     private static final long PICKUP_DECISION_WINDOW_MS = 650L;
     private static final float PICKUP_X_AXIS_SLOP_FACTOR = 0.9f;
     private static final float PICKUP_Y_INTENT_SLOP_FACTOR = 1.8f;
@@ -3545,7 +3545,7 @@ public final class SuggestionBarView extends GridLayout {
     }
 
     private boolean shouldUseTouchLaunchAnimation(@Nullable View sourceView) {
-        return launcherAnimationsEnabled && !launcherAnimationSafeMode && sourceView != null;
+        return launcherAnimationsEnabled && sourceView != null;
     }
 
     private void applyLaunchBloom(@NonNull View sourceView) {

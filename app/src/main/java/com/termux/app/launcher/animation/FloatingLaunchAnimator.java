@@ -22,7 +22,7 @@ import androidx.annotation.Nullable;
  */
 public final class FloatingLaunchAnimator {
 
-    public static final long RECOMMENDED_LAUNCH_DELAY_MS = 78L;
+    public static final long RECOMMENDED_LAUNCH_DELAY_MS = 120L;
     private static final long MORPH_DURATION_MS = 320L;
     private static final long SCRIM_DURATION_MS = 130L;
     private static final long SOURCE_PRESS_DURATION_MS = 62L;
