@@ -18,8 +18,10 @@ import android.content.pm.ChangedPackages;
 import android.content.pm.PackageManager;
 import android.content.pm.ShortcutInfo;
 import android.net.Uri;
+import android.graphics.Canvas;
 import android.graphics.ColorFilter;
 import android.graphics.ColorMatrixColorFilter;
+import android.graphics.Paint;
 import android.graphics.Point;
 import android.graphics.Rect;
 import android.graphics.RectF;
@@ -103,7 +105,7 @@ public final class SuggestionBarView extends GridLayout {
     private static final int POPUP_MIN_WIDTH_DP = 188;
     private static final int POPUP_MIN_WIDTH_TIGHT_DP = 132;
     private static final float POPUP_MAX_HEIGHT_FACTOR = 0.45f;
-    private static final long APP_LAUNCH_TOUCH_DELAY_MS = 40L;
+    private static final long APP_LAUNCH_TOUCH_DELAY_MS = 56L;
     private static final long PICKUP_DECISION_WINDOW_MS = 650L;
     private static final float PICKUP_X_AXIS_SLOP_FACTOR = 0.9f;
     private static final float PICKUP_Y_INTENT_SLOP_FACTOR = 1.8f;
@@ -3528,72 +3530,28 @@ public final class SuggestionBarView extends GridLayout {
     }
 
     private void applyLaunchBloom(@NonNull View sourceView) {
-        ViewGroup container = findBloomHost(sourceView);
-        if (container == null) {
+        ViewGroup host = findWaveHost(sourceView);
+        if (host == null || host.getWidth() <= 0 || host.getHeight() <= 0) {
             return;
         }
-        ensureUnclipped(container);
-        View glowFill = new View(getContext());
-        View ring = new View(getContext());
-        View outerRing = new View(getContext());
-        int base = inheritedTintColor & 0x00FFFFFF;
-        int highlight = blendColor(base, 0x00FFFFFF, 0.42f);
-        GradientDrawable fill = new GradientDrawable();
-        fill.setShape(GradientDrawable.OVAL);
-        fill.setColor((0xAA << 24) | highlight);
-        glowFill.setBackground(fill);
-        GradientDrawable stroke = new GradientDrawable();
-        stroke.setShape(GradientDrawable.OVAL);
-        stroke.setColor(0x00000000);
-        stroke.setStroke(dp(3), (0xFF << 24) | highlight);
-        ring.setBackground(stroke);
-        GradientDrawable outerStroke = new GradientDrawable();
-        outerStroke.setShape(GradientDrawable.OVAL);
-        outerStroke.setColor(0x00000000);
-        outerStroke.setStroke(dp(2), (0xD8 << 24) | highlight);
-        outerRing.setBackground(outerStroke);
-        int size = Math.max(sourceView.getWidth(), sourceView.getHeight());
-        if (size <= 0) {
-            size = iconSizePx();
-        }
-        int glowSize = Math.round(size * 1.16f);
-        int ringSize = Math.round(size * 0.96f);
-        int outerRingSize = Math.round(size * 1.06f);
-        glowFill.setLayoutParams(new ViewGroup.LayoutParams(glowSize, glowSize));
-        ring.setLayoutParams(new ViewGroup.LayoutParams(ringSize, ringSize));
-        outerRing.setLayoutParams(new ViewGroup.LayoutParams(outerRingSize, outerRingSize));
-        glowFill.setAlpha(0f);
-        ring.setAlpha(0f);
-        outerRing.setAlpha(0f);
+        ensureUnclipped(host);
         int[] srcLoc = new int[2];
-        int[] rootLoc = new int[2];
+        int[] hostLoc = new int[2];
         sourceView.getLocationOnScreen(srcLoc);
-        container.getLocationOnScreen(rootLoc);
-        float cx = (srcLoc[0] - rootLoc[0]) + sourceView.getWidth() / 2f;
-        float cy = (srcLoc[1] - rootLoc[1]) + sourceView.getHeight() / 2f;
-        glowFill.setX(cx - glowSize / 2f);
-        glowFill.setY(cy - glowSize / 2f);
-        ring.setX(cx - ringSize / 2f);
-        ring.setY(cy - ringSize / 2f);
-        outerRing.setX(cx - outerRingSize / 2f);
-        outerRing.setY(cy - outerRingSize / 2f);
-        glowFill.setScaleX(0.84f);
-        glowFill.setScaleY(0.84f);
-        ring.setScaleX(0.84f);
-        ring.setScaleY(0.84f);
-        outerRing.setScaleX(0.95f);
-        outerRing.setScaleY(0.95f);
-        container.addView(glowFill);
-        container.addView(ring);
-        container.addView(outerRing);
+        host.getLocationOnScreen(hostLoc);
+        float cx = (srcLoc[0] - hostLoc[0]) + sourceView.getWidth() / 2f;
+        float cy = (srcLoc[1] - hostLoc[1]) + sourceView.getHeight() * 0.92f;
+        int iconSize = Math.max(Math.max(sourceView.getWidth(), sourceView.getHeight()), iconSizePx());
+        RippleWaveView waveView = new RippleWaveView(getContext(), inheritedTintColor & 0x00FFFFFF);
+        host.addView(waveView, new ViewGroup.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.MATCH_PARENT
+        ));
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            glowFill.setElevation(dp(22));
-            glowFill.setTranslationZ(dp(22));
-            ring.setElevation(dp(24));
-            ring.setTranslationZ(dp(24));
-            outerRing.setElevation(dp(23));
-            outerRing.setTranslationZ(dp(23));
+            waveView.setElevation(dp(25));
+            waveView.setTranslationZ(dp(25));
         }
+        waveView.start(cx, cy, iconSize, () -> host.removeView(waveView));
         sourceView.animate()
             .scaleX(0.94f)
             .scaleY(0.94f)
@@ -3604,52 +3562,6 @@ public final class SuggestionBarView extends GridLayout {
                 .scaleY(1f)
                 .setDuration(140L)
                 .setInterpolator(new OvershootInterpolator(1.28f))
-                .start())
-            .start();
-        glowFill.animate()
-            .alpha(0.50f)
-            .scaleX(1.22f)
-            .scaleY(1.22f)
-            .setDuration(112L)
-            .setInterpolator(new DecelerateInterpolator())
-            .withEndAction(() -> glowFill.animate()
-                .alpha(0f)
-                .scaleX(1.50f)
-                .scaleY(1.50f)
-                .setDuration(140L)
-                .setInterpolator(new LinearInterpolator())
-                .withEndAction(() -> container.removeView(glowFill))
-                .start())
-            .start();
-        ring.animate()
-            .alpha(1f)
-            .scaleX(1.32f)
-            .scaleY(1.32f)
-            .setDuration(126L)
-            .setInterpolator(new DecelerateInterpolator())
-            .withEndAction(() -> ring.animate()
-                .alpha(0f)
-                .scaleX(1.66f)
-                .scaleY(1.66f)
-                .setDuration(148L)
-                .setInterpolator(new LinearInterpolator())
-                .withEndAction(() -> container.removeView(ring))
-                .start())
-            .start();
-        outerRing.animate()
-            .alpha(0.82f)
-            .scaleX(1.38f)
-            .scaleY(1.38f)
-            .setDuration(86L)
-            .setStartDelay(34L)
-            .setInterpolator(new DecelerateInterpolator())
-            .withEndAction(() -> outerRing.animate()
-                .alpha(0f)
-                .scaleX(1.84f)
-                .scaleY(1.84f)
-                .setDuration(144L)
-                .setInterpolator(new LinearInterpolator())
-                .withEndAction(() -> container.removeView(outerRing))
                 .start())
             .start();
     }
@@ -3669,7 +3581,15 @@ public final class SuggestionBarView extends GridLayout {
     }
 
     @Nullable
-    private ViewGroup findBloomHost(@NonNull View sourceView) {
+    private ViewGroup findWaveHost(@NonNull View sourceView) {
+        Context context = getContext();
+        if (context instanceof Activity) {
+            Activity activity = (Activity) context;
+            View prioritized = activity.findViewById(R.id.activity_termux_root_relative_layout);
+            if (prioritized instanceof ViewGroup) {
+                return (ViewGroup) prioritized;
+            }
+        }
         ViewGroup fallback = (sourceView.getParent() instanceof ViewGroup) ? (ViewGroup) sourceView.getParent() : null;
         ViewParent parent = sourceView.getParent();
         while (parent instanceof ViewGroup) {
@@ -3680,6 +3600,118 @@ public final class SuggestionBarView extends GridLayout {
             parent = group.getParent();
         }
         return fallback;
+    }
+
+    private static final class RippleWaveView extends View {
+        private static final long DURATION_MS = 300L;
+
+        private final Paint fillPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint primaryRingPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint secondaryRingPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private float originX;
+        private float originY;
+        private float iconSizePx;
+        private float progress;
+        private float clipTop;
+        @Nullable private ValueAnimator animator;
+
+        RippleWaveView(@NonNull Context context, int tintColor) {
+            super(context);
+            int highlight = blendColor(tintColor, 0x00FFFFFF, 0.46f);
+            fillPaint.setStyle(Paint.Style.FILL);
+            fillPaint.setColor(0xFF000000 | highlight);
+            primaryRingPaint.setStyle(Paint.Style.STROKE);
+            primaryRingPaint.setStrokeWidth(dp(context, 2.6f));
+            primaryRingPaint.setColor(0xFF000000 | highlight);
+            secondaryRingPaint.setStyle(Paint.Style.STROKE);
+            secondaryRingPaint.setStrokeWidth(dp(context, 1.8f));
+            secondaryRingPaint.setColor(0xFF000000 | highlight);
+        }
+
+        void start(float originX, float originY, int iconSizePx, @NonNull Runnable onEnd) {
+            this.originX = originX;
+            this.originY = originY;
+            this.iconSizePx = Math.max(1f, iconSizePx);
+            this.clipTop = originY - this.iconSizePx * 0.22f;
+            if (animator != null) {
+                animator.cancel();
+            }
+            animator = ValueAnimator.ofFloat(0f, 1f);
+            animator.setDuration(DURATION_MS);
+            animator.setInterpolator(new DecelerateInterpolator());
+            animator.addUpdateListener(a -> {
+                progress = (float) a.getAnimatedValue();
+                invalidate();
+            });
+            animator.addListener(new AnimatorListenerAdapter() {
+                private boolean finished = false;
+
+                @Override
+                public void onAnimationEnd(Animator animation) {
+                    finishOnce();
+                }
+
+                @Override
+                public void onAnimationCancel(Animator animation) {
+                    finishOnce();
+                }
+
+                private void finishOnce() {
+                    if (finished) {
+                        return;
+                    }
+                    finished = true;
+                    onEnd.run();
+                }
+            });
+            animator.start();
+        }
+
+        @Override
+        protected void onDetachedFromWindow() {
+            super.onDetachedFromWindow();
+            if (animator != null) {
+                animator.cancel();
+                animator = null;
+            }
+        }
+
+        @Override
+        protected void onDraw(@NonNull Canvas canvas) {
+            super.onDraw(canvas);
+            if (progress <= 0f) {
+                return;
+            }
+            float maxRadius = (float) Math.hypot(getWidth(), getHeight()) * 1.05f;
+            float startRadius = iconSizePx * 0.34f;
+            float waveRadius = lerp(startRadius, maxRadius, progress);
+            float secondProgress = Math.max(0f, (progress - 0.16f) / 0.84f);
+            float secondRadius = lerp(startRadius * 0.72f, maxRadius * 1.12f, secondProgress);
+            float driftY = progress * getHeight() * 0.16f;
+            float cy = originY + driftY;
+
+            canvas.save();
+            canvas.clipRect(0f, clipTop, getWidth(), getHeight());
+            fillPaint.setAlpha(Math.round(112f * (1f - progress) * (1f - progress)));
+            canvas.drawCircle(originX, cy, waveRadius * 0.46f, fillPaint);
+
+            primaryRingPaint.setAlpha(Math.round(205f * (1f - progress)));
+            canvas.drawCircle(originX, cy, waveRadius, primaryRingPaint);
+
+            if (secondProgress > 0f) {
+                secondaryRingPaint.setAlpha(Math.round(176f * (1f - secondProgress)));
+                canvas.drawCircle(originX, cy, secondRadius, secondaryRingPaint);
+            }
+            canvas.restore();
+        }
+
+        private static float lerp(float start, float end, float t) {
+            return start + (end - start) * t;
+        }
+
+        private static float dp(@NonNull Context context, float value) {
+            return Math.max(1f, value * context.getResources().getDisplayMetrics().density);
+        }
     }
 
     private void ensureUnclipped(@NonNull ViewGroup container) {
