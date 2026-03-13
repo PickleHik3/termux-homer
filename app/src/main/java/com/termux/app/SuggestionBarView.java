@@ -3603,11 +3603,13 @@ public final class SuggestionBarView extends GridLayout {
     }
 
     private static final class RippleWaveView extends View {
-        private static final long DURATION_MS = 560L;
+        private static final long DURATION_MS = 920L;
 
         private final Paint fillPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint coreFillPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Paint primaryGlowPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Paint primaryRingPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint trailingGlowPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Paint secondaryGlowPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Paint secondaryRingPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         private float originX;
@@ -3622,20 +3624,26 @@ public final class SuggestionBarView extends GridLayout {
             int highlight = blendColor(tintColor, 0x00FFFFFF, 0.46f);
             fillPaint.setStyle(Paint.Style.FILL);
             fillPaint.setColor(0xFF000000 | highlight);
+            coreFillPaint.setStyle(Paint.Style.FILL);
+            coreFillPaint.setColor(0xFF000000 | highlight);
             primaryGlowPaint.setStyle(Paint.Style.STROKE);
-            primaryGlowPaint.setStrokeWidth(dp(context, 8.5f));
+            primaryGlowPaint.setStrokeWidth(dp(context, 13.8f));
             primaryGlowPaint.setColor(0xFF000000 | highlight);
             primaryGlowPaint.setStrokeCap(Paint.Cap.ROUND);
             primaryRingPaint.setStyle(Paint.Style.STROKE);
-            primaryRingPaint.setStrokeWidth(dp(context, 2.6f));
+            primaryRingPaint.setStrokeWidth(dp(context, 3.2f));
             primaryRingPaint.setColor(0xFF000000 | highlight);
             primaryRingPaint.setStrokeCap(Paint.Cap.ROUND);
+            trailingGlowPaint.setStyle(Paint.Style.STROKE);
+            trailingGlowPaint.setStrokeWidth(dp(context, 18.5f));
+            trailingGlowPaint.setColor(0xFF000000 | highlight);
+            trailingGlowPaint.setStrokeCap(Paint.Cap.ROUND);
             secondaryGlowPaint.setStyle(Paint.Style.STROKE);
-            secondaryGlowPaint.setStrokeWidth(dp(context, 6.2f));
+            secondaryGlowPaint.setStrokeWidth(dp(context, 10.8f));
             secondaryGlowPaint.setColor(0xFF000000 | highlight);
             secondaryGlowPaint.setStrokeCap(Paint.Cap.ROUND);
             secondaryRingPaint.setStyle(Paint.Style.STROKE);
-            secondaryRingPaint.setStrokeWidth(dp(context, 1.8f));
+            secondaryRingPaint.setStrokeWidth(dp(context, 2.4f));
             secondaryRingPaint.setColor(0xFF000000 | highlight);
             secondaryRingPaint.setStrokeCap(Paint.Cap.ROUND);
         }
@@ -3694,31 +3702,38 @@ public final class SuggestionBarView extends GridLayout {
             if (progress <= 0f) {
                 return;
             }
-            float maxRadius = (float) Math.hypot(getWidth(), getHeight()) * 1.05f;
+            float maxRadius = (float) Math.hypot(getWidth(), getHeight()) * 1.06f;
             float startRadius = iconSizePx * 0.34f;
             float waveProgress = smoothstep(0f, 1f, progress);
             float waveRadius = lerp(startRadius, maxRadius, waveProgress);
-            float secondProgress = Math.max(0f, (progress - 0.22f) / 0.78f);
+            float secondProgress = Math.max(0f, (progress - 0.3f) / 0.7f);
             float secondRadius = lerp(startRadius * 0.72f, maxRadius * 1.12f, secondProgress);
-            float driftY = progress * getHeight() * 0.16f;
+            float driftY = smoothstep(0f, 1f, progress) * getHeight() * 0.11f;
             float cy = originY + driftY;
-            float edgeFadePrimary = 1f - smoothstep(0.72f, 1.0f, waveRadius / maxRadius);
-            float edgeFadeSecondary = 1f - smoothstep(0.7f, 1.0f, secondRadius / (maxRadius * 1.12f));
+            float edgeFadePrimary = 1f - smoothstep(0.62f, 1.0f, waveRadius / maxRadius);
+            float edgeFadeSecondary = 1f - smoothstep(0.6f, 1.0f, secondRadius / (maxRadius * 1.12f));
+            float lifeFade = 1f - smoothstep(0.48f, 1.0f, progress);
+            float primaryAlpha = lifeFade * edgeFadePrimary;
+            float secondaryAlpha = lifeFade * edgeFadeSecondary;
 
             canvas.save();
             canvas.clipRect(0f, clipTop, getWidth(), getHeight());
-            fillPaint.setAlpha(Math.round(126f * (1f - progress) * (1f - progress) * edgeFadePrimary));
-            canvas.drawCircle(originX, cy, waveRadius * 0.46f, fillPaint);
+            fillPaint.setAlpha(Math.round(62f * primaryAlpha));
+            canvas.drawCircle(originX, cy, waveRadius * 0.56f, fillPaint);
+            coreFillPaint.setAlpha(Math.round(38f * primaryAlpha));
+            canvas.drawCircle(originX, cy, waveRadius * 0.34f, coreFillPaint);
 
-            primaryGlowPaint.setAlpha(Math.round(96f * (1f - progress) * edgeFadePrimary));
+            trailingGlowPaint.setAlpha(Math.round(52f * primaryAlpha));
+            canvas.drawCircle(originX, cy, waveRadius, trailingGlowPaint);
+            primaryGlowPaint.setAlpha(Math.round(110f * primaryAlpha));
             canvas.drawCircle(originX, cy, waveRadius, primaryGlowPaint);
-            primaryRingPaint.setAlpha(Math.round(168f * (1f - progress) * edgeFadePrimary));
+            primaryRingPaint.setAlpha(Math.round(124f * primaryAlpha));
             canvas.drawCircle(originX, cy, waveRadius, primaryRingPaint);
 
             if (secondProgress > 0f) {
-                secondaryGlowPaint.setAlpha(Math.round(84f * (1f - secondProgress) * edgeFadeSecondary));
+                secondaryGlowPaint.setAlpha(Math.round(86f * secondaryAlpha));
                 canvas.drawCircle(originX, cy, secondRadius, secondaryGlowPaint);
-                secondaryRingPaint.setAlpha(Math.round(142f * (1f - secondProgress) * edgeFadeSecondary));
+                secondaryRingPaint.setAlpha(Math.round(106f * secondaryAlpha));
                 canvas.drawCircle(originX, cy, secondRadius, secondaryRingPaint);
             }
             canvas.restore();
