@@ -3532,7 +3532,7 @@ public final class SuggestionBarView extends GridLayout {
         sourceView.animate().cancel();
         sourceView.setPivotX(sourceView.getWidth() * 0.5f);
         sourceView.setPivotY(sourceView.getHeight());
-        float lift = (float) dp(4.2f);
+        float lift = dp(4.2f);
         sourceView.animate()
             .translationY(-lift)
             .scaleX(1.08f)
@@ -3554,7 +3554,7 @@ public final class SuggestionBarView extends GridLayout {
         final float startTranslationY = sourceView.getTranslationY();
         final float startScaleX = sourceView.getScaleX();
         final float startScaleY = sourceView.getScaleY();
-        final float lift = (float) dp(4.2f);
+        final float lift = dp(4.2f);
         ValueAnimator animator = ValueAnimator.ofFloat(0f, 1f);
         animator.setDuration(760L);
         animator.setInterpolator(new LinearInterpolator());
@@ -3655,6 +3655,10 @@ public final class SuggestionBarView extends GridLayout {
         int perPage = Math.max(1, maxButtonCount);
         if (total <= 0) return 1;
         return (total + perPage - 1) / perPage;
+    }
+
+    private float dp(float value) {
+        return value * getResources().getDisplayMetrics().density;
     }
 
     private int dp(int value) {
