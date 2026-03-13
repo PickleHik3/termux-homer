@@ -18,10 +18,8 @@ import android.content.pm.ChangedPackages;
 import android.content.pm.PackageManager;
 import android.content.pm.ShortcutInfo;
 import android.net.Uri;
-import android.graphics.Canvas;
 import android.graphics.ColorFilter;
 import android.graphics.ColorMatrixColorFilter;
-import android.graphics.Paint;
 import android.graphics.Point;
 import android.graphics.Rect;
 import android.graphics.RectF;
@@ -48,10 +46,8 @@ import android.view.ViewConfiguration;
 import android.view.ViewGroup;
 import android.view.ViewParent;
 import android.view.WindowManager;
-import android.view.animation.AccelerateInterpolator;
 import android.view.animation.DecelerateInterpolator;
 import android.view.animation.LinearInterpolator;
-import android.view.animation.OvershootInterpolator;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
@@ -94,6 +90,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.WeakHashMap;
 import java.lang.ref.WeakReference;
 
 public final class SuggestionBarView extends GridLayout {
@@ -105,7 +102,7 @@ public final class SuggestionBarView extends GridLayout {
     private static final int POPUP_MIN_WIDTH_DP = 188;
     private static final int POPUP_MIN_WIDTH_TIGHT_DP = 132;
     private static final float POPUP_MAX_HEIGHT_FACTOR = 0.45f;
-    private static final long APP_LAUNCH_TOUCH_DELAY_MS = 56L;
+    private static final long APP_LAUNCH_TOUCH_DELAY_MS = 120L;
     private static final long PICKUP_DECISION_WINDOW_MS = 650L;
     private static final float PICKUP_X_AXIS_SLOP_FACTOR = 0.9f;
     private static final float PICKUP_Y_INTENT_SLOP_FACTOR = 1.8f;
@@ -127,6 +124,7 @@ public final class SuggestionBarView extends GridLayout {
     private List<String> defaultButtonStrings = new ArrayList<>();
     private final Map<String, WeakReference<View>> launchTargetViews = new HashMap<>();
     private final Map<String, WeakReference<View>> launchTargetViewsByPackage = new HashMap<>();
+    private final Map<View, ValueAnimator> launchTouchAnimators = new WeakHashMap<>();
 
     private LauncherAppDataProvider appDataProvider;
     private LauncherConfigRepository configRepository;
@@ -834,11 +832,7 @@ public final class SuggestionBarView extends GridLayout {
 
     private void launchEntryFromTouch(@NonNull View sourceView, @NonNull LauncherAppEntry entry, @Nullable TerminalView terminalView) {
         boolean touchAnimation = shouldUseTouchLaunchAnimation(sourceView);
-        long launchDelay = 0L;
-        if (touchAnimation) {
-            applyLaunchBloom(sourceView);
-            launchDelay = APP_LAUNCH_TOUCH_DELAY_MS;
-        }
+        long launchDelay = touchAnimation ? APP_LAUNCH_TOUCH_DELAY_MS : 0L;
         sourceView.postDelayed(() -> launchEntry(entry, terminalView, touchAnimation ? sourceView : null), launchDelay);
     }
 
@@ -1850,6 +1844,7 @@ public final class SuggestionBarView extends GridLayout {
             if (event == null) return false;
             int action = event.getActionMasked();
             if (action == MotionEvent.ACTION_DOWN) {
+                animateLaunchPressDown(pressTarget);
                 activeLongPressPickupState = new LongPressPickupState(
                     pressTarget,
                     pinnedIndex,
@@ -1899,6 +1894,7 @@ public final class SuggestionBarView extends GridLayout {
                     return true;
                 }
             } else if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) {
+                animateLaunchReleaseBounce(pressTarget);
                 LongPressPickupState state = activeLongPressPickupState;
                 if (state != null && state.sourceView == pressTarget) {
                     if (action == MotionEvent.ACTION_UP && state.menuShown && !state.dragStarted) {
@@ -2178,7 +2174,6 @@ public final class SuggestionBarView extends GridLayout {
         boolean touchAnimation = shouldUseTouchLaunchAnimation(sourceView);
         long launchDelay = 0L;
         if (touchAnimation && sourceView != null) {
-            applyLaunchBloom(sourceView);
             launchDelay = APP_LAUNCH_TOUCH_DELAY_MS;
         }
         Runnable launcherRunnable = () -> doLaunchShortcut(shortcutInfo, touchAnimation ? sourceView : null);
@@ -3529,241 +3524,93 @@ public final class SuggestionBarView extends GridLayout {
         return sourceView != null;
     }
 
-    private void applyLaunchBloom(@NonNull View sourceView) {
-        ViewGroup host = findWaveHost(sourceView);
-        if (host == null || host.getWidth() <= 0 || host.getHeight() <= 0) {
+    private void animateLaunchPressDown(@NonNull View sourceView) {
+        if (sourceView.getWidth() <= 0 || sourceView.getHeight() <= 0) {
             return;
         }
-        ensureUnclipped(host);
-        int[] srcLoc = new int[2];
-        int[] hostLoc = new int[2];
-        sourceView.getLocationOnScreen(srcLoc);
-        host.getLocationOnScreen(hostLoc);
-        float cx = (srcLoc[0] - hostLoc[0]) + sourceView.getWidth() / 2f;
-        float cy = (srcLoc[1] - hostLoc[1]) + sourceView.getHeight() * 0.92f;
-        int iconSize = Math.max(Math.max(sourceView.getWidth(), sourceView.getHeight()), iconSizePx());
-        RippleWaveView waveView = new RippleWaveView(getContext(), inheritedTintColor & 0x00FFFFFF);
-        host.addView(waveView, new ViewGroup.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT,
-            ViewGroup.LayoutParams.MATCH_PARENT
-        ));
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            waveView.setElevation(dp(25));
-            waveView.setTranslationZ(dp(25));
-        }
-        waveView.start(cx, cy, iconSize, () -> host.removeView(waveView));
+        cancelLaunchTouchAnimator(sourceView);
+        sourceView.animate().cancel();
+        sourceView.setPivotX(sourceView.getWidth() * 0.5f);
+        sourceView.setPivotY(sourceView.getHeight());
+        float lift = dp(4.2f);
         sourceView.animate()
-            .scaleX(0.94f)
-            .scaleY(0.94f)
-            .setDuration(56L)
-            .setInterpolator(new AccelerateInterpolator())
-            .withEndAction(() -> sourceView.animate()
-                .scaleX(1f)
-                .scaleY(1f)
-                .setDuration(140L)
-                .setInterpolator(new OvershootInterpolator(1.28f))
-                .start())
+            .translationY(-lift)
+            .scaleX(1.08f)
+            .scaleY(1.08f)
+            .setDuration(120L)
+            .setInterpolator(new DecelerateInterpolator())
             .start();
     }
 
-    private static int blendColor(int colorA, int colorB, float ratio) {
-        float t = Math.max(0f, Math.min(1f, ratio));
-        int ar = (colorA >> 16) & 0xFF;
-        int ag = (colorA >> 8) & 0xFF;
-        int ab = colorA & 0xFF;
-        int br = (colorB >> 16) & 0xFF;
-        int bg = (colorB >> 8) & 0xFF;
-        int bb = colorB & 0xFF;
-        int rr = Math.round(ar + (br - ar) * t);
-        int rg = Math.round(ag + (bg - ag) * t);
-        int rb = Math.round(ab + (bb - ab) * t);
-        return (rr << 16) | (rg << 8) | rb;
+    private void animateLaunchReleaseBounce(@NonNull View sourceView) {
+        if (sourceView.getWidth() <= 0 || sourceView.getHeight() <= 0) {
+            return;
+        }
+        cancelLaunchTouchAnimator(sourceView);
+        sourceView.animate().cancel();
+        sourceView.setPivotX(sourceView.getWidth() * 0.5f);
+        sourceView.setPivotY(sourceView.getHeight());
+
+        final float startTranslationY = sourceView.getTranslationY();
+        final float startScaleX = sourceView.getScaleX();
+        final float startScaleY = sourceView.getScaleY();
+        final float lift = dp(4.2f);
+        ValueAnimator animator = ValueAnimator.ofFloat(0f, 1f);
+        animator.setDuration(760L);
+        animator.setInterpolator(new LinearInterpolator());
+        animator.addUpdateListener(a -> {
+            float t = (float) a.getAnimatedValue();
+            float decay = (float) Math.exp(-3.9f * t);
+            float wave = (float) Math.cos((float) (Math.PI * 4.65f * t));
+            float simulatedY = -lift * decay * wave;
+            float latch = Math.max(0f, Math.min(1f, t / 0.12f));
+            float translationY = startTranslationY + ((simulatedY - startTranslationY) * latch);
+            float impact = clamp01(translationY / lift);
+            float stretch = clamp01((-translationY) / lift);
+            float carry = (1f - Math.max(0f, Math.min(1f, t / 0.2f)));
+            float carryScaleX = 1f + ((startScaleX - 1f) * carry);
+            float carryScaleY = 1f + ((startScaleY - 1f) * carry);
+
+            float targetScaleX = 1f + (0.085f * impact) - (0.018f * stretch);
+            float targetScaleY = 1f - (0.108f * impact) + (0.03f * stretch);
+            sourceView.setTranslationY(translationY);
+            sourceView.setScaleX(lerp(carryScaleX, targetScaleX, 1f - carry));
+            sourceView.setScaleY(lerp(carryScaleY, targetScaleY, 1f - carry));
+        });
+        animator.addListener(new AnimatorListenerAdapter() {
+            @Override
+            public void onAnimationEnd(Animator animation) {
+                launchTouchAnimators.remove(sourceView);
+                sourceView.setTranslationY(0f);
+                sourceView.setScaleX(1f);
+                sourceView.setScaleY(1f);
+            }
+
+            @Override
+            public void onAnimationCancel(Animator animation) {
+                launchTouchAnimators.remove(sourceView);
+                sourceView.setTranslationY(0f);
+                sourceView.setScaleX(1f);
+                sourceView.setScaleY(1f);
+            }
+        });
+        launchTouchAnimators.put(sourceView, animator);
+        animator.start();
     }
 
-    @Nullable
-    private ViewGroup findWaveHost(@NonNull View sourceView) {
-        Context context = getContext();
-        if (context instanceof Activity) {
-            Activity activity = (Activity) context;
-            View prioritized = activity.findViewById(R.id.activity_termux_root_relative_layout);
-            if (prioritized instanceof ViewGroup) {
-                return (ViewGroup) prioritized;
-            }
-        }
-        ViewGroup fallback = (sourceView.getParent() instanceof ViewGroup) ? (ViewGroup) sourceView.getParent() : null;
-        ViewParent parent = sourceView.getParent();
-        while (parent instanceof ViewGroup) {
-            ViewGroup group = (ViewGroup) parent;
-            if (group.getWidth() > sourceView.getWidth() * 3 && group.getHeight() > sourceView.getHeight() * 3) {
-                fallback = group;
-            }
-            parent = group.getParent();
-        }
-        return fallback;
-    }
-
-    private static final class RippleWaveView extends View {
-        private static final long DURATION_MS = 920L;
-
-        private final Paint fillPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        private final Paint coreFillPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        private final Paint primaryGlowPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        private final Paint primaryRingPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        private final Paint trailingGlowPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        private final Paint secondaryGlowPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        private final Paint secondaryRingPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        private float originX;
-        private float originY;
-        private float iconSizePx;
-        private float progress;
-        private float clipTop;
-        @Nullable private ValueAnimator animator;
-
-        RippleWaveView(@NonNull Context context, int tintColor) {
-            super(context);
-            int highlight = blendColor(tintColor, 0x00FFFFFF, 0.46f);
-            fillPaint.setStyle(Paint.Style.FILL);
-            fillPaint.setColor(0xFF000000 | highlight);
-            coreFillPaint.setStyle(Paint.Style.FILL);
-            coreFillPaint.setColor(0xFF000000 | highlight);
-            primaryGlowPaint.setStyle(Paint.Style.STROKE);
-            primaryGlowPaint.setStrokeWidth(dp(context, 13.8f));
-            primaryGlowPaint.setColor(0xFF000000 | highlight);
-            primaryGlowPaint.setStrokeCap(Paint.Cap.ROUND);
-            primaryRingPaint.setStyle(Paint.Style.STROKE);
-            primaryRingPaint.setStrokeWidth(dp(context, 3.2f));
-            primaryRingPaint.setColor(0xFF000000 | highlight);
-            primaryRingPaint.setStrokeCap(Paint.Cap.ROUND);
-            trailingGlowPaint.setStyle(Paint.Style.STROKE);
-            trailingGlowPaint.setStrokeWidth(dp(context, 18.5f));
-            trailingGlowPaint.setColor(0xFF000000 | highlight);
-            trailingGlowPaint.setStrokeCap(Paint.Cap.ROUND);
-            secondaryGlowPaint.setStyle(Paint.Style.STROKE);
-            secondaryGlowPaint.setStrokeWidth(dp(context, 10.8f));
-            secondaryGlowPaint.setColor(0xFF000000 | highlight);
-            secondaryGlowPaint.setStrokeCap(Paint.Cap.ROUND);
-            secondaryRingPaint.setStyle(Paint.Style.STROKE);
-            secondaryRingPaint.setStrokeWidth(dp(context, 2.4f));
-            secondaryRingPaint.setColor(0xFF000000 | highlight);
-            secondaryRingPaint.setStrokeCap(Paint.Cap.ROUND);
-        }
-
-        void start(float originX, float originY, int iconSizePx, @NonNull Runnable onEnd) {
-            this.originX = originX;
-            this.originY = originY;
-            this.iconSizePx = Math.max(1f, iconSizePx);
-            this.clipTop = originY - this.iconSizePx * 0.22f;
-            if (animator != null) {
-                animator.cancel();
-            }
-            animator = ValueAnimator.ofFloat(0f, 1f);
-            animator.setDuration(DURATION_MS);
-            animator.setInterpolator(new LinearInterpolator());
-            animator.addUpdateListener(a -> {
-                progress = (float) a.getAnimatedValue();
-                invalidate();
-            });
-            animator.addListener(new AnimatorListenerAdapter() {
-                private boolean finished = false;
-
-                @Override
-                public void onAnimationEnd(Animator animation) {
-                    finishOnce();
-                }
-
-                @Override
-                public void onAnimationCancel(Animator animation) {
-                    finishOnce();
-                }
-
-                private void finishOnce() {
-                    if (finished) {
-                        return;
-                    }
-                    finished = true;
-                    onEnd.run();
-                }
-            });
-            animator.start();
-        }
-
-        @Override
-        protected void onDetachedFromWindow() {
-            super.onDetachedFromWindow();
-            if (animator != null) {
-                animator.cancel();
-                animator = null;
-            }
-        }
-
-        @Override
-        protected void onDraw(@NonNull Canvas canvas) {
-            super.onDraw(canvas);
-            if (progress <= 0f) {
-                return;
-            }
-            float maxRadius = (float) Math.hypot(getWidth(), getHeight()) * 1.06f;
-            float startRadius = iconSizePx * 0.34f;
-            float waveProgress = smoothstep(0f, 1f, progress);
-            float waveRadius = lerp(startRadius, maxRadius, waveProgress);
-            float secondProgress = Math.max(0f, (progress - 0.3f) / 0.7f);
-            float secondRadius = lerp(startRadius * 0.72f, maxRadius * 1.12f, secondProgress);
-            float driftY = smoothstep(0f, 1f, progress) * getHeight() * 0.11f;
-            float cy = originY + driftY;
-            float edgeFadePrimary = 1f - smoothstep(0.62f, 1.0f, waveRadius / maxRadius);
-            float edgeFadeSecondary = 1f - smoothstep(0.6f, 1.0f, secondRadius / (maxRadius * 1.12f));
-            float lifeFade = 1f - smoothstep(0.48f, 1.0f, progress);
-            float primaryAlpha = lifeFade * edgeFadePrimary;
-            float secondaryAlpha = lifeFade * edgeFadeSecondary;
-
-            canvas.save();
-            canvas.clipRect(0f, clipTop, getWidth(), getHeight());
-            fillPaint.setAlpha(Math.round(62f * primaryAlpha));
-            canvas.drawCircle(originX, cy, waveRadius * 0.56f, fillPaint);
-            coreFillPaint.setAlpha(Math.round(38f * primaryAlpha));
-            canvas.drawCircle(originX, cy, waveRadius * 0.34f, coreFillPaint);
-
-            trailingGlowPaint.setAlpha(Math.round(52f * primaryAlpha));
-            canvas.drawCircle(originX, cy, waveRadius, trailingGlowPaint);
-            primaryGlowPaint.setAlpha(Math.round(110f * primaryAlpha));
-            canvas.drawCircle(originX, cy, waveRadius, primaryGlowPaint);
-            primaryRingPaint.setAlpha(Math.round(124f * primaryAlpha));
-            canvas.drawCircle(originX, cy, waveRadius, primaryRingPaint);
-
-            if (secondProgress > 0f) {
-                secondaryGlowPaint.setAlpha(Math.round(86f * secondaryAlpha));
-                canvas.drawCircle(originX, cy, secondRadius, secondaryGlowPaint);
-                secondaryRingPaint.setAlpha(Math.round(106f * secondaryAlpha));
-                canvas.drawCircle(originX, cy, secondRadius, secondaryRingPaint);
-            }
-            canvas.restore();
-        }
-
-        private static float lerp(float start, float end, float t) {
-            return start + (end - start) * t;
-        }
-
-        private static float smoothstep(float edge0, float edge1, float x) {
-            float t = (x - edge0) / (edge1 - edge0);
-            t = Math.max(0f, Math.min(1f, t));
-            return t * t * (3f - 2f * t);
-        }
-
-        private static float dp(@NonNull Context context, float value) {
-            return Math.max(1f, value * context.getResources().getDisplayMetrics().density);
+    private void cancelLaunchTouchAnimator(@NonNull View sourceView) {
+        ValueAnimator animator = launchTouchAnimators.remove(sourceView);
+        if (animator != null) {
+            animator.cancel();
         }
     }
 
-    private void ensureUnclipped(@NonNull ViewGroup container) {
-        ViewParent p = container;
-        int hops = 0;
-        while (p instanceof ViewGroup && hops < 4) {
-            ViewGroup g = (ViewGroup) p;
-            g.setClipChildren(false);
-            g.setClipToPadding(false);
-            p = g.getParent();
-            hops++;
-        }
+    private static float lerp(float start, float end, float t) {
+        return start + ((end - start) * t);
+    }
+
+    private static float clamp01(float value) {
+        return Math.max(0f, Math.min(1f, value));
     }
 
     private int computeFolderPopupIconSize(int rows, int cols, int screenW, int screenH) {
