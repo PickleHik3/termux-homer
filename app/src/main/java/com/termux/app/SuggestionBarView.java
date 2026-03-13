@@ -3603,10 +3603,12 @@ public final class SuggestionBarView extends GridLayout {
     }
 
     private static final class RippleWaveView extends View {
-        private static final long DURATION_MS = 300L;
+        private static final long DURATION_MS = 560L;
 
         private final Paint fillPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint primaryGlowPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Paint primaryRingPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint secondaryGlowPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Paint secondaryRingPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         private float originX;
         private float originY;
@@ -3620,12 +3622,22 @@ public final class SuggestionBarView extends GridLayout {
             int highlight = blendColor(tintColor, 0x00FFFFFF, 0.46f);
             fillPaint.setStyle(Paint.Style.FILL);
             fillPaint.setColor(0xFF000000 | highlight);
+            primaryGlowPaint.setStyle(Paint.Style.STROKE);
+            primaryGlowPaint.setStrokeWidth(dp(context, 8.5f));
+            primaryGlowPaint.setColor(0xFF000000 | highlight);
+            primaryGlowPaint.setStrokeCap(Paint.Cap.ROUND);
             primaryRingPaint.setStyle(Paint.Style.STROKE);
             primaryRingPaint.setStrokeWidth(dp(context, 2.6f));
             primaryRingPaint.setColor(0xFF000000 | highlight);
+            primaryRingPaint.setStrokeCap(Paint.Cap.ROUND);
+            secondaryGlowPaint.setStyle(Paint.Style.STROKE);
+            secondaryGlowPaint.setStrokeWidth(dp(context, 6.2f));
+            secondaryGlowPaint.setColor(0xFF000000 | highlight);
+            secondaryGlowPaint.setStrokeCap(Paint.Cap.ROUND);
             secondaryRingPaint.setStyle(Paint.Style.STROKE);
             secondaryRingPaint.setStrokeWidth(dp(context, 1.8f));
             secondaryRingPaint.setColor(0xFF000000 | highlight);
+            secondaryRingPaint.setStrokeCap(Paint.Cap.ROUND);
         }
 
         void start(float originX, float originY, int iconSizePx, @NonNull Runnable onEnd) {
@@ -3638,7 +3650,7 @@ public final class SuggestionBarView extends GridLayout {
             }
             animator = ValueAnimator.ofFloat(0f, 1f);
             animator.setDuration(DURATION_MS);
-            animator.setInterpolator(new DecelerateInterpolator());
+            animator.setInterpolator(new LinearInterpolator());
             animator.addUpdateListener(a -> {
                 progress = (float) a.getAnimatedValue();
                 invalidate();
@@ -3684,22 +3696,29 @@ public final class SuggestionBarView extends GridLayout {
             }
             float maxRadius = (float) Math.hypot(getWidth(), getHeight()) * 1.05f;
             float startRadius = iconSizePx * 0.34f;
-            float waveRadius = lerp(startRadius, maxRadius, progress);
-            float secondProgress = Math.max(0f, (progress - 0.16f) / 0.84f);
+            float waveProgress = smoothstep(0f, 1f, progress);
+            float waveRadius = lerp(startRadius, maxRadius, waveProgress);
+            float secondProgress = Math.max(0f, (progress - 0.22f) / 0.78f);
             float secondRadius = lerp(startRadius * 0.72f, maxRadius * 1.12f, secondProgress);
             float driftY = progress * getHeight() * 0.16f;
             float cy = originY + driftY;
+            float edgeFadePrimary = 1f - smoothstep(0.72f, 1.0f, waveRadius / maxRadius);
+            float edgeFadeSecondary = 1f - smoothstep(0.7f, 1.0f, secondRadius / (maxRadius * 1.12f));
 
             canvas.save();
             canvas.clipRect(0f, clipTop, getWidth(), getHeight());
-            fillPaint.setAlpha(Math.round(112f * (1f - progress) * (1f - progress)));
+            fillPaint.setAlpha(Math.round(126f * (1f - progress) * (1f - progress) * edgeFadePrimary));
             canvas.drawCircle(originX, cy, waveRadius * 0.46f, fillPaint);
 
-            primaryRingPaint.setAlpha(Math.round(205f * (1f - progress)));
+            primaryGlowPaint.setAlpha(Math.round(96f * (1f - progress) * edgeFadePrimary));
+            canvas.drawCircle(originX, cy, waveRadius, primaryGlowPaint);
+            primaryRingPaint.setAlpha(Math.round(168f * (1f - progress) * edgeFadePrimary));
             canvas.drawCircle(originX, cy, waveRadius, primaryRingPaint);
 
             if (secondProgress > 0f) {
-                secondaryRingPaint.setAlpha(Math.round(176f * (1f - secondProgress)));
+                secondaryGlowPaint.setAlpha(Math.round(84f * (1f - secondProgress) * edgeFadeSecondary));
+                canvas.drawCircle(originX, cy, secondRadius, secondaryGlowPaint);
+                secondaryRingPaint.setAlpha(Math.round(142f * (1f - secondProgress) * edgeFadeSecondary));
                 canvas.drawCircle(originX, cy, secondRadius, secondaryRingPaint);
             }
             canvas.restore();
@@ -3707,6 +3726,12 @@ public final class SuggestionBarView extends GridLayout {
 
         private static float lerp(float start, float end, float t) {
             return start + (end - start) * t;
+        }
+
+        private static float smoothstep(float edge0, float edge1, float x) {
+            float t = (x - edge0) / (edge1 - edge0);
+            t = Math.max(0f, Math.min(1f, t));
+            return t * t * (3f - 2f * t);
         }
 
         private static float dp(@NonNull Context context, float value) {
