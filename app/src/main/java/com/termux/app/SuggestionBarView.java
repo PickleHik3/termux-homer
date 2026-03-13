@@ -158,6 +158,43 @@ public final class SuggestionBarView extends GridLayout {
     private int activeMenuTintBase = (0xFF202020 & 0x00FFFFFF);
     @Nullable private TextView shortcutsMainRowView;
     private final Runnable azResetRunnable = this::clearAzPreviewWithFade;
+    private final Map<Integer, LauncherAppEntry> azRenderedSlotEntries = new HashMap<>();
+    private final Map<String, WeakReference<View>> azRenderedEntryTargets = new HashMap<>();
+    private int azRenderedSlotCount = 0;
+    private boolean azPreviewRendered = false;
+
+    public static final int AZ_EDGE_NONE = 0;
+    public static final int AZ_EDGE_LEFT = -1;
+    public static final int AZ_EDGE_RIGHT = 1;
+
+    public static final class AzDragFocusResult {
+        @Nullable public final LauncherAppEntry entry;
+        @Nullable public final RectF iconBounds;
+        @Nullable public final View launchView;
+        public final int edge;
+        public final boolean canPageLeft;
+        public final boolean canPageRight;
+
+        AzDragFocusResult(
+            @Nullable LauncherAppEntry entry,
+            @Nullable RectF iconBounds,
+            @Nullable View launchView,
+            int edge,
+            boolean canPageLeft,
+            boolean canPageRight
+        ) {
+            this.entry = entry;
+            this.iconBounds = iconBounds;
+            this.launchView = launchView;
+            this.edge = edge;
+            this.canPageLeft = canPageLeft;
+            this.canPageRight = canPageRight;
+        }
+
+        public boolean hasFocusEntry() {
+            return entry != null;
+        }
+    }
 
     public SuggestionBarView(Context context, AttributeSet attrs) {
         super(context, attrs);
@@ -309,6 +346,96 @@ public final class SuggestionBarView extends GridLayout {
             letters.add('#');
         }
         return letters;
+    }
+
+    public boolean isAzPreviewActive() {
+        return activeAzLetter != null && activeAzCandidates != null && !activeAzCandidates.isEmpty();
+    }
+
+    public boolean hasAzOverflowPages() {
+        return isAzPreviewActive() && getAzPagesCount() > 1;
+    }
+
+    public boolean canAzPageLeft() {
+        return hasAzOverflowPages() && activeAzPageIndex > 0;
+    }
+
+    public boolean canAzPageRight() {
+        return hasAzOverflowPages() && activeAzPageIndex < (getAzPagesCount() - 1);
+    }
+
+    public boolean requestAzPageDelta(int pageDelta, float velocityPxPerSec) {
+        if (!isAzPreviewActive() || pageDelta == 0 || pageSwitchAnimating) {
+            return false;
+        }
+        int totalPages = getAzPagesCount();
+        if (totalPages <= 1) {
+            return false;
+        }
+        int targetPage = clamp(activeAzPageIndex + pageDelta, 0, totalPages - 1);
+        if (targetPage == activeAzPageIndex) {
+            return false;
+        }
+        animateAzPageSwitch(pageDelta, velocityPxPerSec);
+        return true;
+    }
+
+    public AzDragFocusResult resolveAzDragFocus(float rawX, float rawY) {
+        boolean pageLeft = canAzPageLeft();
+        boolean pageRight = canAzPageRight();
+        if (!isAzPreviewActive() || !azPreviewRendered || azRenderedSlotCount <= 0) {
+            return new AzDragFocusResult(null, null, null, AZ_EDGE_NONE, pageLeft, pageRight);
+        }
+
+        int[] location = new int[2];
+        getLocationOnScreen(location);
+        float localX = rawX - location[0];
+        float localY = rawY - location[1];
+        float width = Math.max(1f, getWidth());
+        float height = Math.max(1f, getHeight());
+
+        int edge = AZ_EDGE_NONE;
+        float edgeZone = Math.max(dp(20), width * 0.08f);
+        if (localX <= edgeZone && pageLeft) {
+            edge = AZ_EDGE_LEFT;
+        } else if (localX >= (width - edgeZone) && pageRight) {
+            edge = AZ_EDGE_RIGHT;
+        }
+
+        if (localY < -dp(10) || localY > height + dp(12)) {
+            return new AzDragFocusResult(null, null, null, edge, pageLeft, pageRight);
+        }
+
+        int slot = clamp((int) ((Math.max(0f, Math.min(width - 1f, localX)) / width) * azRenderedSlotCount), 0, azRenderedSlotCount - 1);
+        LauncherAppEntry entry = azRenderedSlotEntries.get(slot);
+        if (entry == null) {
+            return new AzDragFocusResult(null, null, null, edge, pageLeft, pageRight);
+        }
+
+        String key = stableEntryKey(entry);
+        WeakReference<View> viewRef = azRenderedEntryTargets.get(key);
+        View launchView = viewRef == null ? null : viewRef.get();
+        RectF bounds = null;
+        if (launchView != null && launchView.isAttachedToWindow()) {
+            int[] viewLoc = new int[2];
+            launchView.getLocationOnScreen(viewLoc);
+            bounds = new RectF(
+                viewLoc[0],
+                viewLoc[1],
+                viewLoc[0] + launchView.getWidth(),
+                viewLoc[1] + launchView.getHeight()
+            );
+        }
+        return new AzDragFocusResult(entry, bounds, launchView, edge, pageLeft, pageRight);
+    }
+
+    public boolean launchAzFocusedEntry(@Nullable AzDragFocusResult focusResult) {
+        if (focusResult == null || focusResult.entry == null) {
+            return false;
+        }
+        launchEntry(focusResult.entry, lastTerminalView, focusResult.launchView);
+        clearAzPreview();
+        return true;
     }
 
     public void clearAzPreview() {
@@ -501,6 +628,10 @@ public final class SuggestionBarView extends GridLayout {
         removeAllViews();
         launchTargetViews.clear();
         launchTargetViewsByPackage.clear();
+        azRenderedSlotEntries.clear();
+        azRenderedEntryTargets.clear();
+        azRenderedSlotCount = 0;
+        azPreviewRendered = azPreview;
         int buttonCount = Math.max(1, maxButtonCount);
         int renderStartCol = 0;
         List<PinnedItem> pinnedForSlots = new ArrayList<>();
@@ -544,6 +675,9 @@ public final class SuggestionBarView extends GridLayout {
             pinnedPageIndex = 0;
         }
         setColumnCount(buttonCount);
+        if (azPreview) {
+            azRenderedSlotCount = buttonCount;
+        }
 
         boolean[] usedColumns = new boolean[Math.max(1, buttonCount)];
         for (int col = 0; col < entries.size() && col < buttonCount; col++) {
@@ -571,6 +705,12 @@ public final class SuggestionBarView extends GridLayout {
             } else {
                 View pressTarget = resolvePrimaryPressTarget(view);
                 bindAppContextLongPress(pressTarget, entry, -1, null, null, false);
+            }
+
+            View dragTarget = resolvePrimaryPressTarget(view);
+            if (azPreview && renderCol >= 0 && renderCol < buttonCount) {
+                azRenderedSlotEntries.put(renderCol, entry);
+                azRenderedEntryTargets.put(stableEntryKey(entry), new WeakReference<>(dragTarget));
             }
 
             addView(view);
@@ -3611,6 +3751,11 @@ public final class SuggestionBarView extends GridLayout {
 
     private static float clamp01(float value) {
         return Math.max(0f, Math.min(1f, value));
+    }
+
+    @NonNull
+    private static String stableEntryKey(@NonNull LauncherAppEntry entry) {
+        return entry.appRef.stableId();
     }
 
     private int computeFolderPopupIconSize(int rows, int cols, int screenW, int screenH) {

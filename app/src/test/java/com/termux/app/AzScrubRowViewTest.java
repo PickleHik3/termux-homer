@@ -34,10 +34,10 @@ public class AzScrubRowViewTest {
 
         view.setScrubCallback(new AzScrubRowView.ScrubCallback() {
             @Override
-            public void onScrub(char letter, int selectionIndex, boolean commit) {
+            public void onScrub(char letter, int selectionIndex, float touchX, float touchY, float rawX, float rawY, AzScrubRowView.GesturePhase phase) {
                 lastLetter[0] = letter;
                 lastSelection[0] = selectionIndex;
-                committed[0] = commit;
+                committed[0] = (phase == AzScrubRowView.GesturePhase.UP);
             }
 
             @Override
@@ -60,6 +60,6 @@ public class AzScrubRowViewTest {
         assertFalse(committed[0]);
 
         view.onTouchEvent(MotionEvent.obtain(0, 40, MotionEvent.ACTION_UP, 200f, -40f, 0));
-        assertFalse(committed[0]);
+        assertTrue(committed[0]);
     }
 }

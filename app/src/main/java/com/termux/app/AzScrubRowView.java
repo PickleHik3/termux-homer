@@ -19,8 +19,14 @@ import java.util.LinkedHashSet;
 import java.util.Set;
 
 public final class AzScrubRowView extends AppCompatTextView {
+    public enum GesturePhase {
+        DOWN,
+        MOVE,
+        UP
+    }
+
     public interface ScrubCallback {
-        void onScrub(char letter, int selectionIndex, boolean commit);
+        void onScrub(char letter, int selectionIndex, float touchX, float touchY, float rawX, float rawY, @NonNull GesturePhase phase);
         void onCancel();
         default void onDoubleTap() {}
     }
@@ -198,20 +204,20 @@ public final class AzScrubRowView extends AppCompatTextView {
                     return true;
                 }
                 suppressUpScrub = false;
-                callback.onScrub(letter, currentSelectionIndex, false);
+                callback.onScrub(letter, currentSelectionIndex, event.getX(), event.getY(), event.getRawX(), event.getRawY(), GesturePhase.DOWN);
                 return true;
             case MotionEvent.ACTION_MOVE:
                 activeTouchX = x;
                 waveStrength = 1f;
                 updateInteractionLayerOffset();
                 invalidate();
-                callback.onScrub(letter, currentSelectionIndex, false);
+                callback.onScrub(letter, currentSelectionIndex, event.getX(), event.getY(), event.getRawX(), event.getRawY(), GesturePhase.MOVE);
                 return true;
             case MotionEvent.ACTION_UP:
                 lastTapUpTimeMs = event.getEventTime();
                 lastTapUpX = x;
                 if (!suppressUpScrub) {
-                    callback.onScrub(letter, currentSelectionIndex, false);
+                    callback.onScrub(letter, currentSelectionIndex, event.getX(), event.getY(), event.getRawX(), event.getRawY(), GesturePhase.UP);
                 }
                 suppressUpScrub = false;
                 animateWaveRelease();
