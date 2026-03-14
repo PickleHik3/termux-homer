@@ -46,6 +46,7 @@ public final class LauncherAzGestureFxView extends View {
     private final int[] locationOnScreen = new int[2];
 
     private int glassTintColor = 0xFF86A7FF;
+    private int vividLetterTintColor = 0xFF9AB8FF;
     private int edgeTintColor = 0xFF7CE2FF;
 
     private boolean dragActive;
@@ -110,6 +111,7 @@ public final class LauncherAzGestureFxView extends View {
 
     public void setColors(int glassTintColor, int edgeTintColor) {
         this.glassTintColor = enforceGlassVisibility(glassTintColor, 0.78f);
+        this.vividLetterTintColor = boostColor(this.glassTintColor, 1.20f, 1.08f);
         this.edgeTintColor = enforceGlassVisibility(edgeTintColor, 0.84f);
         invalidate();
     }
@@ -124,6 +126,7 @@ public final class LauncherAzGestureFxView extends View {
         @Nullable RectF focusedBoundsRaw,
         @NonNull InteractionMode mode
     ) {
+        boolean wasActive = dragActive;
         dragActive = active;
         targetRawX = rawX;
         targetRawY = rawY;
@@ -137,6 +140,17 @@ public final class LauncherAzGestureFxView extends View {
             focusRawRect.set(focusedBoundsRaw);
         } else {
             hasFocus = false;
+        }
+
+        if (active && !wasActive) {
+            if (mode == InteractionMode.LETTER_TRACK && focusedBoundsRaw != null && !focusedBoundsRaw.isEmpty()) {
+                displayRawX = focusedBoundsRaw.centerX();
+                displayRawY = focusedBoundsRaw.centerY();
+            } else {
+                displayRawX = rawX;
+                displayRawY = rawY;
+            }
+            focusDisplayRect.setEmpty();
         }
 
         if (getVisibility() != VISIBLE) {
@@ -182,6 +196,8 @@ public final class LauncherAzGestureFxView extends View {
         dragActive = false;
         hasFocus = false;
         hasAnchor = false;
+        displayRawX = 0f;
+        displayRawY = 0f;
         edgeProximityLeft = 0f;
         edgeProximityRight = 0f;
         interactionMode = InteractionMode.LETTER_TRACK;
@@ -300,14 +316,34 @@ public final class LauncherAzGestureFxView extends View {
         }
 
         tmpRect.set(cx - (w * 0.5f), cy - (h * 0.5f), cx + (w * 0.5f), cy + (h * 0.5f));
-        drawGlassBody(canvas, tmpRect, radius, 0.58f, 0.22f);
+        drawLetterGlassPopupEvolution(canvas, tmpRect, radius);
+    }
 
-        // Subtle directional sheen so the focused letter reads as glass, not a white smudge.
-        RectF sheen = new RectF(tmpRect);
-        sheen.inset(Math.max(dp(1.4f), w * 0.10f), Math.max(dp(1.3f), h * 0.15f));
-        sheen.bottom = sheen.top + Math.max(dp(5f), sheen.height() * 0.46f);
-        glassInnerPaint.setColor(withAlpha(Color.WHITE, 74));
-        canvas.drawRoundRect(sheen, Math.max(dp(4f), radius - dp(4f)), Math.max(dp(4f), radius - dp(4f)), glassInnerPaint);
+    private void drawLetterGlassPopupEvolution(Canvas canvas, RectF pill, float radius) {
+        // Evolved from folder-popup style: richer tint body, restrained inner veil, crisp dual rim.
+        glassFillPaint.setColor(withAlpha(vividLetterTintColor, 170));
+        canvas.drawRoundRect(pill, radius, radius, glassFillPaint);
+
+        RectF innerVeil = new RectF(pill);
+        float veilPad = Math.max(dp(1.4f), Math.min(pill.width(), pill.height()) * 0.10f);
+        innerVeil.inset(veilPad, veilPad * 0.95f);
+        glassInnerPaint.setColor(withAlpha(Color.WHITE, 56));
+        canvas.drawRoundRect(innerVeil, Math.max(dp(4f), radius - veilPad), Math.max(dp(4f), radius - veilPad), glassInnerPaint);
+
+        RectF sheen = new RectF(innerVeil);
+        sheen.bottom = sheen.top + Math.max(dp(4.6f), innerVeil.height() * 0.42f);
+        glassInnerPaint.setColor(withAlpha(Color.WHITE, 86));
+        canvas.drawRoundRect(sheen, Math.max(dp(3f), radius - dp(5f)), Math.max(dp(3f), radius - dp(5f)), glassInnerPaint);
+
+        glassStrokePaint.setStrokeWidth(dp(1.25f));
+        glassStrokePaint.setColor(withAlpha(Color.WHITE, 170));
+        canvas.drawRoundRect(pill, radius, radius, glassStrokePaint);
+
+        RectF innerRim = new RectF(pill);
+        innerRim.inset(dp(0.9f), dp(0.9f));
+        glassStrokePaint.setStrokeWidth(dp(0.9f));
+        glassStrokePaint.setColor(withAlpha(vividLetterTintColor, 130));
+        canvas.drawRoundRect(innerRim, Math.max(dp(4f), radius - dp(1.2f)), Math.max(dp(4f), radius - dp(1.2f)), glassStrokePaint);
     }
 
     private void drawLockedIconTrackGlass(Canvas canvas) {
@@ -497,6 +533,14 @@ public final class LauncherAzGestureFxView extends View {
         hsv[1] = Math.max(0.42f, hsv[1]);
         hsv[2] = Math.max(minValue, hsv[2]);
         return Color.HSVToColor((color >>> 24) == 0 ? 0xE8 : (color >>> 24), hsv);
+    }
+
+    private static int boostColor(int color, float satMul, float valMul) {
+        float[] hsv = new float[3];
+        Color.colorToHSV(color, hsv);
+        hsv[1] = clamp(hsv[1] * satMul, 0f, 1f);
+        hsv[2] = clamp(hsv[2] * valMul, 0f, 1f);
+        return Color.HSVToColor((color >>> 24) == 0 ? 0xFF : (color >>> 24), hsv);
     }
 
     private static void blendRect(RectF out, RectF target, float t) {
