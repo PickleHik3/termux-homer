@@ -19,6 +19,11 @@ import java.util.LinkedHashSet;
 import java.util.Set;
 
 public final class AzScrubRowView extends AppCompatTextView {
+    public enum InteractionMode {
+        WAVE_TRACK,
+        INLINE_EMPHASIS_TRACK
+    }
+
     public enum GesturePhase {
         DOWN,
         MOVE,
@@ -48,6 +53,8 @@ public final class AzScrubRowView extends AppCompatTextView {
     private int doubleTapTimeoutMs;
     private int doubleTapSlopPx;
     private boolean suppressUpScrub;
+    @NonNull private InteractionMode interactionMode = InteractionMode.WAVE_TRACK;
+    @Nullable private Character lockedInlineLetter;
 
     public AzScrubRowView(Context context) {
         super(context);
@@ -97,13 +104,21 @@ public final class AzScrubRowView extends AppCompatTextView {
         letterPaint.setColor(baseColor);
         float baseTextSize = getTextSize();
         letterPaint.setTextSize(baseTextSize);
-        float contentTop = getPaddingTop();
         float contentBottom = height - getPaddingBottom();
         float slot = width / Math.max(1, visibleLetters.length);
         float anchorX = activeTouchX < 0f ? (width * 0.5f) : activeTouchX;
-        float waveAmplitude = dp(15) * waveStrength;
+        float waveAmplitude = interactionMode == InteractionMode.INLINE_EMPHASIS_TRACK ? 0f : (dp(15) * waveStrength);
         int activeIndex = (int) (anchorX / Math.max(1f, slot));
         activeIndex = Math.max(0, Math.min(visibleLetters.length - 1, activeIndex));
+        if (interactionMode == InteractionMode.INLINE_EMPHASIS_TRACK && lockedInlineLetter != null) {
+            char target = Character.toUpperCase(lockedInlineLetter);
+            for (int i = 0; i < visibleLetters.length; i++) {
+                if (visibleLetters[i] == target) {
+                    activeIndex = i;
+                    break;
+                }
+            }
+        }
 
         for (int i = 0; i < visibleLetters.length; i++) {
             float x = (slot * i) + (slot * 0.5f);
@@ -111,17 +126,27 @@ public final class AzScrubRowView extends AppCompatTextView {
             float envelope = (float) Math.exp(-(distance * distance) * 0.85f);
             float waveLift = (float) Math.sin(Math.min(1f, envelope) * (Math.PI * 0.5f)) * waveAmplitude;
             boolean activeFocus = waveStrength > 0.01f && i == activeIndex;
+            if (interactionMode == InteractionMode.INLINE_EMPHASIS_TRACK && i == activeIndex) {
+                activeFocus = true;
+            }
             if (activeFocus) {
                 waveLift *= 1.2f;
             }
-            float scale = 1f + (0.34f * envelope * waveStrength);
+            float scale;
+            if (interactionMode == InteractionMode.INLINE_EMPHASIS_TRACK) {
+                float inlineInfluence = i == activeIndex ? 1f : Math.max(0f, 0.65f - (distance * 0.28f));
+                scale = 1f + (0.24f * inlineInfluence);
+            } else {
+                scale = 1f + (0.34f * envelope * waveStrength);
+            }
             letterPaint.setTextSize(baseTextSize * scale);
             applyLetterWeight(envelope, activeFocus);
             Paint.FontMetrics letterMetrics = letterPaint.getFontMetrics();
             // Keep baseline closer to bottom so raised crest has enough headroom and avoids clipping.
             float baseline = (contentBottom - dp(2) - letterMetrics.descent) - waveLift;
             if (activeFocus) {
-                int bright = blendColors(baseColor, accentColor, 0.68f);
+                float glowRatio = interactionMode == InteractionMode.INLINE_EMPHASIS_TRACK ? 0.88f : 0.68f;
+                int bright = blendColors(baseColor, accentColor, glowRatio);
                 letterPaint.setColor(bright);
             } else {
                 letterPaint.setColor(baseColor);
@@ -178,6 +203,19 @@ public final class AzScrubRowView extends AppCompatTextView {
         invalidate();
     }
 
+    public void setInteractionMode(@NonNull InteractionMode mode) {
+        interactionMode = mode;
+        if (mode == InteractionMode.WAVE_TRACK) {
+            lockedInlineLetter = null;
+        }
+        invalidate();
+    }
+
+    public void setLockedInlineLetter(@Nullable Character letter) {
+        lockedInlineLetter = letter;
+        invalidate();
+    }
+
     @Override
     public boolean onTouchEvent(MotionEvent event) {
         if (callback == null) return super.onTouchEvent(event);
@@ -191,6 +229,9 @@ public final class AzScrubRowView extends AppCompatTextView {
                 stopSettleAnimation();
                 activeTouchX = x;
                 waveStrength = 1f;
+                if (interactionMode == InteractionMode.WAVE_TRACK) {
+                    lockedInlineLetter = null;
+                }
                 bringToFront();
                 updateInteractionLayerOffset();
                 invalidate();
@@ -208,7 +249,7 @@ public final class AzScrubRowView extends AppCompatTextView {
                 return true;
             case MotionEvent.ACTION_MOVE:
                 activeTouchX = x;
-                waveStrength = 1f;
+                waveStrength = interactionMode == InteractionMode.INLINE_EMPHASIS_TRACK ? 0.92f : 1f;
                 updateInteractionLayerOffset();
                 invalidate();
                 callback.onScrub(letter, currentSelectionIndex, event.getX(), event.getY(), event.getRawX(), event.getRawY(), GesturePhase.MOVE);
@@ -220,12 +261,22 @@ public final class AzScrubRowView extends AppCompatTextView {
                     callback.onScrub(letter, currentSelectionIndex, event.getX(), event.getY(), event.getRawX(), event.getRawY(), GesturePhase.UP);
                 }
                 suppressUpScrub = false;
-                animateWaveRelease();
+                if (interactionMode == InteractionMode.WAVE_TRACK) {
+                    animateWaveRelease();
+                } else {
+                    waveStrength = 0f;
+                    invalidate();
+                }
                 return true;
             case MotionEvent.ACTION_CANCEL:
                 suppressUpScrub = false;
                 callback.onCancel();
-                animateWaveRelease();
+                if (interactionMode == InteractionMode.WAVE_TRACK) {
+                    animateWaveRelease();
+                } else {
+                    waveStrength = 0f;
+                    invalidate();
+                }
                 return true;
             default:
                 return super.onTouchEvent(event);
@@ -264,10 +315,12 @@ public final class AzScrubRowView extends AppCompatTextView {
     }
 
     private void applyLetterWeight(float envelope, boolean active) {
-        float influence = Math.max(0f, Math.min(1f, envelope * waveStrength));
+        float influence = interactionMode == InteractionMode.INLINE_EMPHASIS_TRACK
+            ? (active ? 1f : Math.max(0f, Math.min(1f, envelope * 0.65f)))
+            : Math.max(0f, Math.min(1f, envelope * waveStrength));
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             int weight = (int) (420 + (influence * 380));
-            if (active) weight = 900;
+            if (active) weight = interactionMode == InteractionMode.INLINE_EMPHASIS_TRACK ? 920 : 900;
             weight = Math.max(200, Math.min(900, weight));
             letterPaint.setTypeface(Typeface.create(Typeface.DEFAULT, weight, false));
         } else {

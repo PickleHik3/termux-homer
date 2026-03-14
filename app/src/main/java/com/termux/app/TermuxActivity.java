@@ -258,6 +258,9 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
     private float mAzLastRawY = 0f;
     private float mAzLastAnchorRawX = 0f;
     private float mAzLastAnchorRawY = 0f;
+    private final RectF mAzRowRawBounds = new RectF();
+    private final RectF mAppsRowRawBounds = new RectF();
+    private final RectF mExtraKeysRawBounds = new RectF();
     private static final long AZ_EDGE_PAGE_INTERVAL_MS = 210L;
     private static final long AZ_PREVIEW_TIMEOUT_REFRESH_MS = 5200L;
 
@@ -1005,6 +1008,8 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         int muted = mutedMonetShade(base);
         mAzScrubRowView.setTextColor(muted);
         mAzScrubRowView.setInteractionAccentColor(base);
+        mAzScrubRowView.setInteractionMode(AzScrubRowView.InteractionMode.WAVE_TRACK);
+        mAzScrubRowView.setLockedInlineLetter(null);
         if (mLauncherAzGestureFxView != null) {
             int orbColor = brightMonetShade(base);
             int edgeColor = edgeMonetVariant(base);
@@ -1050,6 +1055,8 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         if (phase == AzScrubRowView.GesturePhase.DOWN) {
             mAzGestureMode = AzGestureMode.AZ_TRACKING;
             mAzHasLockedSelection = false;
+            mAzScrubRowView.setInteractionMode(AzScrubRowView.InteractionMode.WAVE_TRACK);
+            mAzScrubRowView.setLockedInlineLetter(null);
         }
 
         mAzLastRawX = rawX;
@@ -1078,9 +1085,12 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
                 mAzLockedLetter = letter;
                 mAzLockedSelectionIndex = selectionIndex;
                 mAzHasLockedSelection = true;
+                mAzScrubRowView.setInteractionMode(AzScrubRowView.InteractionMode.INLINE_EMPHASIS_TRACK);
+                mAzScrubRowView.setLockedInlineLetter(Character.toUpperCase(letter));
             }
         } else if (mAzGestureMode == AzGestureMode.ICON_TRACKING_LOCKED && mAzHasLockedSelection) {
             mSuggestionBarView.persistAzPreview(mAzLockedLetter, mAzLockedSelectionIndex);
+            mAzScrubRowView.setLockedInlineLetter(Character.toUpperCase(mAzLockedLetter));
         }
         updateAzOverflowAffordance();
 
@@ -1115,6 +1125,10 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         if (mLauncherAzGestureFxView == null) {
             return;
         }
+        populateRawBounds(mAzScrubRowView, mAzRowRawBounds);
+        populateRawBounds(mSuggestionBarView, mAppsRowRawBounds);
+        populateRawBounds(findViewById(R.id.terminal_toolbar_view_pager), mExtraKeysRawBounds);
+        mLauncherAzGestureFxView.setRowBounds(mAzRowRawBounds, mAppsRowRawBounds, mExtraKeysRawBounds);
         LauncherAzGestureFxView.InteractionMode interactionMode =
             mAzGestureMode == AzGestureMode.ICON_TRACKING_LOCKED
                 ? LauncherAzGestureFxView.InteractionMode.ICON_TRACK_LOCKED
@@ -1153,10 +1167,24 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         );
     }
 
+    private void populateRawBounds(@Nullable View view, @NonNull RectF out) {
+        if (view == null || !view.isShown() || view.getWidth() <= 0 || view.getHeight() <= 0) {
+            out.setEmpty();
+            return;
+        }
+        int[] loc = new int[2];
+        view.getLocationOnScreen(loc);
+        out.set(loc[0], loc[1], loc[0] + view.getWidth(), loc[1] + view.getHeight());
+    }
+
     private void updateAzOverflowAffordance() {
         if (mLauncherAzGestureFxView == null || mSuggestionBarView == null) {
             return;
         }
+        populateRawBounds(mAzScrubRowView, mAzRowRawBounds);
+        populateRawBounds(mSuggestionBarView, mAppsRowRawBounds);
+        populateRawBounds(findViewById(R.id.terminal_toolbar_view_pager), mExtraKeysRawBounds);
+        mLauncherAzGestureFxView.setRowBounds(mAzRowRawBounds, mAppsRowRawBounds, mExtraKeysRawBounds);
         boolean overflow = mSuggestionBarView.hasAzOverflowPages();
         mLauncherAzGestureFxView.setFilteredOverflowState(overflow, mSuggestionBarView.canAzPageLeft(), mSuggestionBarView.canAzPageRight());
     }
@@ -1223,6 +1251,10 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         mAzLockedSelectionIndex = 0;
         mAzHasLockedSelection = false;
         mAzCurrentFocusResult = null;
+        if (mAzScrubRowView != null) {
+            mAzScrubRowView.setInteractionMode(AzScrubRowView.InteractionMode.WAVE_TRACK);
+            mAzScrubRowView.setLockedInlineLetter(null);
+        }
         if (mLauncherAzGestureFxView != null) {
             mLauncherAzGestureFxView.clearDrag(keepOverflowAffordance);
         }

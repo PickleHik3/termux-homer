@@ -10,6 +10,7 @@ import android.graphics.RectF;
 import android.os.Build;
 import android.graphics.RenderEffect;
 import android.graphics.Shader;
+import android.os.SystemClock;
 import android.util.AttributeSet;
 import android.view.View;
 import android.view.animation.DecelerateInterpolator;
@@ -39,6 +40,9 @@ public final class LauncherAzGestureFxView extends View {
     private final RectF tmpRect = new RectF();
     private final RectF focusDisplayRect = new RectF();
     private final RectF focusRawRect = new RectF();
+    private final RectF azRowRawBounds = new RectF();
+    private final RectF appsRowRawBounds = new RectF();
+    private final RectF extraKeysRawBounds = new RectF();
     private final int[] locationOnScreen = new int[2];
 
     private int glassTintColor = 0xFF86A7FF;
@@ -62,6 +66,8 @@ public final class LauncherAzGestureFxView extends View {
     private float edgeProximityRight;
 
     @NonNull private InteractionMode interactionMode = InteractionMode.LETTER_TRACK;
+    private long lastFocusUpdateUptimeMs = 0L;
+    private static final long FOCUS_HOLD_MS = 140L;
 
     private boolean launchBloomActive;
     private float launchBloomRawX;
@@ -103,8 +109,8 @@ public final class LauncherAzGestureFxView extends View {
     }
 
     public void setColors(int glassTintColor, int edgeTintColor) {
-        this.glassTintColor = glassTintColor;
-        this.edgeTintColor = edgeTintColor;
+        this.glassTintColor = enforceGlassVisibility(glassTintColor, 0.78f);
+        this.edgeTintColor = enforceGlassVisibility(edgeTintColor, 0.84f);
         invalidate();
     }
 
@@ -138,6 +144,24 @@ public final class LauncherAzGestureFxView extends View {
         }
         applyBlurIfSupported(active || filteredOverflowActive);
         invalidate();
+    }
+
+    public void setRowBounds(@Nullable RectF azRowRaw, @Nullable RectF appsRowRaw, @Nullable RectF extraKeysRowRaw) {
+        if (azRowRaw != null) {
+            azRowRawBounds.set(azRowRaw);
+        } else {
+            azRowRawBounds.setEmpty();
+        }
+        if (appsRowRaw != null) {
+            appsRowRawBounds.set(appsRowRaw);
+        } else {
+            appsRowRawBounds.setEmpty();
+        }
+        if (extraKeysRowRaw != null) {
+            extraKeysRawBounds.set(extraKeysRowRaw);
+        } else {
+            extraKeysRawBounds.setEmpty();
+        }
     }
 
     public void setFilteredOverflowState(boolean active, boolean pageLeft, boolean pageRight) {
@@ -250,6 +274,11 @@ public final class LauncherAzGestureFxView extends View {
     private void drawLetterGlassDroplet(Canvas canvas) {
         float cx = displayRawX - locationOnScreen[0];
         float cy = displayRawY - locationOnScreen[1];
+        if (!azRowRawBounds.isEmpty()) {
+            float top = azRowRawBounds.top - locationOnScreen[1];
+            float bottom = azRowRawBounds.bottom - locationOnScreen[1];
+            cy = clamp(cy, top + dp(6f), bottom - dp(6f));
+        }
 
         float w = dp(42f);
         float h = dp(26f);
@@ -270,13 +299,26 @@ public final class LauncherAzGestureFxView extends View {
 
     private void drawLockedIconTrackGlass(Canvas canvas) {
         if (hasFocus) {
+            lastFocusUpdateUptimeMs = SystemClock.uptimeMillis();
             if (focusDisplayRect.isEmpty()) {
                 focusDisplayRect.set(focusRawRect);
             } else {
                 blendRect(focusDisplayRect, focusRawRect, 0.31f);
             }
         } else {
-            focusDisplayRect.setEmpty();
+            if ((SystemClock.uptimeMillis() - lastFocusUpdateUptimeMs) > FOCUS_HOLD_MS) {
+                focusDisplayRect.setEmpty();
+            }
+        }
+
+        int save = -1;
+        if (!appsRowRawBounds.isEmpty()) {
+            float left = appsRowRawBounds.left - locationOnScreen[0];
+            float top = appsRowRawBounds.top - locationOnScreen[1];
+            float right = appsRowRawBounds.right - locationOnScreen[0];
+            float bottom = appsRowRawBounds.bottom - locationOnScreen[1];
+            save = canvas.save();
+            canvas.clipRect(left, top, right, bottom);
         }
 
         if (hasAnchor && !focusDisplayRect.isEmpty()) {
@@ -290,14 +332,18 @@ public final class LauncherAzGestureFxView extends View {
                 focusDisplayRect.right - locationOnScreen[0],
                 focusDisplayRect.bottom - locationOnScreen[1]
             );
-            local.inset(-dp(5f), -dp(5f));
+            float shellPad = Math.max(dp(6f), Math.min(local.width(), local.height()) * 0.17f);
+            local.inset(-shellPad, -shellPad);
             drawGlassBody(canvas, local, dp(14f), 0.72f, 0.42f);
+        } else {
+            float cx = displayRawX - locationOnScreen[0];
+            float cy = displayRawY - locationOnScreen[1];
+            tmpRect.set(cx - dp(7f), cy - dp(7f), cx + dp(7f), cy + dp(7f));
+            drawGlassBody(canvas, tmpRect, dp(7f), 0.34f, 0.18f);
         }
-
-        float cx = displayRawX - locationOnScreen[0];
-        float cy = displayRawY - locationOnScreen[1];
-        tmpRect.set(cx - dp(10f), cy - dp(10f), cx + dp(10f), cy + dp(10f));
-        drawGlassBody(canvas, tmpRect, dp(8f), 0.56f, 0.30f);
+        if (save >= 0) {
+            canvas.restoreToCount(save);
+        }
     }
 
     private void drawLiquidBridge(Canvas canvas, RectF focusRaw) {
@@ -324,10 +370,16 @@ public final class LauncherAzGestureFxView extends View {
 
     private void drawGlassEdgeCapsules(Canvas canvas) {
         float width = getWidth();
-        float height = getHeight();
+        float top = 0f;
+        float bottom = getHeight();
+        if (!appsRowRawBounds.isEmpty()) {
+            top = appsRowRawBounds.top - locationOnScreen[1];
+            bottom = appsRowRawBounds.bottom - locationOnScreen[1];
+        }
+        float height = Math.max(dp(18f), bottom - top);
         float capsuleW = Math.max(dp(24f), width * 0.085f);
-        float capsuleH = Math.max(dp(62f), height * 0.58f);
-        float cy = height * 0.5f;
+        float capsuleH = Math.max(dp(28f), height * 0.86f);
+        float cy = top + (height * 0.5f);
         float radius = capsuleW * 0.52f;
 
         if (canPageLeft) {
@@ -417,9 +469,21 @@ public final class LauncherAzGestureFxView extends View {
         return Math.max(0f, Math.min(1f, v));
     }
 
+    private static float clamp(float v, float min, float max) {
+        return Math.max(min, Math.min(max, v));
+    }
+
     private static int withAlpha(int color, int alpha) {
         int a = Math.max(0, Math.min(255, alpha));
         return (color & 0x00FFFFFF) | (a << 24);
+    }
+
+    private static int enforceGlassVisibility(int color, float minValue) {
+        float[] hsv = new float[3];
+        Color.colorToHSV(color, hsv);
+        hsv[1] = Math.max(0.42f, hsv[1]);
+        hsv[2] = Math.max(minValue, hsv[2]);
+        return Color.HSVToColor((color >>> 24) == 0 ? 0xE8 : (color >>> 24), hsv);
     }
 
     private static void blendRect(RectF out, RectF target, float t) {
