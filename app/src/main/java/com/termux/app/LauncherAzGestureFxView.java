@@ -142,7 +142,7 @@ public final class LauncherAzGestureFxView extends View {
         if (getVisibility() != VISIBLE) {
             setVisibility(VISIBLE);
         }
-        applyBlurIfSupported(active || filteredOverflowActive);
+        applyBlurIfSupported((active && mode == InteractionMode.ICON_TRACK_LOCKED) || filteredOverflowActive);
         invalidate();
     }
 
@@ -233,14 +233,20 @@ public final class LauncherAzGestureFxView extends View {
         }
 
         if (dragActive) {
-            if (displayRawX == 0f && displayRawY == 0f) {
-                displayRawX = targetRawX;
-                displayRawY = targetRawY;
+            float desiredRawX = targetRawX;
+            float desiredRawY = targetRawY;
+            if (interactionMode == InteractionMode.LETTER_TRACK && hasFocus && !focusRawRect.isEmpty()) {
+                desiredRawX = focusRawRect.centerX();
+                desiredRawY = focusRawRect.centerY();
             }
-            float smoothing = interactionMode == InteractionMode.ICON_TRACK_LOCKED ? 0.30f : 0.37f;
-            displayRawX = lerp(displayRawX, targetRawX, smoothing);
-            displayRawY = lerp(displayRawY, targetRawY, smoothing);
-            if (Math.abs(displayRawX - targetRawX) > 0.55f || Math.abs(displayRawY - targetRawY) > 0.55f) {
+            if (displayRawX == 0f && displayRawY == 0f) {
+                displayRawX = desiredRawX;
+                displayRawY = desiredRawY;
+            }
+            float smoothing = interactionMode == InteractionMode.ICON_TRACK_LOCKED ? 0.30f : 0.34f;
+            displayRawX = lerp(displayRawX, desiredRawX, smoothing);
+            displayRawY = lerp(displayRawY, desiredRawY, smoothing);
+            if (Math.abs(displayRawX - desiredRawX) > 0.55f || Math.abs(displayRawY - desiredRawY) > 0.55f) {
                 needsMoreFrames = true;
             }
 
@@ -280,21 +286,28 @@ public final class LauncherAzGestureFxView extends View {
             cy = clamp(cy, top + dp(6f), bottom - dp(6f));
         }
 
-        float w = dp(42f);
-        float h = dp(26f);
-        float radius = dp(13f);
+        float w = dp(30f);
+        float h = dp(21f);
+        float radius = dp(11f);
+        if (hasFocus && !focusRawRect.isEmpty()) {
+            float slotW = focusRawRect.width();
+            float slotH = focusRawRect.height();
+            w = Math.max(dp(20f), Math.min(dp(34f), slotW * 0.90f));
+            h = Math.max(dp(16f), Math.min(dp(24f), slotH * 0.92f));
+            radius = Math.max(dp(8f), Math.min(dp(14f), h * 0.48f));
+            cx = focusRawRect.centerX() - locationOnScreen[0];
+            cy = focusRawRect.centerY() - locationOnScreen[1];
+        }
 
         tmpRect.set(cx - (w * 0.5f), cy - (h * 0.5f), cx + (w * 0.5f), cy + (h * 0.5f));
-        drawGlassBody(canvas, tmpRect, radius, 0.68f, 0.36f);
+        drawGlassBody(canvas, tmpRect, radius, 0.58f, 0.22f);
 
-        if (hasAnchor) {
-            float ax = anchorRawX - locationOnScreen[0];
-            float ay = anchorRawY - locationOnScreen[1];
-            float anchorW = dp(18f);
-            float anchorH = dp(12f);
-            tmpRect.set(ax - (anchorW * 0.5f), ay - (anchorH * 0.5f), ax + (anchorW * 0.5f), ay + (anchorH * 0.5f));
-            drawGlassBody(canvas, tmpRect, dp(7f), 0.52f, 0.26f);
-        }
+        // Subtle directional sheen so the focused letter reads as glass, not a white smudge.
+        RectF sheen = new RectF(tmpRect);
+        sheen.inset(Math.max(dp(1.4f), w * 0.10f), Math.max(dp(1.3f), h * 0.15f));
+        sheen.bottom = sheen.top + Math.max(dp(5f), sheen.height() * 0.46f);
+        glassInnerPaint.setColor(withAlpha(Color.WHITE, 74));
+        canvas.drawRoundRect(sheen, Math.max(dp(4f), radius - dp(4f)), Math.max(dp(4f), radius - dp(4f)), glassInnerPaint);
     }
 
     private void drawLockedIconTrackGlass(Canvas canvas) {

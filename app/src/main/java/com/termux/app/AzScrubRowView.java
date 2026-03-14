@@ -5,6 +5,7 @@ import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
+import android.graphics.RectF;
 import android.graphics.Typeface;
 import android.os.Build;
 import android.util.AttributeSet;
@@ -216,6 +217,40 @@ public final class AzScrubRowView extends AppCompatTextView {
         invalidate();
     }
 
+    public void getLetterFocusBoundsOnScreen(char letter, @NonNull RectF out) {
+        out.setEmpty();
+        if (getWidth() <= 0 || getHeight() <= 0 || visibleLetters.length == 0) {
+            return;
+        }
+        char target = Character.toUpperCase(letter);
+        int index = indexOfVisibleLetter(target);
+        if (index < 0) {
+            float width = Math.max(1f, getWidth());
+            float slot = width / Math.max(1, visibleLetters.length);
+            float anchorX = activeTouchX < 0f ? (width * 0.5f) : activeTouchX;
+            index = Math.max(0, Math.min(visibleLetters.length - 1, (int) (anchorX / Math.max(1f, slot))));
+        }
+
+        float width = Math.max(1f, getWidth());
+        float slot = width / Math.max(1, visibleLetters.length);
+        float cx = (slot * index) + (slot * 0.5f);
+        float contentTop = getPaddingTop();
+        float contentBottom = getHeight() - getPaddingBottom();
+        float h = Math.max(dp(18), Math.min(dp(24), (contentBottom - contentTop) * 0.76f));
+        float w = Math.max(dp(18), Math.min(dp(34), slot * 0.82f));
+        float left = Math.max(0f, cx - (w * 0.5f));
+        float right = Math.min(getWidth(), left + w);
+        left = Math.max(0f, right - w);
+        float cy = contentTop + ((contentBottom - contentTop) * 0.52f);
+        float top = Math.max(0f, cy - (h * 0.5f));
+        float bottom = Math.min(getHeight(), top + h);
+        top = Math.max(0f, bottom - h);
+
+        int[] loc = new int[2];
+        getLocationOnScreen(loc);
+        out.set(loc[0] + left, loc[1] + top, loc[0] + right, loc[1] + bottom);
+    }
+
     @Override
     public boolean onTouchEvent(MotionEvent event) {
         if (callback == null) return super.onTouchEvent(event);
@@ -308,6 +343,16 @@ public final class AzScrubRowView extends AppCompatTextView {
         int index = (int) ((x / width) * len);
         index = Math.max(0, Math.min(len - 1, index));
         return visibleLetters[index];
+    }
+
+    private int indexOfVisibleLetter(char letter) {
+        char upper = Character.toUpperCase(letter);
+        for (int i = 0; i < visibleLetters.length; i++) {
+            if (visibleLetters[i] == upper) {
+                return i;
+            }
+        }
+        return -1;
     }
 
     private void updateInteractionLayerOffset() {
