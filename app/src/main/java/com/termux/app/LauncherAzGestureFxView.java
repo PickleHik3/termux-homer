@@ -385,19 +385,19 @@ public final class LauncherAzGestureFxView extends View {
         if (canPageLeft) {
             float intensity = 0.38f + (0.56f * edgeProximityLeft);
             float left = dp(4f);
-            float top = cy - (capsuleH * 0.5f);
+            float capsuleTop = cy - (capsuleH * 0.5f);
             float right = left + capsuleW;
-            float bottom = cy + (capsuleH * 0.5f);
-            drawEdgeCapsule(canvas, left, top, right, bottom, radius, intensity);
+            float capsuleBottom = cy + (capsuleH * 0.5f);
+            drawEdgeCapsule(canvas, left, capsuleTop, right, capsuleBottom, radius, intensity);
         }
 
         if (canPageRight) {
             float intensity = 0.38f + (0.56f * edgeProximityRight);
             float right = width - dp(4f);
             float left = right - capsuleW;
-            float top = cy - (capsuleH * 0.5f);
-            float bottom = cy + (capsuleH * 0.5f);
-            drawEdgeCapsule(canvas, left, top, right, bottom, radius, intensity);
+            float capsuleTop = cy - (capsuleH * 0.5f);
+            float capsuleBottom = cy + (capsuleH * 0.5f);
+            drawEdgeCapsule(canvas, left, capsuleTop, right, capsuleBottom, radius, intensity);
         }
     }
 
