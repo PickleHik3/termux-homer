@@ -156,7 +156,7 @@ public final class LauncherAzGestureFxView extends View {
         if (getVisibility() != VISIBLE) {
             setVisibility(VISIBLE);
         }
-        applyBlurIfSupported((active && mode == InteractionMode.ICON_TRACK_LOCKED) || filteredOverflowActive);
+        applyBlurIfSupported(active && mode == InteractionMode.ICON_TRACK_LOCKED);
         invalidate();
     }
 
@@ -182,7 +182,7 @@ public final class LauncherAzGestureFxView extends View {
         filteredOverflowActive = active;
         canPageLeft = pageLeft;
         canPageRight = pageRight;
-        applyBlurIfSupported(dragActive || active);
+        applyBlurIfSupported(dragActive && interactionMode == InteractionMode.ICON_TRACK_LOCKED);
         invalidate();
     }
 
@@ -206,7 +206,7 @@ public final class LauncherAzGestureFxView extends View {
             canPageLeft = false;
             canPageRight = false;
         }
-        applyBlurIfSupported(filteredOverflowActive);
+        applyBlurIfSupported(false);
         invalidate();
     }
 
@@ -320,29 +320,28 @@ public final class LauncherAzGestureFxView extends View {
     }
 
     private void drawLetterGlassPopupEvolution(Canvas canvas, RectF pill, float radius) {
-        // Evolved from folder-popup style: richer tint body, restrained inner veil, crisp dual rim.
-        glassFillPaint.setColor(withAlpha(vividLetterTintColor, 170));
+        glassFillPaint.setColor(withAlpha(vividLetterTintColor, 196));
         canvas.drawRoundRect(pill, radius, radius, glassFillPaint);
 
         RectF innerVeil = new RectF(pill);
         float veilPad = Math.max(dp(1.4f), Math.min(pill.width(), pill.height()) * 0.10f);
         innerVeil.inset(veilPad, veilPad * 0.95f);
-        glassInnerPaint.setColor(withAlpha(Color.WHITE, 56));
+        glassInnerPaint.setColor(withAlpha(Color.WHITE, 42));
         canvas.drawRoundRect(innerVeil, Math.max(dp(4f), radius - veilPad), Math.max(dp(4f), radius - veilPad), glassInnerPaint);
 
         RectF sheen = new RectF(innerVeil);
         sheen.bottom = sheen.top + Math.max(dp(4.6f), innerVeil.height() * 0.42f);
-        glassInnerPaint.setColor(withAlpha(Color.WHITE, 86));
+        glassInnerPaint.setColor(withAlpha(Color.WHITE, 76));
         canvas.drawRoundRect(sheen, Math.max(dp(3f), radius - dp(5f)), Math.max(dp(3f), radius - dp(5f)), glassInnerPaint);
 
         glassStrokePaint.setStrokeWidth(dp(1.25f));
-        glassStrokePaint.setColor(withAlpha(Color.WHITE, 170));
+        glassStrokePaint.setColor(withAlpha(Color.WHITE, 132));
         canvas.drawRoundRect(pill, radius, radius, glassStrokePaint);
 
         RectF innerRim = new RectF(pill);
         innerRim.inset(dp(0.9f), dp(0.9f));
         glassStrokePaint.setStrokeWidth(dp(0.9f));
-        glassStrokePaint.setColor(withAlpha(vividLetterTintColor, 130));
+        glassStrokePaint.setColor(withAlpha(glassTintColor, 122));
         canvas.drawRoundRect(innerRim, Math.max(dp(4f), radius - dp(1.2f)), Math.max(dp(4f), radius - dp(1.2f)), glassStrokePaint);
     }
 
@@ -426,14 +425,22 @@ public final class LauncherAzGestureFxView extends View {
             bottom = appsRowRawBounds.bottom - locationOnScreen[1];
         }
         float height = Math.max(dp(18f), bottom - top);
-        float capsuleW = Math.max(dp(24f), width * 0.085f);
-        float capsuleH = Math.max(dp(28f), height * 0.86f);
+        boolean passiveLetterState = interactionMode == InteractionMode.LETTER_TRACK || !dragActive;
+        float capsuleW = passiveLetterState
+            ? Math.max(dp(12f), width * 0.032f)
+            : Math.max(dp(18f), width * 0.055f);
+        float capsuleH = passiveLetterState
+            ? Math.max(dp(20f), height * 0.68f)
+            : Math.max(dp(26f), height * 0.80f);
         float cy = top + (height * 0.5f);
-        float radius = capsuleW * 0.52f;
+        float radius = passiveLetterState ? capsuleW * 0.74f : capsuleW * 0.56f;
+        float inset = passiveLetterState ? dp(1.5f) : dp(4f);
+        float baseIntensity = passiveLetterState ? 0.14f : 0.20f;
+        float proximityGain = passiveLetterState ? 0.16f : 0.40f;
 
         if (canPageLeft) {
-            float intensity = 0.38f + (0.56f * edgeProximityLeft);
-            float left = dp(4f);
+            float intensity = baseIntensity + (proximityGain * edgeProximityLeft);
+            float left = inset;
             float capsuleTop = cy - (capsuleH * 0.5f);
             float right = left + capsuleW;
             float capsuleBottom = cy + (capsuleH * 0.5f);
@@ -441,8 +448,8 @@ public final class LauncherAzGestureFxView extends View {
         }
 
         if (canPageRight) {
-            float intensity = 0.38f + (0.56f * edgeProximityRight);
-            float right = width - dp(4f);
+            float intensity = baseIntensity + (proximityGain * edgeProximityRight);
+            float right = width - inset;
             float left = right - capsuleW;
             float capsuleTop = cy - (capsuleH * 0.5f);
             float capsuleBottom = cy + (capsuleH * 0.5f);
@@ -452,17 +459,17 @@ public final class LauncherAzGestureFxView extends View {
 
     private void drawEdgeCapsule(Canvas canvas, float left, float top, float right, float bottom, float radius, float intensity) {
         tmpRect.set(left, top, right, bottom);
-        edgePaint.setColor(withAlpha(edgeTintColor, (int) (190f * intensity)));
+        edgePaint.setColor(withAlpha(edgeTintColor, (int) (168f * intensity)));
         canvas.drawRoundRect(tmpRect, radius, radius, edgePaint);
 
-        edgeInnerPaint.setColor(withAlpha(Color.WHITE, (int) (88f * intensity)));
+        edgeInnerPaint.setColor(withAlpha(Color.WHITE, (int) (52f * intensity)));
         float pad = Math.max(dp(2.2f), (right - left) * 0.16f);
         RectF inner = new RectF(tmpRect);
         inner.inset(pad, pad * 1.2f);
         canvas.drawRoundRect(inner, Math.max(dp(7f), radius - pad), Math.max(dp(7f), radius - pad), edgeInnerPaint);
 
         glassStrokePaint.setStrokeWidth(dp(1.4f));
-        glassStrokePaint.setColor(withAlpha(Color.WHITE, (int) (146f * intensity)));
+        glassStrokePaint.setColor(withAlpha(Color.WHITE, (int) (102f * intensity)));
         canvas.drawRoundRect(tmpRect, radius, radius, glassStrokePaint);
     }
 

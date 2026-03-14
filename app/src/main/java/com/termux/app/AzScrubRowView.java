@@ -20,6 +20,26 @@ import java.util.LinkedHashSet;
 import java.util.Set;
 
 public final class AzScrubRowView extends AppCompatTextView {
+    public static final class LetterVisualMetrics {
+        public final RectF glyphBoundsRaw = new RectF();
+        public final RectF glassBoundsRaw = new RectF();
+        public float baselineRawY;
+        public float centerRawX;
+        public char letter;
+
+        public void clear() {
+            glyphBoundsRaw.setEmpty();
+            glassBoundsRaw.setEmpty();
+            baselineRawY = 0f;
+            centerRawX = 0f;
+            letter = '\0';
+        }
+
+        public boolean isValid() {
+            return !glassBoundsRaw.isEmpty();
+        }
+    }
+
     public enum InteractionMode {
         WAVE_TRACK,
         INLINE_EMPHASIS_TRACK
@@ -109,41 +129,28 @@ public final class AzScrubRowView extends AppCompatTextView {
         float slot = width / Math.max(1, visibleLetters.length);
         float anchorX = activeTouchX < 0f ? (width * 0.5f) : activeTouchX;
         float waveAmplitude = interactionMode == InteractionMode.INLINE_EMPHASIS_TRACK ? 0f : (dp(15) * waveStrength);
-        int activeIndex = (int) (anchorX / Math.max(1f, slot));
-        activeIndex = Math.max(0, Math.min(visibleLetters.length - 1, activeIndex));
-        if (interactionMode == InteractionMode.INLINE_EMPHASIS_TRACK && lockedInlineLetter != null) {
-            char target = Character.toUpperCase(lockedInlineLetter);
-            for (int i = 0; i < visibleLetters.length; i++) {
-                if (visibleLetters[i] == target) {
-                    activeIndex = i;
-                    break;
-                }
-            }
-        }
+        int activeIndex = resolveActiveIndex(anchorX, slot);
+        boolean hasInlineFocus = interactionMode == InteractionMode.INLINE_EMPHASIS_TRACK
+            && waveStrength > 0.01f
+            && (activeTouchX >= 0f || lockedInlineLetter != null);
 
         for (int i = 0; i < visibleLetters.length; i++) {
             float x = (slot * i) + (slot * 0.5f);
             float distance = Math.abs(x - anchorX) / Math.max(1f, slot);
             float envelope = (float) Math.exp(-(distance * distance) * 0.85f);
             float waveLift = (float) Math.sin(Math.min(1f, envelope) * (Math.PI * 0.5f)) * waveAmplitude;
-            boolean activeFocus = waveStrength > 0.01f && i == activeIndex;
-            if (interactionMode == InteractionMode.INLINE_EMPHASIS_TRACK && i == activeIndex) {
-                activeFocus = true;
-            }
-            if (activeFocus) {
+            boolean activeFocus = interactionMode == InteractionMode.INLINE_EMPHASIS_TRACK
+                ? (hasInlineFocus && i == activeIndex)
+                : (waveStrength > 0.01f && i == activeIndex);
+            if (activeFocus && interactionMode != InteractionMode.INLINE_EMPHASIS_TRACK) {
                 waveLift *= 1.2f;
             }
-            float scale;
-            if (interactionMode == InteractionMode.INLINE_EMPHASIS_TRACK) {
-                float inlineInfluence = i == activeIndex ? 1f : Math.max(0f, 0.65f - (distance * 0.28f));
-                scale = 1f + (0.24f * inlineInfluence);
-            } else {
-                scale = 1f + (0.34f * envelope * waveStrength);
-            }
+            float scale = interactionMode == InteractionMode.INLINE_EMPHASIS_TRACK
+                ? (activeFocus ? 1.14f : 1f)
+                : (1f + (0.34f * envelope * waveStrength));
             letterPaint.setTextSize(baseTextSize * scale);
             applyLetterWeight(envelope, activeFocus);
             Paint.FontMetrics letterMetrics = letterPaint.getFontMetrics();
-            // Keep baseline closer to bottom so raised crest has enough headroom and avoids clipping.
             float baseline = (contentBottom - dp(2) - letterMetrics.descent) - waveLift;
             if (activeFocus) {
                 float glowRatio = interactionMode == InteractionMode.INLINE_EMPHASIS_TRACK ? 0.88f : 0.68f;
@@ -218,37 +225,72 @@ public final class AzScrubRowView extends AppCompatTextView {
     }
 
     public void getLetterFocusBoundsOnScreen(char letter, @NonNull RectF out) {
-        out.setEmpty();
-        if (getWidth() <= 0 || getHeight() <= 0 || visibleLetters.length == 0) {
-            return;
+        LetterVisualMetrics metrics = new LetterVisualMetrics();
+        if (getLetterVisualMetricsOnScreen(letter, metrics)) {
+            out.set(metrics.glassBoundsRaw);
+        } else {
+            out.setEmpty();
         }
-        char target = Character.toUpperCase(letter);
-        int index = indexOfVisibleLetter(target);
-        if (index < 0) {
-            float width = Math.max(1f, getWidth());
-            float slot = width / Math.max(1, visibleLetters.length);
-            float anchorX = activeTouchX < 0f ? (width * 0.5f) : activeTouchX;
-            index = Math.max(0, Math.min(visibleLetters.length - 1, (int) (anchorX / Math.max(1f, slot))));
+    }
+
+    public boolean getLetterVisualMetricsOnScreen(char letter, @NonNull LetterVisualMetrics out) {
+        out.clear();
+        if (getWidth() <= 0 || getHeight() <= 0 || visibleLetters.length == 0) {
+            return false;
         }
 
         float width = Math.max(1f, getWidth());
         float slot = width / Math.max(1, visibleLetters.length);
-        float cx = (slot * index) + (slot * 0.5f);
-        float contentTop = getPaddingTop();
-        float contentBottom = getHeight() - getPaddingBottom();
-        float h = Math.max(dp(18), Math.min(dp(24), (contentBottom - contentTop) * 0.76f));
-        float w = Math.max(dp(18), Math.min(dp(34), slot * 0.82f));
-        float left = Math.max(0f, cx - (w * 0.5f));
-        float right = Math.min(getWidth(), left + w);
-        left = Math.max(0f, right - w);
-        float cy = contentTop + ((contentBottom - contentTop) * 0.52f);
-        float top = Math.max(0f, cy - (h * 0.5f));
-        float bottom = Math.min(getHeight(), top + h);
-        top = Math.max(0f, bottom - h);
+        float anchorX = activeTouchX < 0f ? (width * 0.5f) : activeTouchX;
+        int activeIndex = resolveActiveIndex(anchorX, slot);
+        int index = indexOfVisibleLetter(letter);
+        if (index < 0) {
+            index = activeIndex;
+        }
+        if (index < 0 || index >= visibleLetters.length) {
+            return false;
+        }
+
+        boolean activeFocus = index == activeIndex;
+        float x = (slot * index) + (slot * 0.5f);
+        float baseTextSize = getTextSize();
+        float scale = interactionMode == InteractionMode.INLINE_EMPHASIS_TRACK
+            ? (activeFocus ? 1.14f : 1f)
+            : (1f + (0.34f * waveStrength));
+        letterPaint.setTextSize(baseTextSize * scale);
+        applyLetterWeight(activeFocus ? 1f : 0f, activeFocus);
+
+        Paint.FontMetrics fontMetrics = letterPaint.getFontMetrics();
+        float baseline = (getHeight() - getPaddingBottom() - dp(2) - fontMetrics.descent);
+        String label = String.valueOf(visibleLetters[index]);
+        float textWidth = Math.max(letterPaint.measureText(label), dp(8));
+        float glyphTop = baseline + fontMetrics.ascent;
+        float glyphBottom = baseline + fontMetrics.descent;
+        float padX = Math.max(dp(5), Math.min(dp(8), slot * 0.16f));
+        float padY = Math.max(dp(3), Math.min(dp(5), (glyphBottom - glyphTop) * 0.20f));
+        float glassLeft = Math.max(0f, x - (textWidth * 0.5f) - padX);
+        float glassRight = Math.min(getWidth(), x + (textWidth * 0.5f) + padX);
+        float glassTop = Math.max(0f, glyphTop - padY);
+        float glassBottom = Math.min(getHeight(), glyphBottom + padY);
 
         int[] loc = new int[2];
         getLocationOnScreen(loc);
-        out.set(loc[0] + left, loc[1] + top, loc[0] + right, loc[1] + bottom);
+        out.letter = visibleLetters[index];
+        out.centerRawX = loc[0] + x;
+        out.baselineRawY = loc[1] + baseline;
+        out.glyphBoundsRaw.set(
+            loc[0] + (x - (textWidth * 0.5f)),
+            loc[1] + glyphTop,
+            loc[0] + (x + (textWidth * 0.5f)),
+            loc[1] + glyphBottom
+        );
+        out.glassBoundsRaw.set(
+            loc[0] + glassLeft,
+            loc[1] + glassTop,
+            loc[0] + glassRight,
+            loc[1] + glassBottom
+        );
+        return true;
     }
 
     @Override
@@ -300,6 +342,7 @@ public final class AzScrubRowView extends AppCompatTextView {
                     animateWaveRelease();
                 } else {
                     waveStrength = 0f;
+                    activeTouchX = -1f;
                     invalidate();
                 }
                 return true;
@@ -310,6 +353,7 @@ public final class AzScrubRowView extends AppCompatTextView {
                     animateWaveRelease();
                 } else {
                     waveStrength = 0f;
+                    activeTouchX = -1f;
                     invalidate();
                 }
                 return true;
@@ -355,13 +399,25 @@ public final class AzScrubRowView extends AppCompatTextView {
         return -1;
     }
 
+    private int resolveActiveIndex(float anchorX, float slot) {
+        int activeIndex = (int) (anchorX / Math.max(1f, slot));
+        activeIndex = Math.max(0, Math.min(visibleLetters.length - 1, activeIndex));
+        if (interactionMode == InteractionMode.INLINE_EMPHASIS_TRACK && lockedInlineLetter != null) {
+            int lockedIndex = indexOfVisibleLetter(lockedInlineLetter);
+            if (lockedIndex >= 0) {
+                activeIndex = lockedIndex;
+            }
+        }
+        return activeIndex;
+    }
+
     private void updateInteractionLayerOffset() {
         setTranslationY(0f);
     }
 
     private void applyLetterWeight(float envelope, boolean active) {
         float influence = interactionMode == InteractionMode.INLINE_EMPHASIS_TRACK
-            ? (active ? 1f : Math.max(0f, Math.min(1f, envelope * 0.65f)))
+            ? (active ? 1f : 0f)
             : Math.max(0f, Math.min(1f, envelope * waveStrength));
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             int weight = (int) (420 + (influence * 380));

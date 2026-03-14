@@ -262,6 +262,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
     private final RectF mAppsRowRawBounds = new RectF();
     private final RectF mExtraKeysRawBounds = new RectF();
     private final RectF mAzFocusLetterRawBounds = new RectF();
+    private final AzScrubRowView.LetterVisualMetrics mAzLetterVisualMetrics = new AzScrubRowView.LetterVisualMetrics();
     private static final long AZ_EDGE_PAGE_INTERVAL_MS = 210L;
     private static final long AZ_PREVIEW_TIMEOUT_REFRESH_MS = 5200L;
 
@@ -1005,11 +1006,11 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         if (mAzScrubRowView == null || mSuggestionBarView == null) return;
         Set<Character> letters = new LinkedHashSet<>(mSuggestionBarView.getAvailableAzLetters());
         mAzScrubRowView.setVisibleLetters(letters);
-        int base = ContextCompat.getColor(this, R.color.menu_accent);
+        int base = resolveAzGestureAccentColor();
         int muted = mutedMonetShade(base);
         mAzScrubRowView.setTextColor(muted);
         mAzScrubRowView.setInteractionAccentColor(base);
-        mAzScrubRowView.setInteractionMode(AzScrubRowView.InteractionMode.WAVE_TRACK);
+        mAzScrubRowView.setInteractionMode(AzScrubRowView.InteractionMode.INLINE_EMPHASIS_TRACK);
         mAzScrubRowView.setLockedInlineLetter(null);
         if (mLauncherAzGestureFxView != null) {
             int orbColor = brightMonetShade(base);
@@ -1056,7 +1057,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         if (phase == AzScrubRowView.GesturePhase.DOWN) {
             mAzGestureMode = AzGestureMode.AZ_TRACKING;
             mAzHasLockedSelection = false;
-            mAzScrubRowView.setInteractionMode(AzScrubRowView.InteractionMode.WAVE_TRACK);
+            mAzScrubRowView.setInteractionMode(AzScrubRowView.InteractionMode.INLINE_EMPHASIS_TRACK);
             mAzScrubRowView.setLockedInlineLetter(null);
         }
 
@@ -1139,8 +1140,15 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
                 : LauncherAzGestureFxView.InteractionMode.LETTER_TRACK;
         RectF focusBounds;
         if (interactionMode == LauncherAzGestureFxView.InteractionMode.LETTER_TRACK && mAzScrubRowView != null) {
-            mAzScrubRowView.getLetterFocusBoundsOnScreen(Character.toUpperCase(activeLetter), mAzFocusLetterRawBounds);
-            focusBounds = mAzFocusLetterRawBounds.isEmpty() ? null : mAzFocusLetterRawBounds;
+            mAzLetterVisualMetrics.clear();
+            boolean hasMetrics = mAzScrubRowView.getLetterVisualMetricsOnScreen(Character.toUpperCase(activeLetter), mAzLetterVisualMetrics);
+            if (hasMetrics) {
+                mAzFocusLetterRawBounds.set(mAzLetterVisualMetrics.glassBoundsRaw);
+                focusBounds = mAzFocusLetterRawBounds;
+            } else {
+                mAzFocusLetterRawBounds.setEmpty();
+                focusBounds = null;
+            }
         } else {
             focusBounds = focusResult == null ? null : focusResult.iconBounds;
         }
@@ -1151,7 +1159,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
 
         float leftProximity = 0f;
         float rightProximity = 0f;
-        if (mSuggestionBarView != null) {
+        if (mSuggestionBarView != null && interactionMode == LauncherAzGestureFxView.InteractionMode.ICON_TRACK_LOCKED) {
             int[] loc = new int[2];
             mSuggestionBarView.getLocationOnScreen(loc);
             float localX = mAzLastRawX - loc[0];
@@ -1262,7 +1270,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         mAzHasLockedSelection = false;
         mAzCurrentFocusResult = null;
         if (mAzScrubRowView != null) {
-            mAzScrubRowView.setInteractionMode(AzScrubRowView.InteractionMode.WAVE_TRACK);
+            mAzScrubRowView.setInteractionMode(AzScrubRowView.InteractionMode.INLINE_EMPHASIS_TRACK);
             mAzScrubRowView.setLockedInlineLetter(null);
         }
         if (mLauncherAzGestureFxView != null) {
@@ -1275,6 +1283,19 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
 
     private float dpToPx(int dp) {
         return dp * getResources().getDisplayMetrics().density;
+    }
+
+    private int resolveAzGestureAccentColor() {
+        int fallback = ContextCompat.getColor(this, R.color.main_accent);
+        try {
+            if (mPreferences != null
+                && (mPreferences.isMonetBackgroundEnabled() || mPreferences.isMonetOverlayEnabled())
+                && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                return ContextCompat.getColor(this, android.R.color.system_accent1_500);
+            }
+        } catch (Exception ignored) {
+        }
+        return fallback;
     }
 
     private int mutedMonetShade(int color) {
