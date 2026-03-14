@@ -241,10 +241,19 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
 
     private float mTerminalToolbarDefaultHeight;
     private final Handler mAzGestureHandler = new Handler(Looper.getMainLooper());
+    private enum AzGestureMode {
+        IDLE,
+        AZ_TRACKING,
+        ICON_TRACKING_LOCKED
+    }
+    @NonNull private AzGestureMode mAzGestureMode = AzGestureMode.IDLE;
     @Nullable private Runnable mAzEdgePagingRunnable;
     @Nullable private SuggestionBarView.AzDragFocusResult mAzCurrentFocusResult;
     @Nullable private Runnable mAzOverflowRefreshRunnable;
     private boolean mAzGestureActive = false;
+    private char mAzLockedLetter = '#';
+    private int mAzLockedSelectionIndex = 0;
+    private boolean mAzHasLockedSelection = false;
     private float mAzLastRawX = 0f;
     private float mAzLastRawY = 0f;
     private float mAzLastAnchorRawX = 0f;
@@ -1038,6 +1047,11 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
             return;
         }
 
+        if (phase == AzScrubRowView.GesturePhase.DOWN) {
+            mAzGestureMode = AzGestureMode.AZ_TRACKING;
+            mAzHasLockedSelection = false;
+        }
+
         mAzLastRawX = rawX;
         mAzLastRawY = rawY;
         int[] azLoc = new int[2];
@@ -1054,11 +1068,24 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
 
         mAzGestureActive = true;
         cancelAzOverflowRefresh();
-        mSuggestionBarView.persistAzPreview(letter, selectionIndex);
+        float lockThreshold = -(mAzScrubRowView.getHeight() * 0.16f);
+        boolean enteringIconTrack = touchY <= lockThreshold;
+
+        if (mAzGestureMode == AzGestureMode.AZ_TRACKING) {
+            mSuggestionBarView.persistAzPreview(letter, selectionIndex);
+            if (enteringIconTrack) {
+                mAzGestureMode = AzGestureMode.ICON_TRACKING_LOCKED;
+                mAzLockedLetter = letter;
+                mAzLockedSelectionIndex = selectionIndex;
+                mAzHasLockedSelection = true;
+            }
+        } else if (mAzGestureMode == AzGestureMode.ICON_TRACKING_LOCKED && mAzHasLockedSelection) {
+            mSuggestionBarView.persistAzPreview(mAzLockedLetter, mAzLockedSelectionIndex);
+        }
         updateAzOverflowAffordance();
 
         SuggestionBarView.AzDragFocusResult focusResult = null;
-        if (touchY < 0f || phase == AzScrubRowView.GesturePhase.UP) {
+        if (mAzGestureMode == AzGestureMode.ICON_TRACKING_LOCKED || (phase == AzScrubRowView.GesturePhase.UP && touchY < 0f)) {
             focusResult = mSuggestionBarView.resolveAzDragFocus(rawX, rawY);
             mAzCurrentFocusResult = focusResult;
         } else {
@@ -1070,7 +1097,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
 
         if (phase == AzScrubRowView.GesturePhase.UP) {
             boolean launched = false;
-            if (focusResult != null && focusResult.hasFocusEntry()) {
+            if (mAzGestureMode == AzGestureMode.ICON_TRACKING_LOCKED && focusResult != null && focusResult.hasFocusEntry()) {
                 if (mLauncherAzGestureFxView != null) {
                     mLauncherAzGestureFxView.playLaunchBloom(rawX, rawY);
                 }
@@ -1088,6 +1115,10 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         if (mLauncherAzGestureFxView == null) {
             return;
         }
+        LauncherAzGestureFxView.InteractionMode interactionMode =
+            mAzGestureMode == AzGestureMode.ICON_TRACKING_LOCKED
+                ? LauncherAzGestureFxView.InteractionMode.ICON_TRACK_LOCKED
+                : LauncherAzGestureFxView.InteractionMode.LETTER_TRACK;
         RectF focusBounds = focusResult == null ? null : focusResult.iconBounds;
         boolean overflowActive = mSuggestionBarView != null && mSuggestionBarView.hasAzOverflowPages();
         boolean canLeft = mSuggestionBarView != null && mSuggestionBarView.canAzPageLeft();
@@ -1117,7 +1148,8 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
             true,
             mAzLastAnchorRawX,
             mAzLastAnchorRawY,
-            focusBounds
+            focusBounds,
+            interactionMode
         );
     }
 
@@ -1131,7 +1163,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
 
     private void updateAzEdgePagingLoop(@Nullable SuggestionBarView.AzDragFocusResult focusResult) {
         stopAzEdgePagingLoop();
-        if (!mAzGestureActive || focusResult == null) {
+        if (!mAzGestureActive || mAzGestureMode != AzGestureMode.ICON_TRACKING_LOCKED || focusResult == null) {
             return;
         }
         if (focusResult.edge != SuggestionBarView.AZ_EDGE_LEFT && focusResult.edge != SuggestionBarView.AZ_EDGE_RIGHT) {
@@ -1186,6 +1218,10 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         stopAzEdgePagingLoop();
         cancelAzOverflowRefresh();
         mAzGestureActive = false;
+        mAzGestureMode = AzGestureMode.IDLE;
+        mAzLockedLetter = '#';
+        mAzLockedSelectionIndex = 0;
+        mAzHasLockedSelection = false;
         mAzCurrentFocusResult = null;
         if (mLauncherAzGestureFxView != null) {
             mLauncherAzGestureFxView.clearDrag(keepOverflowAffordance);
