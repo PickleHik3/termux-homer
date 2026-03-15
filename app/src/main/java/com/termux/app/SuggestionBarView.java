@@ -426,7 +426,25 @@ public final class SuggestionBarView extends GridLayout {
                 viewLoc[1] + launchView.getHeight()
             );
         }
+        if (bounds == null) {
+            bounds = approximateAzSlotIconBounds(slot, azRenderedSlotCount, location, width, height);
+        }
         return new AzDragFocusResult(entry, bounds, launchView, edge, pageLeft, pageRight);
+    }
+
+    @NonNull
+    private RectF approximateAzSlotIconBounds(int slot, int slotCount, @NonNull int[] rowLocation, float width, float height) {
+        float safeSlotCount = Math.max(1, slotCount);
+        float slotWidth = width / safeSlotCount;
+        float cx = (slotWidth * slot) + (slotWidth * 0.5f);
+        float cy = height * 0.5f;
+        float size = iconSizePx();
+        return new RectF(
+            rowLocation[0] + cx - (size * 0.5f),
+            rowLocation[1] + cy - (size * 0.5f),
+            rowLocation[0] + cx + (size * 0.5f),
+            rowLocation[1] + cy + (size * 0.5f)
+        );
     }
 
     public boolean launchAzFocusedEntry(@Nullable AzDragFocusResult focusResult) {

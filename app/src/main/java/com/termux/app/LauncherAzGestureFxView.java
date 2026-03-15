@@ -386,8 +386,10 @@ public final class LauncherAzGestureFxView extends View {
         } else {
             float cx = displayRawX - locationOnScreen[0];
             float cy = displayRawY - locationOnScreen[1];
-            tmpRect.set(cx - dp(7f), cy - dp(7f), cx + dp(7f), cy + dp(7f));
-            drawGlassBody(canvas, tmpRect, dp(7f), 0.34f, 0.18f);
+            float halfW = dp(17f);
+            float halfH = dp(17f);
+            tmpRect.set(cx - halfW, cy - halfH, cx + halfW, cy + halfH);
+            drawGlassBody(canvas, tmpRect, dp(12f), 0.56f, 0.24f);
         }
         if (save >= 0) {
             canvas.restoreToCount(save);
@@ -458,6 +460,27 @@ public final class LauncherAzGestureFxView extends View {
     }
 
     private void drawEdgeCapsule(Canvas canvas, float left, float top, float right, float bottom, float radius, float intensity) {
+        RectF glow = new RectF(left, top, right, bottom);
+        float spreadX = Math.max(dp(16f), (right - left) * 2.0f);
+        float spreadY = Math.max(dp(8f), (bottom - top) * 0.34f);
+        boolean rightEdge = right >= (getWidth() * 0.5f);
+        if (rightEdge) {
+            glow.left -= spreadX * 0.22f;
+            glow.right += spreadX;
+        } else {
+            glow.left -= spreadX;
+            glow.right += spreadX * 0.22f;
+        }
+        glow.top -= spreadY;
+        glow.bottom += spreadY;
+        edgePaint.setColor(withAlpha(edgeTintColor, (int) (86f * intensity)));
+        canvas.drawRoundRect(glow, radius + spreadY, radius + spreadY, edgePaint);
+
+        RectF glowCore = new RectF(glow);
+        glowCore.inset(spreadX * 0.28f, spreadY * 0.22f);
+        edgePaint.setColor(withAlpha(edgeTintColor, (int) (58f * intensity)));
+        canvas.drawRoundRect(glowCore, radius + (spreadY * 0.5f), radius + (spreadY * 0.5f), edgePaint);
+
         tmpRect.set(left, top, right, bottom);
         edgePaint.setColor(withAlpha(edgeTintColor, (int) (168f * intensity)));
         canvas.drawRoundRect(tmpRect, radius, radius, edgePaint);

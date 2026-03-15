@@ -1010,7 +1010,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         int muted = mutedMonetShade(base);
         mAzScrubRowView.setTextColor(muted);
         mAzScrubRowView.setInteractionAccentColor(base);
-        mAzScrubRowView.setInteractionMode(AzScrubRowView.InteractionMode.INLINE_EMPHASIS_TRACK);
+        mAzScrubRowView.setInteractionMode(AzScrubRowView.InteractionMode.WAVE_TRACK);
         mAzScrubRowView.setLockedInlineLetter(null);
         if (mLauncherAzGestureFxView != null) {
             int orbColor = brightMonetShade(base);
@@ -1057,7 +1057,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         if (phase == AzScrubRowView.GesturePhase.DOWN) {
             mAzGestureMode = AzGestureMode.AZ_TRACKING;
             mAzHasLockedSelection = false;
-            mAzScrubRowView.setInteractionMode(AzScrubRowView.InteractionMode.INLINE_EMPHASIS_TRACK);
+            mAzScrubRowView.setInteractionMode(AzScrubRowView.InteractionMode.WAVE_TRACK);
             mAzScrubRowView.setLockedInlineLetter(null);
         }
 
@@ -1270,7 +1270,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         mAzHasLockedSelection = false;
         mAzCurrentFocusResult = null;
         if (mAzScrubRowView != null) {
-            mAzScrubRowView.setInteractionMode(AzScrubRowView.InteractionMode.INLINE_EMPHASIS_TRACK);
+            mAzScrubRowView.setInteractionMode(AzScrubRowView.InteractionMode.WAVE_TRACK);
             mAzScrubRowView.setLockedInlineLetter(null);
         }
         if (mLauncherAzGestureFxView != null) {

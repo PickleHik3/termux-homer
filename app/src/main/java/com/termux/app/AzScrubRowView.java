@@ -253,15 +253,23 @@ public final class AzScrubRowView extends AppCompatTextView {
 
         boolean activeFocus = index == activeIndex;
         float x = (slot * index) + (slot * 0.5f);
+        float distance = Math.abs(x - anchorX) / Math.max(1f, slot);
+        float envelope = (float) Math.exp(-(distance * distance) * 0.85f);
+        float waveLift = interactionMode == InteractionMode.INLINE_EMPHASIS_TRACK
+            ? 0f
+            : (float) Math.sin(Math.min(1f, envelope) * (Math.PI * 0.5f)) * (dp(15) * waveStrength);
+        if (activeFocus && interactionMode != InteractionMode.INLINE_EMPHASIS_TRACK) {
+            waveLift *= 1.2f;
+        }
         float baseTextSize = getTextSize();
         float scale = interactionMode == InteractionMode.INLINE_EMPHASIS_TRACK
             ? (activeFocus ? 1.14f : 1f)
-            : (1f + (0.34f * waveStrength));
+            : (1f + (0.34f * envelope * waveStrength));
         letterPaint.setTextSize(baseTextSize * scale);
-        applyLetterWeight(activeFocus ? 1f : 0f, activeFocus);
+        applyLetterWeight(envelope, activeFocus);
 
         Paint.FontMetrics fontMetrics = letterPaint.getFontMetrics();
-        float baseline = (getHeight() - getPaddingBottom() - dp(2) - fontMetrics.descent);
+        float baseline = (getHeight() - getPaddingBottom() - dp(2) - fontMetrics.descent) - waveLift;
         String label = String.valueOf(visibleLetters[index]);
         float textWidth = Math.max(letterPaint.measureText(label), dp(8));
         float glyphTop = baseline + fontMetrics.ascent;
